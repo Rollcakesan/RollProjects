@@ -1,0 +1,24 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" /><meta name="theme-color" content="#f2f0e8" />
+    <meta name="description" content="e-Gov法令APIを使って、法令名や条文をキーワード検索できます。" />
+    <link rel="canonical" href="https://jinfo.rollprojects.com/laws" /><link rel="icon" href="/favicon.svg" type="image/svg+xml" /><link rel="stylesheet" href="/styles.css?v=6" />
+    <title>法令検索｜e-Gov法令API｜JInfo</title>
+  </head>
+  <body data-page="laws">
+    <a class="skip-link" href="#main">本文へ移動</a>
+    <header class="app-header"><a class="brand" href="/"><span class="brand-symbol">J</span><span><strong>INFO</strong><small>公共情報ツール</small></span></a><nav class="app-nav"><a href="/">防災</a><a class="active" href="/laws">法令</a><a href="/map">地図</a><a href="/datasets">行政データ</a><a href="/books">図書</a></nav><div class="live-clock"><span class="live-dot"></span><span id="current-time">JST --:--</span></div></header>
+    <main class="app-main" id="main">
+      <section class="page-heading"><div><p class="eyebrow">e-Gov 法令API Version 2</p><h1>法令検索</h1></div><p>法令名や条文のキーワードから、該当箇所と最新の法令情報を検索します。</p></section>
+      <form class="search-panel" id="law-form"><label for="law-query">法令名・条文キーワード</label><div class="search-row"><input id="law-query" name="q" type="search" value="個人情報" maxlength="80" autocomplete="off" /><button type="submit">検索 <span>→</span></button></div><div class="suggestions"><span>例</span><button type="button" data-target="law-query">著作権</button><button type="button" data-target="law-query">労働時間</button><button type="button" data-target="law-query">災害対策</button></div></form>
+      <div class="filter-toolbar" aria-label="法令検索の表示設定">
+        <label>種類<select id="law-type-filter"><option value="all">すべて</option><option value="法律">法律</option><option value="政令">政令</option><option value="府省令">府省令</option><option value="規則">規則</option><option value="other">その他</option></select></label>
+        <label>並び順<select id="law-sort"><option value="relevance">関連度順</option><option value="updated-desc" selected>更新日の新しい順</option><option value="promulgated-desc">公布日の新しい順</option><option value="title">法令名順</option></select></label>
+        <label>取得件数<select id="law-limit"><option value="12">12件</option><option value="25" selected>25件</option><option value="50">50件</option><option value="100">100件</option></select></label>
+      </div>
+      <div class="result-status" id="law-status" aria-live="polite">検索しています。</div><div class="result-list law-results" id="law-results"></div>
+    </main>
+    <footer class="app-footer"><span>JInfo by RollProjects</span><span>出典：e-Gov法令検索</span></footer><script src="/app.js?v=6" type="module"></script>
+  </body>
+</html>

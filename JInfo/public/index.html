@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#101827" />
+    <meta name="robots" content="index, follow, max-image-preview:large" />
+    <meta name="description" content="気象庁が発表する警報・注意報、地震、津波、火山などの最新防災情報を見やすく確認できます。" />
+    <link rel="canonical" href="https://jinfo.rollprojects.com/" />
+    <meta property="og:title" content="防災情報｜JInfo" />
+    <meta property="og:description" content="気象庁の最新防災情報を、種類ごとに見やすく確認。" />
+    <meta property="og:type" content="website" />
+    <meta property="og:url" content="https://jinfo.rollprojects.com/" />
+    <meta property="og:image" content="https://jinfo.rollprojects.com/og-image.svg" />
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <link rel="manifest" href="/site.webmanifest" />
+    <link rel="stylesheet" href="/styles.css?v=4" />
+    <title>防災情報｜警報・地震・津波・火山を確認｜JInfo</title>
+  </head>
+  <body data-page="weather">
+    <a class="skip-link" href="#main">本文へ移動</a>
+    <header class="app-header">
+      <a class="brand" href="/" aria-label="JInfo 防災情報"><span class="brand-symbol">J</span><span><strong>INFO</strong><small>公共情報ツール</small></span></a>
+      <nav class="app-nav" aria-label="機能一覧">
+        <a class="active" href="/">防災</a><a href="/laws">法令</a><a href="/map">地図</a><a href="/datasets">行政データ</a><a href="/books">図書</a>
+      </nav>
+      <div class="live-clock"><span class="live-dot"></span><span id="current-time">JST --:--</span></div>
+    </header>
+
+    <main class="app-main" id="main">
+      <section class="page-heading weather-page-heading">
+        <div><p class="eyebrow">気象庁 防災情報XML</p><h1>防災情報</h1></div>
+        <p>警報・注意報、地震・津波、火山など、気象庁が発表した情報を新しい順に表示します。</p>
+      </section>
+
+      <section class="weather-dashboard" aria-labelledby="weather-list-title">
+        <div class="weather-toolbar light-toolbar">
+          <div class="feed-tabs light-tabs" role="tablist" aria-label="防災情報の種類">
+            <button type="button" class="active" data-feed="extra">警報・注意報</button>
+            <button type="button" data-feed="eqvol">地震・火山</button>
+            <button type="button" data-feed="regular">定時情報</button>
+            <button type="button" data-feed="other">その他</button>
+          </div>
+          <button class="refresh-button light-refresh" type="button" id="weather-refresh">↻ 更新</button>
+        </div>
+        <div class="result-status" id="weather-status" aria-live="polite">最新情報を読み込んでいます。</div>
+        <h2 class="visually-hidden" id="weather-list-title">最新の防災情報</h2>
+        <div class="weather-list weather-list-light" id="weather-results"></div>
+      </section>
+
+      <aside class="source-guidance">
+        <strong>情報について</strong>
+        <p>表示内容は気象庁の公開XMLを整形したものです。避難など重要な判断では、自治体や気象庁の最新発表も確認してください。</p>
+        <a href="https://www.jma.go.jp/bosai/" target="_blank" rel="noreferrer">気象庁 防災情報 ↗</a>
+      </aside>
+    </main>
+
+    <footer class="app-footer"><span>JInfo by RollProjects</span><span>出典：気象庁</span></footer>
+    <script src="/app.js?v=4" type="module"></script>
+  </body>
+</html>

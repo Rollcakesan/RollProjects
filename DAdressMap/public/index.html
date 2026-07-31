@@ -1,0 +1,284 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#f6f2e9" />
+    <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1" />
+    <meta name="author" content="RollProjects" />
+    <meta
+      name="description"
+      content="日本郵便の7桁のデジタルアドレスまたは郵便番号から住所を検索し、Google マップ上の位置を確認できる無料の住所検索ツールです。"
+    />
+    <link rel="canonical" href="https://daddressmap.rollprojects.com/" />
+    <link rel="alternate" hreflang="ja" href="https://daddressmap.rollprojects.com/" />
+    <meta property="og:title" content="デジタルアドレスマップ｜7桁から住所検索" />
+    <meta
+      property="og:description"
+      content="デジタルアドレスや郵便番号から住所を検索し、Google マップで場所をすぐ確認できます。"
+    />
+    <meta property="og:type" content="website" />
+    <meta property="og:locale" content="ja_JP" />
+    <meta property="og:site_name" content="デジタルアドレスマップ" />
+    <meta property="og:url" content="https://daddressmap.rollprojects.com/" />
+    <meta property="og:image" content="https://daddressmap.rollprojects.com/og-image.png" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:image:alt" content="デジタルアドレスマップ — 7桁から、場所がひらく。" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="デジタルアドレスマップ｜7桁から住所検索" />
+    <meta
+      name="twitter:description"
+      content="デジタルアドレスや郵便番号から住所を検索し、Google マップで場所をすぐ確認できます。"
+    />
+    <meta name="twitter:image" content="https://daddressmap.rollprojects.com/og-image.png" />
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <link rel="manifest" href="/site.webmanifest" />
+    <link rel="stylesheet" href="/styles.css" />
+    <title>デジタルアドレスマップ｜7桁のデジタルアドレス・郵便番号から住所検索</title>
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@type": "WebApplication",
+        "name": "デジタルアドレスマップ",
+        "url": "https://daddressmap.rollprojects.com/",
+        "description": "7桁のデジタルアドレスまたは郵便番号から住所を検索し、地図で確認できる無料の住所検索ツールです。",
+        "applicationCategory": "UtilitiesApplication",
+        "operatingSystem": "Any",
+        "inLanguage": "ja-JP",
+        "isAccessibleForFree": true,
+        "offers": {
+          "@type": "Offer",
+          "price": "0",
+          "priceCurrency": "JPY"
+        },
+        "provider": {
+          "@type": "Organization",
+          "name": "RollProjects",
+          "url": "https://rollprojects.com/"
+        }
+      }
+    </script>
+  </head>
+  <body>
+    <div class="page-glow page-glow-left" aria-hidden="true"></div>
+    <div class="page-glow page-glow-right" aria-hidden="true"></div>
+
+    <header class="site-header">
+      <a class="brand" href="/" aria-label="デジタルアドレスマップ ホーム">
+        <span class="brand-mark" aria-hidden="true">
+          <svg viewBox="0 0 48 48" role="img">
+            <path d="M24 5.5c-8.1 0-14.6 6.3-14.6 14.1 0 10.3 14.6 22.9 14.6 22.9s14.6-12.6 14.6-22.9C38.6 11.8 32.1 5.5 24 5.5Z" />
+            <path class="brand-mark-line" d="m16.5 21.7 5-5 4.4 4.4 6.1-6.1" />
+            <circle class="brand-mark-dot" cx="32" cy="15" r="2.2" />
+          </svg>
+        </span>
+        <span>
+          <strong>デジタルアドレス</strong>
+          <small>MAP</small>
+        </span>
+      </a>
+      <div class="header-status" id="api-status">
+        <span class="status-dot" aria-hidden="true"></span>
+        <span>準備中</span>
+      </div>
+    </header>
+
+    <main>
+      <section class="hero" aria-labelledby="hero-title">
+        <div class="eyebrow"><span>7 characters</span><i></i><span>1 place</span></div>
+        <h1 id="hero-title">7桁から、<br /><em>場所がひらく。</em></h1>
+        <p class="hero-copy">
+          デジタルアドレス・郵便番号・住所から相互検索。<br />住所、事業者情報、地図をひとつの画面ですぐ確認できます。
+        </p>
+
+        <div class="search-mode-tabs" role="tablist" aria-label="検索方法">
+          <button type="button" role="tab" aria-selected="true" data-search-mode="code">コードから探す</button>
+          <button type="button" role="tab" aria-selected="false" data-search-mode="address">住所から探す</button>
+        </div>
+
+        <form class="search-form" id="search-form" novalidate>
+          <label for="address-code" id="search-label">デジタルアドレス・郵便番号</label>
+          <div class="search-box" id="search-box">
+            <span class="search-prefix" id="search-prefix" aria-hidden="true">@</span>
+            <input
+              id="address-code"
+              name="query"
+              type="text"
+              maxlength="120"
+              autocomplete="off"
+              autocapitalize="characters"
+              spellcheck="false"
+              placeholder="A7E-2FK2"
+              aria-describedby="search-hint"
+            />
+            <button type="submit" id="search-button">
+              <span>地図で見る</span>
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 18 6-6-6-6" /></svg>
+            </button>
+          </div>
+          <div class="search-meta">
+            <p id="search-hint">郵便番号は3桁から、デジタルアドレスは7桁で検索できます</p>
+            <div class="sample-list" id="sample-list" aria-label="検索サンプル">
+              <span>Sample</span>
+              <button type="button" data-code="A7E-2FK2">東京</button>
+              <button type="button" data-code="JN4-LKS2">大阪</button>
+              <button type="button" data-code="QN6-GQX1">福岡</button>
+            </div>
+          </div>
+        </form>
+        <div class="notice" id="notice" role="status" aria-live="polite" hidden></div>
+      </section>
+
+      <section class="workspace" aria-label="検索結果">
+        <div class="map-card">
+          <div class="map-toolbar">
+            <div>
+              <span class="map-kicker">Google Maps</span>
+              <strong id="map-title">日本全国から検索</strong>
+            </div>
+            <button class="map-expand" id="open-map-button" type="button" disabled>
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14 5h5v5M19 5l-7 7M10 19H5v-5M5 19l7-7" /></svg>
+              大きな地図
+            </button>
+          </div>
+          <div class="map" id="map" aria-label="検索した住所の地図">
+            <div class="map-placeholder" id="map-placeholder">
+              <div class="map-pin-pulse">
+                <span></span>
+                <svg viewBox="0 0 48 48" aria-hidden="true">
+                  <path d="M24 5.5c-8.1 0-14.6 6.3-14.6 14.1 0 10.3 14.6 22.9 14.6 22.9s14.6-12.6 14.6-22.9C38.6 11.8 32.1 5.5 24 5.5Z" />
+                  <circle cx="24" cy="19.5" r="5.2" />
+                </svg>
+              </div>
+              <strong>コードを入力して場所を表示</strong>
+              <span>地図は検索後にここへ表示されます</span>
+            </div>
+          </div>
+        </div>
+
+        <aside class="result-card" id="result-card">
+          <div class="result-empty" id="result-empty">
+            <span class="result-index">01</span>
+            <div class="result-empty-icon" aria-hidden="true">
+              <svg viewBox="0 0 64 64"><path d="M13 16h38v36H13z" /><path d="M20 9v14M44 9v14M13 26h38M21 36h9M21 43h19" /></svg>
+            </div>
+            <h2>住所の詳細</h2>
+            <p>検索すると、郵便番号・住所・建物名などの情報を整理して表示します。</p>
+          </div>
+
+          <div class="result-content" id="result-content" hidden>
+            <div class="result-heading">
+              <div>
+                <span class="result-label" id="result-type">Digital Address</span>
+                <h2 id="result-code">A7E-2FK2</h2>
+              </div>
+              <span class="source-badge" id="source-badge">日本郵便API</span>
+            </div>
+
+            <div class="address-primary">
+              <span id="result-postal">〒100-0005</span>
+              <h3 id="result-address">東京都千代田区丸の内2丁目7-2</h3>
+              <p id="result-building" hidden></p>
+            </div>
+
+            <dl class="address-grid">
+              <div><dt>都道府県</dt><dd id="result-prefecture">東京都</dd></div>
+              <div><dt>市区町村</dt><dd id="result-city">千代田区</dd></div>
+              <div><dt>町域・番地</dt><dd id="result-town">丸の内2丁目7-2</dd></div>
+              <div id="kana-row" hidden><dt>カナ</dt><dd id="result-kana"></dd></div>
+              <div id="roman-row" hidden><dt>ローマ字</dt><dd id="result-roman"></dd></div>
+            </dl>
+
+            <section class="business-panel" id="business-panel" hidden aria-labelledby="business-title">
+              <span>Business information</span>
+              <h3 id="business-title">事業者情報</h3>
+              <strong id="result-business"></strong>
+              <small id="result-business-kana" hidden></small>
+              <dl class="business-grid">
+                <div id="corporate-row" hidden><dt>法人番号</dt><dd id="result-corporate"></dd></div>
+                <div id="telephone-row" hidden><dt>電話番号</dt><dd><a id="result-telephone"></a></dd></div>
+                <div id="website-row" hidden><dt>Webサイト</dt><dd><a id="result-website" target="_blank" rel="noreferrer">サイトを開く</a></dd></div>
+                <div id="usage-row" hidden><dt>用途</dt><dd id="result-usage"></dd></div>
+              </dl>
+              <div class="entrance-section" id="entrance-section" hidden>
+                <span>登録された入口</span>
+                <div id="entrance-list"></div>
+              </div>
+            </section>
+
+            <div class="result-actions">
+              <button type="button" class="button-primary" id="copy-button">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 8h11v11H8z" /><path d="M5 16H4V5h11v1" /></svg>
+                住所をコピー
+              </button>
+              <button type="button" class="button-secondary" id="share-button">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="18" cy="5" r="2.5" /><circle cx="6" cy="12" r="2.5" /><circle cx="18" cy="19" r="2.5" /><path d="m8.2 10.8 7.5-4.4M8.2 13.2l7.5 4.4" /></svg>
+                共有
+              </button>
+            </div>
+          </div>
+        </aside>
+      </section>
+
+      <section class="candidate-section" id="candidate-section" hidden aria-labelledby="candidate-title">
+        <div class="section-heading">
+          <div><span>Matches</span><h2 id="candidate-title">検索候補</h2></div>
+          <p id="candidate-summary"></p>
+        </div>
+        <div class="candidate-list" id="candidate-list"></div>
+      </section>
+
+      <section class="history-section" id="history-section" hidden>
+        <div class="section-heading">
+          <div><span>Recent</span><h2>最近の検索</h2></div>
+          <button type="button" id="clear-history">履歴を消去</button>
+        </div>
+        <div class="history-list" id="history-list"></div>
+      </section>
+
+      <section class="feature-section" aria-labelledby="feature-title">
+        <div class="feature-intro">
+          <span>Less typing, more moving.</span>
+          <h2 id="feature-title">住所を探す時間を、<br />もっと短く。</h2>
+        </div>
+        <div class="feature-grid">
+          <article>
+            <span>01</span>
+            <svg viewBox="0 0 48 48" aria-hidden="true"><path d="M8 12h32v24H8z" /><path d="M14 19h20M14 25h12M14 31h16" /></svg>
+            <h3>住所を相互検索</h3>
+            <p>デジタルアドレス・郵便番号から住所へ、住所から郵便番号へ検索。</p>
+          </article>
+          <article>
+            <span>02</span>
+            <svg viewBox="0 0 48 48" aria-hidden="true"><path d="M24 5.5c-7.3 0-13.2 5.7-13.2 12.8 0 9.3 13.2 20.7 13.2 20.7s13.2-11.4 13.2-20.7C37.2 11.2 31.3 5.5 24 5.5Z" /><circle cx="24" cy="18" r="4" /></svg>
+            <h3>事業者情報まで確認</h3>
+            <p>カナ・ローマ字に加え、対応する事業者の法人番号や入口情報も表示。</p>
+          </article>
+          <article>
+            <span>03</span>
+            <svg viewBox="0 0 48 48" aria-hidden="true"><path d="M17 18h22v22H17z" /><path d="M11 32H8V10h22v3" /><path d="m23 29 4 4 7-8" /></svg>
+            <h3>コピー＆共有</h3>
+            <p>確認した住所はワンタップでコピー。URLで相手に共有できます。</p>
+          </article>
+        </div>
+      </section>
+    </main>
+
+    <footer>
+      <div class="footer-brand">
+        <img src="/favicon.svg" alt="" width="36" height="36" />
+        <div><strong>デジタルアドレスマップ</strong><span>A RollProjects service</span></div>
+      </div>
+      <p>
+        住所検索には日本郵便「郵便番号・デジタルアドレスAPI」、地図表示にはGoogle Maps Platformを利用します。<br />入力したコードや住所を本サービスのデータベースへ保存することはありません。
+      </p>
+      <a href="https://guide-biz.da.pf.japanpost.jp/api/" target="_blank" rel="noreferrer">APIについて</a>
+    </footer>
+
+    <div class="loading-overlay" id="loading-overlay" hidden aria-hidden="true">
+      <div class="loader"><i></i><i></i><i></i></div>
+    </div>
+    <script src="/app.js" type="module"></script>
+  </body>
+</html>

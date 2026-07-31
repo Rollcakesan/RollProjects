@@ -1,0 +1,45 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630" role="img" aria-labelledby="title description">
+  <title id="title">デジタルアドレスマップ</title>
+  <desc id="description">7桁から、場所がひらく。</desc>
+  <defs>
+    <linearGradient id="background" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#f8f4eb" />
+      <stop offset="1" stop-color="#eee7d8" />
+    </linearGradient>
+    <radialGradient id="glow" cx="50%" cy="50%" r="50%">
+      <stop offset="0" stop-color="#dc6549" stop-opacity=".22" />
+      <stop offset="1" stop-color="#dc6549" stop-opacity="0" />
+    </radialGradient>
+    <filter id="shadow" x="-40%" y="-40%" width="180%" height="180%">
+      <feDropShadow dx="0" dy="18" stdDeviation="20" flood-color="#123d30" flood-opacity=".2" />
+    </filter>
+  </defs>
+  <rect width="1200" height="630" fill="url(#background)" />
+  <circle cx="1055" cy="72" r="330" fill="url(#glow)" />
+  <path d="M738 0h462v630H820c-68-78-91-169-69-273 26-122 12-238-13-357Z" fill="#174c3a" />
+  <g opacity=".18" fill="none" stroke="#f8f4eb" stroke-width="3">
+    <path d="M770 120c92 52 153 51 236-4 67-44 126-44 194-14" />
+    <path d="M758 236c112 48 191 37 264-26 60-52 119-59 178-36" />
+    <path d="M765 362c96 37 177 20 248-52 63-64 125-77 187-57" />
+    <path d="M798 489c78 22 146 2 207-61 62-63 127-83 195-59" />
+  </g>
+  <g transform="translate(74 68)">
+    <path d="M34 0C15.2 0 0 14.7 0 32.9 0 56.9 34 86 34 86s34-29.1 34-53.1C68 14.7 52.8 0 34 0Z" fill="#dc6549" />
+    <circle cx="34" cy="32" r="12" fill="#f8f4eb" />
+    <text x="91" y="31" fill="#174c3a" font-family="Hiragino Sans, Noto Sans JP, sans-serif" font-size="29" font-weight="700">デジタルアドレス</text>
+    <text x="91" y="62" fill="#6b756f" font-family="Arial, sans-serif" font-size="18" font-weight="700" letter-spacing="7">MAP</text>
+  </g>
+  <g transform="translate(74 223)" font-family="Hiragino Sans, Noto Sans JP, sans-serif">
+    <text x="0" y="0" fill="#174c3a" font-size="72" font-weight="800">7桁から、</text>
+    <text x="0" y="91" fill="#dc6549" font-size="82" font-weight="800">場所がひらく。</text>
+    <text x="4" y="159" fill="#52635c" font-size="25">デジタルアドレス・郵便番号から住所を検索</text>
+    <text x="4" y="243" fill="#174c3a" font-family="Arial, sans-serif" font-size="20" font-weight="700" letter-spacing="1">daddressmap.rollprojects.com</text>
+  </g>
+  <g transform="translate(850 130)" filter="url(#shadow)">
+    <rect width="254" height="370" rx="34" fill="#f8f4eb" />
+    <path d="M34 84h186M34 124h120M34 290h186" stroke="#d9d4c9" stroke-width="4" stroke-linecap="round" />
+    <path d="M127 132c-46 0-83 36-83 80 0 59 83 130 83 130s83-71 83-130c0-44-37-80-83-80Z" fill="#dc6549" />
+    <circle cx="127" cy="210" r="28" fill="#f8f4eb" />
+    <rect x="34" y="34" width="134" height="18" rx="9" fill="#174c3a" />
+  </g>
+</svg>

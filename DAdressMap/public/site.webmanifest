@@ -1,0 +1,21 @@
+{
+  "name": "デジタルアドレスマップ",
+  "short_name": "DAdressMap",
+  "description": "デジタルアドレスと郵便番号を地図で確認",
+  "id": "/",
+  "start_url": "/",
+  "scope": "/",
+  "lang": "ja",
+  "categories": ["utilities", "navigation"],
+  "display": "standalone",
+  "background_color": "#f6f2e9",
+  "theme_color": "#184f3b",
+  "icons": [
+    {
+      "src": "/favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

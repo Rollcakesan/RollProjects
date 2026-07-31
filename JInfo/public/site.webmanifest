@@ -1,0 +1,13 @@
+{
+  "name": "JInfo｜日本公共情報ポータル",
+  "short_name": "JInfo",
+  "description": "防災・法令・地図・行政データ・図書を確認できる公共情報ツール",
+  "lang": "ja",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#f2f0e8",
+  "theme_color": "#151d2c",
+  "icons": [
+    { "src": "/favicon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }
+  ]
+}
