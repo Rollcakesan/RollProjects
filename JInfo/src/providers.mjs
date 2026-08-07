@@ -87,7 +87,7 @@ export async function getWeatherFeed(feedName = "extra", fetcher = fetch) {
     feed: feedName,
     label: feed.label,
     updatedAt: parsed.updatedAt,
-    results: parsed.entries.slice(0, 30),
+    results: parsed.entries.slice(0, 100),
     source: "気象庁防災情報XML",
   };
 }
@@ -230,22 +230,28 @@ export function parseWeatherDetail(xml) {
   const control = firstBlock(report, "Control");
   const head = firstBlock(report, "Head");
   const headline = firstBlock(head, "Headline");
+  const body = firstBlock(report, "Body");
   const title = tagText(head, "Title") || tagText(control, "Title") || "防災情報";
   const informationGroups = matchBlocksWithAttributes(headline, "Information").map(({ attributes, content }) => {
     const type = attributeValueFromOpeningTag(attributes, "type") || "対象情報";
     const entries = matchBlocks(content, "Item").map((item) => {
       const kind = tagText(firstBlock(item, "Kind"), "Name") || "情報";
       const areasBlock = firstBlock(item, "Areas") || firstBlock(item, "Area");
-      const areas = unique(matchTagValues(areasBlock, "Name")).slice(0, 100);
+      const areas = unique(matchTagValues(areasBlock, "Name"));
       return { kind, areas };
     }).filter((entry) => entry.kind !== "なし" || entry.areas.length);
     return { type, entries };
   }).filter((group) => group.entries.length);
 
-  const allTexts = unique(matchTagValues(report, "Text"))
+  const allTexts = unique([
+    ...matchTagValues(report, "Text"),
+    ...matchTagValues(body, "Notice"),
+    ...matchTagValues(body, "OtherObservation"),
+    ...matchTagValues(body, "Remark"),
+  ])
     .filter((text) => text && text !== tagText(headline, "Text"))
     .filter((text) => !/^https?:\/\//u.test(text))
-    .slice(0, 10);
+    .slice(0, 30);
 
   return {
     title,
@@ -260,8 +266,203 @@ export function parseWeatherDetail(xml) {
     infoKind: tagText(head, "InfoKind"),
     headline: tagText(headline, "Text"),
     informationGroups,
+    bodySections: parseWeatherBody(body),
     notes: allTexts,
   };
+}
+
+export function parseWeatherBody(bodyXml) {
+  const body = String(bodyXml || "");
+  if (!body) return [];
+  return [
+    ...parseWarningSections(body),
+    ...parseMeteorologicalSections(body),
+    ...parseIntensitySections(body),
+    ...parseGenericBodySections(body),
+  ].filter((section) => section.entries.length);
+}
+
+function parseWarningSections(body) {
+  return matchBlocksWithAttributes(body, "Warning").map(({ attributes, content }) => ({
+    title: attributeValueFromOpeningTag(attributes, "type") || "警報・注意報",
+    entries: matchBlocks(content, "Item").map((item, index) => {
+      const areaNames = areaNamesFrom(item);
+      const kindSummaries = matchBlocks(item, "Kind").map(parseKindSummary).filter(Boolean);
+      const facts = [
+        fact("発表内容", kindSummaries.join(" ／ ")),
+        fact("変化", tagText(item, "ChangeStatus")),
+        fact("状態", tagText(item, "FullStatus")),
+      ].filter(Boolean);
+      return { heading: areaNames.join("、") || `対象 ${index + 1}`, facts };
+    }).filter((entry) => entry.facts.length),
+  }));
+}
+
+function parseMeteorologicalSections(body) {
+  return matchBlocksWithAttributes(body, "MeteorologicalInfos").flatMap(({ attributes, content }) => {
+    const sectionType = attributeValueFromOpeningTag(attributes, "type") || "気象情報";
+    return matchBlocks(content, "MeteorologicalInfo").map((meteorologicalInfo, infoIndex) => {
+      const dateTime = tagText(meteorologicalInfo, "DateTime");
+      const dateTimeBlock = tagRaw(meteorologicalInfo, "DateTime");
+      const dateType = attributeValueFromOpeningTag(
+        meteorologicalInfo.match(/<DateTime\b([^>]*)>/iu)?.[1] || "",
+        "type",
+      );
+      const entries = matchBlocks(meteorologicalInfo, "Item").map((item, itemIndex) => {
+        const areaNames = areaNamesFrom(item);
+        const kindSummaries = matchBlocks(item, "Kind").map(parseKindSummary).filter(Boolean);
+        const facts = [
+          fact(dateType || "対象時刻", dateTime || stripMarkup(dateTimeBlock)),
+          fact("内容", kindSummaries.join(" ／ ")),
+          ...semanticLeafFacts(item, { excludedNames: ["Name", "Code", "Type", "DateTime"] }),
+        ].filter(Boolean);
+        return {
+          heading: areaNames.join("、") || kindSummaries[0]?.split("：")[0] || `項目 ${itemIndex + 1}`,
+          facts: uniqueFacts(facts),
+        };
+      }).filter((entry) => entry.facts.length);
+      return { title: dateType ? `${sectionType}・${dateType}` : `${sectionType} ${infoIndex + 1}`, entries };
+    });
+  });
+}
+
+function parseIntensitySections(body) {
+  return matchBlocks(body, "Intensity").flatMap((intensity) => {
+    const entries = matchBlocks(intensity, "City").flatMap((city) => {
+      const cityName = tagText(city, "Name");
+      return matchBlocks(city, "IntensityStation").map((station) => ({
+        heading: [cityName, tagText(station, "Name")].filter(Boolean).join("・") || "観測地点",
+        facts: [fact("震度", tagText(station, "Int"))].filter(Boolean),
+      }));
+    });
+    if (!entries.length) return [];
+    return [{ title: "観測地点別震度", entries }];
+  });
+}
+
+function parseGenericBodySections(body) {
+  const definitions = [
+    ["VolcanoInfo", "火山情報"],
+    ["VolcanoObservation", "火山観測"],
+    ["Earthquake", "地震情報"],
+    ["Tsunami", "津波情報"],
+    ["AshInfos", "降灰情報"],
+    ["TyphoonInfo", "台風情報"],
+    ["MarineWarning", "海上警報"],
+    ["WeatherForecast", "天気予報"],
+  ];
+  return definitions.flatMap(([tagName, defaultTitle]) =>
+    matchBlocksWithAttributes(body, tagName).map(({ attributes, content }) => {
+      const title = attributeValueFromOpeningTag(attributes, "type") || defaultTitle;
+      const itemBlocks = matchBlocks(content, "Item");
+      const sourceEntries = itemBlocks.length ? itemBlocks : [content];
+      const entries = sourceEntries.map((item, index) => parseGenericBodyEntry(item, title, index));
+      return { title, entries: entries.filter((entry) => entry.facts.length) };
+    }),
+  );
+}
+
+function parseGenericBodyEntry(item, fallbackHeading, index) {
+  const areaNames = areaNamesFrom(item);
+  const craterName = tagText(item, "CraterName");
+  const firstName = tagText(item, "Name");
+  const heading = areaNames.join("、") || craterName || firstName || (index ? `${fallbackHeading} ${index + 1}` : fallbackHeading);
+  return {
+    heading,
+    facts: uniqueFacts(semanticLeafFacts(item, { excludedNames: ["Name", "Code", "Title"] })),
+  };
+}
+
+function parseKindSummary(kind) {
+  const name = tagText(kind, "Name") || tagText(kind, "Type");
+  const status = tagText(kind, "Status");
+  const notes = unique([
+    ...matchTagValues(kind, "Note"),
+    ...matchTagValues(kind, "Addition"),
+    ...matchBlocks(kind, "Property").flatMap((property) => {
+      const propertyType = tagText(property, "Type");
+      const values = semanticLeafFacts(property, { excludedNames: ["Type", "Code"] })
+        .map((entry) => `${entry.label} ${entry.value}`);
+      return [propertyType, ...values].filter(Boolean);
+    }),
+  ]).filter((value) => value !== name && value !== status);
+  if (!name && !status && !notes.length) return "";
+  const main = [name, status ? `（${status}）` : ""].join("");
+  return notes.length ? `${main || "詳細"}：${notes.join("、")}` : main;
+}
+
+function semanticLeafFacts(xml, { excludedNames = [] } = {}) {
+  const excluded = new Set(["Code", "Line", "Base", "Axis", "Serial", ...excludedNames]);
+  const facts = [];
+  for (const match of String(xml || "").matchAll(/<([A-Za-z][A-Za-z0-9_.:-]*)\b([^>]*)>([^<>]*)<\/\1>/gu)) {
+    const localName = match[1].split(":").at(-1);
+    if (excluded.has(localName)) continue;
+    const rawValue = stripMarkup(match[3]);
+    if (!rawValue || rawValue.length > 500) continue;
+    const description = attributeValueFromOpeningTag(match[2], "description");
+    const type = attributeValueFromOpeningTag(match[2], "type");
+    const unit = attributeValueFromOpeningTag(match[2], "unit");
+    if (/Coordinate|Line|Polygon/u.test(localName) && !description) continue;
+    const label = type || weatherFieldLabel(localName);
+    const value = description || (unit && !rawValue.includes(unit) ? `${rawValue} ${unit}` : rawValue);
+    if (!label || !value || label === value) continue;
+    facts.push({ label, value });
+  }
+  return facts;
+}
+
+function weatherFieldLabel(name) {
+  return ({
+    EventDateTime: "発生時刻",
+    EventDateTimeUTC: "発生時刻（UTC）",
+    OriginTime: "発生時刻",
+    ArrivalTime: "検知時刻",
+    TargetDateTime: "対象時刻",
+    DateTime: "日時",
+    Date: "日付",
+    Term: "時間帯",
+    Sentence: "内容",
+    TimeModifier: "時刻条件",
+    Status: "状態",
+    ChangeStatus: "変化",
+    FullStatus: "対象範囲",
+    CraterName: "火口",
+    Magnitude: "マグニチュード",
+    Int: "震度",
+    MaxInt: "最大震度",
+    Pressure: "気圧",
+    Direction: "方向",
+    Speed: "速度",
+    WindSpeed: "風速",
+    Visibility: "視程",
+    Weather: "天気",
+    ProbabilityOfPrecipitation: "降水確率",
+    PlumeHeightAboveCrater: "火口上噴煙高度",
+    PlumeHeightAboveSeaLevel: "海抜噴煙高度",
+    PlumeDirection: "噴煙の流向",
+    OtherObservation: "観測事項",
+    Notice: "お知らせ",
+    Text: "本文",
+  })[name] || name.replace(/([a-z])([A-Z])/gu, "$1 $2");
+}
+
+function areaNamesFrom(xml) {
+  return unique(matchBlocks(xml, "Area").flatMap((area) => matchTagValues(area, "Name")));
+}
+
+function fact(label, value) {
+  return value ? { label, value } : null;
+}
+
+function uniqueFacts(facts) {
+  const seen = new Set();
+  return facts.filter((entry) => {
+    if (!entry?.label || !entry.value) return false;
+    const key = `${entry.label}\u0000${entry.value}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
 }
 
 function classifyWeather(title) {

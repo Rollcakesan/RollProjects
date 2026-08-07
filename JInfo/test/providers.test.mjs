@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { ProviderError, normalizeLimit, normalizeQuery, parseAtomFeed, parseNdlFeed, parseWeatherDetail, searchMapPlaces } from "../src/providers.mjs";
+import { ProviderError, normalizeLimit, normalizeQuery, parseAtomFeed, parseNdlFeed, parseWeatherBody, parseWeatherDetail, searchMapPlaces } from "../src/providers.mjs";
 
 test("normalizeQuery trims and normalizes spaces", () => {
   assert.equal(normalizeQuery("  個人\n 情報  "), "個人 情報");
@@ -91,4 +91,40 @@ test("parseWeatherDetail creates readable groups from JMA XML", () => {
   assert.equal(result.informationGroups[0].type, "警戒地域");
   assert.deepEqual(result.informationGroups[0].entries[0].areas, ["見附市", "長岡市"]);
   assert.equal(result.notes[0], "崖や谷の近くでは特に注意してください。");
+});
+
+test("parseWeatherBody extracts warning areas and statuses", () => {
+  const sections = parseWeatherBody(`
+    <Warning type="気象警報・注意報（市町村等）">
+      <Item>
+        <Kind><Name>大雨注意報</Name><Status>発表</Status><Attention><Note>土砂災害注意</Note></Attention></Kind>
+        <Area><Name>見附市</Name><Code>1521100</Code></Area>
+        <ChangeStatus>警報・注意報種別に変化有</ChangeStatus>
+      </Item>
+    </Warning>
+  `);
+  assert.equal(sections[0].title, "気象警報・注意報（市町村等）");
+  assert.equal(sections[0].entries[0].heading, "見附市");
+  assert.match(sections[0].entries[0].facts[0].value, /大雨注意報（発表）/u);
+  assert.match(sections[0].entries[0].facts[0].value, /土砂災害注意/u);
+});
+
+test("parseWeatherBody extracts volcano observations", () => {
+  const sections = parseWeatherBody(`
+    <VolcanoInfo type="噴火に関する火山観測報"><Item><EventTime><EventDateTime>2026-08-01T03:38:00+09:00</EventDateTime></EventTime><Kind><Name>噴火</Name></Kind><Areas><Area><Name>桜島</Name><CraterName>南岳山頂火口</CraterName></Area></Areas></Item></VolcanoInfo>
+    <VolcanoObservation><ColorPlume><jmx_eb:PlumeHeightAboveCrater unit="m" description="火口上1300m">1300</jmx_eb:PlumeHeightAboveCrater><jmx_eb:PlumeDirection description="南東">南東</jmx_eb:PlumeDirection></ColorPlume><OtherObservation>噴煙量：中量</OtherObservation></VolcanoObservation>
+  `);
+  assert.equal(sections[0].entries[0].heading, "桜島");
+  assert.equal(sections[1].title, "火山観測");
+  assert.ok(sections[1].entries[0].facts.some((entry) => entry.value === "火口上1300m"));
+  assert.ok(sections[1].entries[0].facts.some((entry) => entry.value === "噴煙量：中量"));
+});
+
+test("parseWeatherBody summarizes weather chart properties without raw lines", () => {
+  const sections = parseWeatherBody(`
+    <MeteorologicalInfos type="天気図情報"><MeteorologicalInfo><DateTime type="予想　２４時間後">2026-08-01T21:00:00+09:00</DateTime><Item><Kind><Property><Type>等圧線</Type><IsobarPart><jmx_eb:Pressure unit="hPa">1004</jmx_eb:Pressure><jmx_eb:Line>+40.58+139.41/+40.50+139.40/</jmx_eb:Line></IsobarPart></Property></Kind></Item></MeteorologicalInfo></MeteorologicalInfos>
+  `);
+  assert.equal(sections[0].title, "天気図情報・予想　２４時間後");
+  assert.match(sections[0].entries[0].facts.find((entry) => entry.label === "内容").value, /1004 hPa/u);
+  assert.ok(sections[0].entries[0].facts.every((entry) => !entry.value.includes("+40.58")));
 });

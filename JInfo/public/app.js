@@ -5,6 +5,7 @@ const state = {
   marker: null,
   accuracyLayer: null,
   tileLayer: null,
+  weather: null,
   laws: null,
   datasets: null,
   books: null,
@@ -25,19 +26,22 @@ if (page === "weather") {
 if (page === "weather-detail") loadWeatherDetail();
 if (page === "laws") {
   bindSearchForm("#law-form", searchLaws);
-  bindSearchControls(["#law-type-filter", "#law-sort"], renderLaws);
+  bindSearchControls(["#law-type-filter", "#law-category-filter", "#law-date-filter", "#law-sort"], renderLaws);
+  bindSearchInputs(["#law-result-query"], renderLaws);
   document.querySelector("#law-limit")?.addEventListener("change", () => searchLaws(document.querySelector("#law-query").value));
   searchLaws(document.querySelector("#law-query").value);
 }
 if (page === "datasets") {
   bindSearchForm("#dataset-form", searchDatasets);
-  bindSearchControls(["#dataset-format-filter", "#dataset-sort"], renderDatasets);
+  bindSearchControls(["#dataset-format-filter", "#dataset-organization-filter", "#dataset-date-filter", "#dataset-sort"], renderDatasets);
+  bindSearchInputs(["#dataset-result-query"], renderDatasets);
   document.querySelector("#dataset-limit")?.addEventListener("change", () => searchDatasets(document.querySelector("#dataset-query").value));
   searchDatasets(document.querySelector("#dataset-query").value);
 }
 if (page === "books") {
   bindSearchForm("#book-form", searchBooks);
-  bindSearchControls(["#book-category-filter", "#book-sort"], renderBooks);
+  bindSearchControls(["#book-category-filter", "#book-publisher-filter", "#book-sort"], renderBooks);
+  bindSearchInputs(["#book-result-query", "#book-year-from", "#book-year-to"], renderBooks);
   document.querySelector("#book-limit")?.addEventListener("change", () => searchBooks(document.querySelector("#book-query").value));
   searchBooks(document.querySelector("#book-query").value);
 }
@@ -75,6 +79,10 @@ function bindSearchControls(selectors, handler) {
   selectors.forEach((selector) => document.querySelector(selector)?.addEventListener("change", handler));
 }
 
+function bindSearchInputs(selectors, handler) {
+  selectors.forEach((selector) => document.querySelector(selector)?.addEventListener("input", handler));
+}
+
 function bindWeatherControls() {
   document.querySelectorAll("[data-feed]").forEach((button) => {
     button.addEventListener("click", () => {
@@ -84,6 +92,8 @@ function bindWeatherControls() {
     });
   });
   document.querySelector("#weather-refresh")?.addEventListener("click", loadWeather);
+  bindSearchControls(["#weather-category-filter", "#weather-sort", "#weather-limit"], renderWeather);
+  bindSearchInputs(["#weather-filter-query"], renderWeather);
 }
 
 async function loadWeather() {
@@ -92,11 +102,30 @@ async function loadWeather() {
   setLoading(status, "気象庁から最新情報を取得しています。");
   results.replaceChildren();
   try {
-    const data = await apiFetch(`/api/weather?feed=${encodeURIComponent(state.weatherFeed)}`);
-    status.classList.remove("loading");
-    status.textContent = `${data.label}・${data.results.length}件 ／ 更新 ${formatDateTime(data.updatedAt)}`;
-    if (!data.results.length) return renderEmpty(results, "現在表示できる情報はありません。");
-    results.innerHTML = data.results.map((item) => {
+    state.weather = await apiFetch(`/api/weather?feed=${encodeURIComponent(state.weatherFeed)}`);
+    renderWeather();
+  } catch (error) {
+    showError(status, results, error);
+  }
+}
+
+function renderWeather() {
+  if (!state.weather) return;
+  const status = document.querySelector("#weather-status");
+  const results = document.querySelector("#weather-results");
+  const query = document.querySelector("#weather-filter-query").value;
+  const category = document.querySelector("#weather-category-filter").value;
+  const sort = document.querySelector("#weather-sort").value;
+  const limit = Number(document.querySelector("#weather-limit").value);
+  const matching = state.weather.results.filter((item) =>
+    (category === "all" || item.category === category) &&
+    matchesText([item.title, item.summary, item.publisher, item.category], query),
+  ).sort((left, right) => (sort === "oldest" ? 1 : -1) * (dateValue(left.updatedAt) - dateValue(right.updatedAt)));
+  const visible = matching.slice(0, limit);
+  status.classList.remove("loading");
+  status.textContent = `${state.weather.label}・${state.weather.results.length}件取得 ／ 条件一致 ${matching.length}件 ／ ${visible.length}件表示 ／ 更新 ${formatDateTime(state.weather.updatedAt)}`;
+  if (!visible.length) return renderEmpty(results, "指定した条件に一致する防災情報はありません。");
+  results.innerHTML = visible.map((item) => {
       const detailUrl = `/weather-detail?url=${encodeURIComponent(item.url)}`;
       return `
         <a class="weather-item" href="${detailUrl}">
@@ -104,9 +133,6 @@ async function loadWeather() {
           <div class="weather-content"><h3>${escapeHtml(item.title)}</h3><p>${escapeHtml(item.summary || "詳細情報を確認してください。")}</p><span class="weather-source">${escapeHtml(item.publisher || "気象庁")}　詳細を見る →</span></div>
         </a>`;
     }).join("");
-  } catch (error) {
-    showError(status, results, error);
-  }
 }
 
 async function loadWeatherDetail() {
@@ -134,11 +160,73 @@ async function loadWeatherDetail() {
         <section class="detail-section"><h2>${escapeHtml(group.type)}</h2>
           ${group.entries.map((entry) => `<div class="area-group"><strong>${escapeHtml(entry.kind)}</strong><div>${entry.areas.map((area) => `<span>${escapeHtml(area)}</span>`).join("") || "<span>対象地域の記載なし</span>"}</div></div>`).join("")}
         </section>`).join("")}
+      ${renderXmlBodySections(data.bodySections || [])}
       ${data.notes.length ? `<section class="detail-section"><h2>補足情報</h2>${data.notes.map((note) => `<p class="detail-note">${formatMultiline(note)}</p>`).join("")}</section>` : ""}
       <div class="detail-source"><span>出典：気象庁防災情報XML</span><a href="${safeUrl(data.sourceUrl)}" target="_blank" rel="noreferrer">原文XML ↗</a></div>`;
+    bindXmlBodySections(article, data.bodySections || []);
   } catch (error) {
     showDetailError(status, error.message);
   }
+}
+
+function renderXmlBodySections(sections) {
+  if (!sections.length) return "";
+  return `<section class="detail-section xml-body-section"><h2>XML本文データ</h2>
+    <div class="filter-toolbar xml-filter-toolbar">
+      <label class="filter-search">本文内検索<input id="xml-filter-query" type="search" placeholder="地域・警報名・数値" autocomplete="off" /></label>
+      <label>項目<select id="xml-section-filter"><option value="all">すべて</option>${sections.map((section, index) => `<option value="${index}">${escapeHtml(section.title)}</option>`).join("")}</select></label>
+    </div>
+    <p class="xml-filter-status" id="xml-filter-status">${sections.reduce((sum, section) => sum + section.entries.length, 0)}件の本文データ</p>
+    <div class="xml-sections" id="xml-sections">${renderXmlSectionList(sections, false)}</div></section>`;
+}
+
+function renderXmlSectionList(sections, expandMatches) {
+  if (!sections.length) return `<div class="empty-state">条件に一致する本文データがありません。</div>`;
+  return sections.map((section, sectionIndex) => `
+    <details class="xml-section" data-xml-section="${sectionIndex}" ${sectionIndex === 0 || expandMatches ? "open" : ""}>
+      <summary><span>${escapeHtml(section.title)}</span><small>${section.entries.length}件</small></summary>
+      ${sectionIndex === 0 || expandMatches ? renderXmlEntryList(section.entries) : ""}
+    </details>`).join("");
+}
+
+function renderXmlEntryList(entries) {
+  return `<div class="xml-entry-list">${entries.map((entry) => `
+    <article class="xml-entry"><h3>${escapeHtml(entry.heading)}</h3><dl>${entry.facts.map((item) => `<div><dt>${escapeHtml(item.label)}</dt><dd>${formatMultiline(item.value)}</dd></div>`).join("")}</dl></article>`).join("")}</div>`;
+}
+
+function bindXmlBodySections(article, sections) {
+  const queryInput = article.querySelector("#xml-filter-query");
+  const sectionSelect = article.querySelector("#xml-section-filter");
+  const container = article.querySelector("#xml-sections");
+  const status = article.querySelector("#xml-filter-status");
+  const bindSectionToggles = (visibleSections) => {
+    container.querySelectorAll("[data-xml-section]").forEach((details) => details.addEventListener("toggle", () => {
+      if (!details.open || details.querySelector(".xml-entry-list")) return;
+      const section = visibleSections[Number(details.dataset.xmlSection)];
+      if (section) details.insertAdjacentHTML("beforeend", renderXmlEntryList(section.entries));
+    }));
+  };
+  const applyFilters = () => {
+    const query = queryInput.value;
+    const selectedIndex = sectionSelect.value;
+    const visibleSections = sections.map((section, index) => ({
+      ...section,
+      entries: section.entries.filter((entry) => matchesText([
+        entry.heading,
+        ...entry.facts.flatMap((item) => [item.label, item.value]),
+      ], query)),
+      sourceIndex: index,
+    })).filter((section) =>
+      section.entries.length && (selectedIndex === "all" || section.sourceIndex === Number(selectedIndex)),
+    );
+    const visibleCount = visibleSections.reduce((sum, section) => sum + section.entries.length, 0);
+    status.textContent = `${visibleCount}件一致 ／ 全${sections.reduce((sum, section) => sum + section.entries.length, 0)}件`;
+    container.innerHTML = renderXmlSectionList(visibleSections, Boolean(query));
+    bindSectionToggles(visibleSections);
+  };
+  bindSectionToggles(sections);
+  queryInput?.addEventListener("input", applyFilters);
+  sectionSelect?.addEventListener("change", applyFilters);
 }
 
 async function searchLaws(query) {
@@ -149,6 +237,7 @@ async function searchLaws(query) {
   try {
     const limit = document.querySelector("#law-limit").value;
     state.laws = await apiFetch(`/api/laws?q=${encodeURIComponent(query)}&limit=${encodeURIComponent(limit)}`);
+    syncSelectOptions("#law-category-filter", state.laws.results.map((law) => law.category));
     renderLaws();
   } catch (error) { showError(status, results, error); }
 }
@@ -157,10 +246,18 @@ function renderLaws() {
   if (!state.laws) return;
   const status = document.querySelector("#law-status");
   const results = document.querySelector("#law-results");
+  const resultQuery = document.querySelector("#law-result-query").value;
   const type = document.querySelector("#law-type-filter").value;
+  const category = document.querySelector("#law-category-filter").value;
+  const dateRange = document.querySelector("#law-date-filter").value;
   const sort = document.querySelector("#law-sort").value;
   const primaryLawTypes = ["法律", "政令", "府省令", "規則"];
-  const laws = sortItems(state.laws.results.filter((law) => type === "all" || (type === "other" ? !primaryLawTypes.includes(law.type) : law.type === type)), sort, {
+  const laws = sortItems(state.laws.results.filter((law) =>
+    (type === "all" || (type === "other" ? !primaryLawTypes.includes(law.type) : law.type === type)) &&
+    (category === "all" || law.category === category) &&
+    (dateRange === "all" || isWithinYears(law.updatedAt, Number(dateRange))) &&
+    matchesText([law.title, law.number, law.type, law.category, ...law.excerpts], resultQuery),
+  ), sort, {
     "updated-desc": (law) => dateValue(law.updatedAt),
     "promulgated-desc": (law) => dateValue(law.promulgatedAt),
     title: (law) => law.title,
@@ -183,6 +280,7 @@ async function searchDatasets(query) {
   try {
     const limit = document.querySelector("#dataset-limit").value;
     state.datasets = await apiFetch(`/api/datasets?q=${encodeURIComponent(query)}&limit=${encodeURIComponent(limit)}`);
+    syncSelectOptions("#dataset-organization-filter", state.datasets.results.map((dataset) => dataset.organization));
     renderDatasets();
   } catch (error) { showError(status, results, error); }
 }
@@ -191,13 +289,19 @@ function renderDatasets() {
   if (!state.datasets) return;
   const status = document.querySelector("#dataset-status");
   const results = document.querySelector("#dataset-results");
+  const resultQuery = document.querySelector("#dataset-result-query").value;
   const format = document.querySelector("#dataset-format-filter").value;
+  const organization = document.querySelector("#dataset-organization-filter").value;
+  const dateRange = document.querySelector("#dataset-date-filter").value;
   const sort = document.querySelector("#dataset-sort").value;
   const datasets = sortItems(state.datasets.results.filter((dataset) => {
-    if (format === "all") return true;
-    return dataset.formats.some((resourceFormat) => {
+    const matchesFormat = format === "all" || dataset.formats.some((resourceFormat) => {
       return format === "XLSX" ? resourceFormat.startsWith("XLS") : resourceFormat.includes(format);
     });
+    return matchesFormat &&
+      (organization === "all" || dataset.organization === organization) &&
+      (dateRange === "all" || isWithinYears(dataset.updatedAt, Number(dateRange))) &&
+      matchesText([dataset.title, dataset.description, dataset.organization, ...dataset.tags, ...dataset.formats], resultQuery);
   }), sort, {
     "updated-desc": (dataset) => dateValue(dataset.updatedAt),
     "updated-asc": (dataset) => dateValue(dataset.updatedAt),
@@ -218,6 +322,7 @@ async function searchBooks(query) {
   try {
     const limit = document.querySelector("#book-limit").value;
     state.books = await apiFetch(`/api/books?q=${encodeURIComponent(query)}&limit=${encodeURIComponent(limit)}`);
+    syncSelectOptions("#book-publisher-filter", state.books.results.map((book) => book.publisher));
     renderBooks();
   } catch (error) { showError(status, results, error); }
 }
@@ -226,9 +331,19 @@ function renderBooks() {
   if (!state.books) return;
   const status = document.querySelector("#book-status");
   const results = document.querySelector("#book-results");
+  const resultQuery = document.querySelector("#book-result-query").value;
   const category = document.querySelector("#book-category-filter").value;
+  const publisher = document.querySelector("#book-publisher-filter").value;
+  const yearFrom = Number(document.querySelector("#book-year-from").value) || 0;
+  const yearTo = Number(document.querySelector("#book-year-to").value) || Number.POSITIVE_INFINITY;
   const sort = document.querySelector("#book-sort").value;
-  const books = sortItems(state.books.results.filter((book) => matchesBookCategory(book, category)), sort, {
+  const books = sortItems(state.books.results.filter((book) => {
+    const year = yearValue(book.year);
+    return matchesBookCategory(book, category) &&
+      (publisher === "all" || book.publisher === publisher) &&
+      ((!yearFrom && !Number.isFinite(yearTo)) || (year && year >= yearFrom && year <= yearTo)) &&
+      matchesText([book.title, book.creator, book.publisher, book.year, book.description, book.isbn, ...book.categories], resultQuery);
+  }), sort, {
     "year-desc": (book) => yearValue(book.year),
     "year-asc": (book) => yearValue(book.year),
     title: (book) => book.title,
@@ -436,6 +551,34 @@ function requestPosition(options) {
 function resultSummary(data, visibleCount) {
   const filtered = visibleCount !== data.results.length ? `、条件一致 ${visibleCount}件` : "";
   return `「${data.query}」の検索結果 ${number(data.total)}件（${data.results.length}件取得${filtered}）`;
+}
+
+function syncSelectOptions(selector, values) {
+  const select = document.querySelector(selector);
+  if (!select) return;
+  const selectedValue = select.value;
+  const labels = [...new Set(values.map((value) => String(value || "").trim()).filter(Boolean))]
+    .sort((left, right) => left.localeCompare(right, "ja"));
+  select.replaceChildren(new Option("すべて", "all"), ...labels.map((label) => new Option(label, label)));
+  select.value = labels.includes(selectedValue) ? selectedValue : "all";
+}
+
+function matchesText(values, query) {
+  const normalizedQuery = normalizeSearchText(query);
+  if (!normalizedQuery) return true;
+  return normalizeSearchText(values.filter(Boolean).join(" ")).includes(normalizedQuery);
+}
+
+function normalizeSearchText(value) {
+  return String(value || "").normalize("NFKC").toLocaleLowerCase("ja").replace(/\s+/gu, " ").trim();
+}
+
+function isWithinYears(value, years) {
+  const timestamp = dateValue(value);
+  if (!timestamp || !years) return false;
+  const threshold = new Date();
+  threshold.setFullYear(threshold.getFullYear() - years);
+  return timestamp >= threshold.getTime();
 }
 
 function sortItems(items, sort, selectors) {

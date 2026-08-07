@@ -14,7 +14,7 @@
     <meta property="og:image" content="https://jinfo.rollprojects.com/og-image.svg" />
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
     <link rel="manifest" href="/site.webmanifest" />
-    <link rel="stylesheet" href="/styles.css?v=4" />
+    <link rel="stylesheet" href="/styles.css?v=8" />
     <title>防災情報｜警報・地震・津波・火山を確認｜JInfo</title>
   </head>
   <body data-page="weather">
@@ -43,6 +43,12 @@
           </div>
           <button class="refresh-button light-refresh" type="button" id="weather-refresh">↻ 更新</button>
         </div>
+        <div class="filter-toolbar weather-filter-toolbar" aria-label="防災情報の表示設定">
+          <label class="filter-search">結果内検索<input id="weather-filter-query" type="search" placeholder="地域名・情報名" autocomplete="off" /></label>
+          <label>分類<select id="weather-category-filter"><option value="all">すべて</option><option value="警報">警報</option><option value="地震">地震</option><option value="津波">津波</option><option value="火山">火山</option><option value="台風">台風</option><option value="気象">気象</option><option value="防災">その他</option></select></label>
+          <label>並び順<select id="weather-sort"><option value="newest" selected>新しい順</option><option value="oldest">古い順</option></select></label>
+          <label>表示件数<select id="weather-limit"><option value="20">20件</option><option value="50" selected>50件</option><option value="100">100件</option></select></label>
+        </div>
         <div class="result-status" id="weather-status" aria-live="polite">最新情報を読み込んでいます。</div>
         <h2 class="visually-hidden" id="weather-list-title">最新の防災情報</h2>
         <div class="weather-list weather-list-light" id="weather-results"></div>
@@ -56,6 +62,6 @@
     </main>
 
     <footer class="app-footer"><span>JInfo by RollProjects</span><span>出典：気象庁</span></footer>
-    <script src="/app.js?v=4" type="module"></script>
+    <script src="/app.js?v=8" type="module"></script>
   </body>
 </html>

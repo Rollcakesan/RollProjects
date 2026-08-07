@@ -1,9 +1,9 @@
 <!doctype html>
 <html lang="ja">
   <head>
-    <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" /><meta name="theme-color" content="#e9e4f1" />
+    <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" /><meta name="theme-color" content="#e9e4f1" /><meta name="robots" content="index, follow, max-image-preview:large" />
     <meta name="description" content="国立国会図書館サーチのオープンメタデータから書籍、雑誌、論文、デジタル資料を検索できます。" />
-    <link rel="canonical" href="https://jinfo.rollprojects.com/books" /><link rel="icon" href="/favicon.svg" type="image/svg+xml" /><link rel="stylesheet" href="/styles.css?v=6" />
+    <link rel="canonical" href="https://jinfo.rollprojects.com/books" /><link rel="icon" href="/favicon.svg" type="image/svg+xml" /><link rel="stylesheet" href="/styles.css?v=8" />
     <title>本・資料検索｜国立国会図書館サーチ｜JInfo</title>
   </head>
   <body data-page="books" class="books-page">
@@ -13,12 +13,16 @@
       <section class="page-heading"><div><p class="eyebrow">国立国会図書館サーチ</p><h1>本・資料検索</h1></div><p>利用許諾済みのオープンメタデータから、書籍、雑誌、論文、デジタル資料を探せます。</p></section>
       <form class="search-panel violet-panel" id="book-form"><label for="book-query">タイトル・著者・キーワード</label><div class="search-row"><input id="book-query" name="q" type="search" value="夏目漱石" maxlength="80" autocomplete="off" /><button type="submit">検索 <span>→</span></button></div><div class="suggestions"><span>例</span><button type="button" data-target="book-query">新潟県</button><button type="button" data-target="book-query">地震</button><button type="button" data-target="book-query">人工知能</button></div></form>
       <div class="filter-toolbar" aria-label="図書検索の表示設定">
+        <label class="filter-search">結果内検索<input id="book-result-query" type="search" placeholder="タイトル・著者・説明" autocomplete="off" /></label>
         <label>資料種別<select id="book-category-filter"><option value="all">すべて</option><option value="book">図書</option><option value="article">雑誌・記事・論文</option><option value="digital">デジタル資料</option></select></label>
+        <label>出版社<select id="book-publisher-filter"><option value="all">すべて</option></select></label>
+        <label>刊行年（開始）<input class="filter-number" id="book-year-from" type="number" min="1000" max="2100" placeholder="例 2000" inputmode="numeric" /></label>
+        <label>刊行年（終了）<input class="filter-number" id="book-year-to" type="number" min="1000" max="2100" placeholder="例 2026" inputmode="numeric" /></label>
         <label>並び順<select id="book-sort"><option value="relevance">関連度順</option><option value="year-desc" selected>刊行年の新しい順</option><option value="year-asc">刊行年の古い順</option><option value="title">名称順</option></select></label>
         <label>取得件数<select id="book-limit"><option value="12">12件</option><option value="25" selected>25件</option><option value="50">50件</option><option value="100">100件</option></select></label>
       </div>
       <div class="result-status" id="book-status" aria-live="polite">検索しています。</div><div class="book-list" id="book-results"></div>
     </main>
-    <footer class="app-footer"><span>JInfo by RollProjects</span><span>出典：国立国会図書館サーチ</span></footer><script src="/app.js?v=6" type="module"></script>
+    <footer class="app-footer"><span>JInfo by RollProjects</span><span>出典：国立国会図書館サーチ</span></footer><script src="/app.js?v=8" type="module"></script>
   </body>
 </html>

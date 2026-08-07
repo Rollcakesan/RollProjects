@@ -106,6 +106,12 @@ button, a { -webkit-tap-highlight-color: transparent; }
 .filter-toolbar label { display: flex; align-items: center; gap: 7px; padding-left: 11px; color: var(--muted); border: 1px solid var(--line); background: rgba(255,255,255,.48); font-size: 9px; font-weight: 800; }
 .filter-toolbar select { min-height: 36px; padding: 5px 28px 5px 9px; border: 0; border-left: 1px solid var(--line); outline: 0; color: var(--ink); background: var(--surface); font-size: 10px; cursor: pointer; }
 .filter-toolbar select:focus { box-shadow: inset 0 0 0 2px var(--ink); }
+.filter-toolbar .filter-search { flex: 1 1 240px; min-width: 210px; }
+.filter-toolbar input { min-width: 0; min-height: 36px; padding: 5px 10px; border: 0; border-left: 1px solid var(--line); outline: 0; color: var(--ink); background: var(--surface); font-size: 10px; }
+.filter-toolbar .filter-search input { flex: 1; }
+.filter-toolbar input:focus { box-shadow: inset 0 0 0 2px var(--ink); }
+.filter-toolbar .filter-number { width: 92px; }
+.weather-filter-toolbar { justify-content: flex-start; margin: 0 0 16px; }
 
 /* Law results */
 .result-list { border-top: 1px solid var(--line); }
@@ -246,6 +252,21 @@ button, a { -webkit-tap-highlight-color: transparent; }
 .area-group > div { display: flex; flex-wrap: wrap; gap: 6px; }
 .area-group span { padding: 3px 8px; border: 1px solid var(--line); background: white; font-size: 10px; }
 .detail-note { margin: 0 0 14px; color: #515a65; font-size: 12px; line-height: 1.9; }
+.xml-body-section { padding-bottom: 35px; }
+.xml-filter-toolbar { justify-content: flex-start; margin: 0 0 8px; }
+.xml-filter-status { margin: 0 0 11px; color: var(--muted); font-size: 9px; }
+.xml-sections { border-top: 1px solid var(--line); }
+.xml-section { border-bottom: 1px solid var(--line); }
+.xml-section summary { display: flex; justify-content: space-between; align-items: center; gap: 20px; padding: 15px 4px; font-size: 12px; font-weight: 800; cursor: pointer; }
+.xml-section summary:hover { color: var(--red); }
+.xml-section summary small { color: var(--muted); font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 9px; font-weight: 600; }
+.xml-entry-list { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1px; margin: 0 0 18px; overflow: hidden; border: 1px solid var(--line); background: var(--line); }
+.xml-entry { min-width: 0; padding: 16px; background: white; }
+.xml-entry h3 { margin: 0 0 10px; font-size: 12px; }
+.xml-entry dl { display: grid; gap: 7px; margin: 0; }
+.xml-entry dl div { display: grid; grid-template-columns: 88px minmax(0, 1fr); gap: 10px; }
+.xml-entry dt { color: var(--muted); font-size: 8px; font-weight: 800; }
+.xml-entry dd { min-width: 0; margin: 0; overflow-wrap: anywhere; color: #3f4854; font-size: 10px; line-height: 1.65; }
 .detail-source { display: flex; justify-content: space-between; gap: 20px; padding: 20px 40px; color: var(--muted); font-size: 9px; }
 .detail-source a { font-weight: 800; text-decoration: none; }
 
@@ -299,6 +320,8 @@ button, a { -webkit-tap-highlight-color: transparent; }
   .map-layer-switch { top: 17px; right: 17px; }
   .weather-detail-header, .detail-headline, .detail-section { padding: 25px 20px; }
   .area-group { grid-template-columns: 1fr; gap: 8px; }
+  .xml-entry-list { grid-template-columns: 1fr; }
+  .xml-entry dl div { grid-template-columns: 75px minmax(0, 1fr); }
   .detail-source { align-items: flex-start; flex-direction: column; padding: 18px 20px; }
   .app-footer { min-height: 64px; padding: 14px 18px; }
 }
