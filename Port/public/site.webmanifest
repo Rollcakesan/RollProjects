@@ -1,0 +1,9 @@
+{
+  "name": "Port｜プロフィール作成",
+  "short_name": "Port",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#f5f2eb",
+  "theme_color": "#f5f2eb",
+  "icons": [{ "src": "/favicon.svg", "sizes": "any", "type": "image/svg+xml" }]
+}

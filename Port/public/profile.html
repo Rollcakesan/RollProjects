@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{{TITLE}}</title>
+    <meta name="description" content="{{DESCRIPTION}}" />
+    <meta name="robots" content="index, follow, max-image-preview:large" />
+    <meta property="og:title" content="{{TITLE}}" />
+    <meta property="og:description" content="{{DESCRIPTION}}" />
+    <meta property="og:type" content="profile" />
+    <meta property="og:url" content="{{CANONICAL}}" />
+    <meta property="og:image" content="{{IMAGE}}" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="theme-color" content="#f5f2eb" />
+    <link rel="canonical" href="{{CANONICAL}}" />
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <link rel="stylesheet" href="/styles.css?v=2" />
+    <script id="profile-data" type="application/json"><!--PROFILE_JSON--></script>
+    <script id="session-data" type="application/json"><!--SESSION_JSON--></script>
+    <script src="https://accounts.google.com/gsi/client" async defer></script>
+    <script src="/app.js?v=2" type="module"></script>
+  </head>
+  <body class="public-profile-page">
+    <header class="site-header profile-header">
+      <a class="brand" href="/" aria-label="Port ホーム"><span class="brand-mark">P</span><span>Port</span></a>
+      <div class="header-actions">
+        <button id="share-profile" class="icon-button" type="button" aria-label="プロフィールを共有">↗</button>
+        <a id="profile-auth-link" href="/create" class="button button-small">Sign in</a>
+      </div>
+    </header>
+    <main id="app"><!--PROFILE_FALLBACK--></main>
+    <footer class="site-footer profile-footer"><a class="brand brand-muted" href="/"><span class="brand-mark">P</span><span>Port</span></a></footer>
+    <div id="toast" class="toast" role="status" aria-live="polite"></div>
+  </body>
+</html>

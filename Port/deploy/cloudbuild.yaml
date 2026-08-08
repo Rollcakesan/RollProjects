@@ -1,0 +1,41 @@
+steps:
+  - name: gcr.io/cloud-builders/docker
+    args:
+      - build
+      - --tag
+      - ${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPOSITORY}/port:$COMMIT_SHA
+      - .
+  - name: gcr.io/cloud-builders/docker
+    args:
+      - push
+      - ${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPOSITORY}/port:$COMMIT_SHA
+  - name: gcr.io/google.com/cloudsdktool/cloud-sdk:slim
+    entrypoint: gcloud
+    args:
+      - run
+      - deploy
+      - port
+      - --image=${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPOSITORY}/port:$COMMIT_SHA
+      - --region=${_REGION}
+      - --platform=managed
+      - --allow-unauthenticated
+      - --min-instances=0
+      - --max-instances=2
+      - --concurrency=40
+      - --cpu=1
+      - --memory=256Mi
+      - --timeout=30s
+      - --set-env-vars=PROFILE_BUCKET=${_PROFILE_BUCKET},GOOGLE_CLIENT_ID=${_GOOGLE_CLIENT_ID}
+      - --set-secrets=PORT_SESSION_SECRET=${_SESSION_SECRET}:latest
+      - --service-account=${_SERVICE_ACCOUNT}
+images:
+  - ${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPOSITORY}/port:$COMMIT_SHA
+substitutions:
+  _REGION: asia-northeast1
+  _REPOSITORY: rollprojects
+  _PROFILE_BUCKET: rollprojects-port-data
+  _GOOGLE_CLIENT_ID: 804469796792-f633hb8iidlvqg5lmn0b0t8v76ol4sri.apps.googleusercontent.com
+  _SESSION_SECRET: port-session-secret
+  _SERVICE_ACCOUNT: port-runtime@rollprojects.iam.gserviceaccount.com
+options:
+  logging: CLOUD_LOGGING_ONLY

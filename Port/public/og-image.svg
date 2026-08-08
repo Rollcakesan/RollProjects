@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 630">
+  <rect width="1200" height="630" fill="#f5f2eb"/>
+  <circle cx="1010" cy="-40" r="410" fill="#5b5cf0"/>
+  <circle cx="1030" cy="95" r="260" fill="none" stroke="#fff" stroke-opacity=".45" stroke-width="2"/>
+  <circle cx="130" cy="105" r="54" fill="#171714"/>
+  <text x="130" y="126" fill="#fff" font-family="Georgia,serif" font-size="58" font-style="italic" text-anchor="middle">P</text>
+  <text x="215" y="128" fill="#171714" font-family="Arial,sans-serif" font-size="53" font-weight="700">Port</text>
+  <text x="90" y="365" fill="#171714" font-family="Georgia,serif" font-size="94">プロフィールを、</text>
+  <text x="90" y="474" fill="#5b5cf0" font-family="Georgia,serif" font-size="94" font-style="italic">ひとつのページに。</text>
+  <text x="94" y="548" fill="#74736c" font-family="Arial,sans-serif" font-size="25">Links · Works · Payment</text>
+</svg>

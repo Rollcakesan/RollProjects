@@ -1,0 +1,6 @@
+User-agent: *
+Allow: /
+Disallow: /api/
+Disallow: /edit/
+
+Sitemap: https://port.rollprojects.com/sitemap.xml
