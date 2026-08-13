@@ -58,7 +58,7 @@ const server = createServer(async (request, response) => {
     if (request.method === "GET" && ["/healthz", "/api/health"].includes(requestUrl.pathname)) {
       return sendJson(response, 200, {
         status: "ok",
-        service: "Port",
+        service: "URLPort",
         storage: process.env.PROFILE_BUCKET ? "gcs" : "local",
         googleLogin: Boolean(process.env.GOOGLE_CLIENT_ID),
       });
@@ -93,11 +93,12 @@ const server = createServer(async (request, response) => {
 });
 
 server.listen(PORT, "0.0.0.0", () => {
-  console.log(`Port listening on ${PORT}`);
+  console.log(`URLPort listening on ${PORT}`);
 });
 
 async function handleApi(request, response, requestUrl) {
   const profileMatch = requestUrl.pathname.match(/^\/api\/profiles\/([^/]+)$/u);
+  const bookmarkMatch = requestUrl.pathname.match(/^\/api\/me\/bookmarks\/([^/]+)$/u);
 
   if (request.method === "GET" && requestUrl.pathname === "/api/config") {
     return sendJson(response, 200, { googleClientId: process.env.GOOGLE_CLIENT_ID || "" });
@@ -122,6 +123,43 @@ async function handleApi(request, response, requestUrl) {
     const user = await authenticate(request);
     const profiles = await store.getProfilesForOwner(user.subject);
     return sendJson(response, 200, { profiles: profiles.map(profileSummary) });
+  }
+
+  if (request.method === "GET" && requestUrl.pathname === "/api/me/bookmarks") {
+    const user = await authenticate(request);
+    const slugs = await store.getBookmarks(user.subject);
+    const profiles = (await Promise.all(slugs.map(async (slug) => {
+      try {
+        const profile = await store.getProfile(slug);
+        return profile.ownerSubject === user.subject ? null : publicProfile(profile);
+      } catch (error) {
+        if (error instanceof StoreError && error.status === 404) return null;
+        throw error;
+      }
+    }))).filter(Boolean);
+    return sendJson(response, 200, { slugs: profiles.map((profile) => profile.slug), profiles });
+  }
+
+  if (request.method === "DELETE" && requestUrl.pathname === "/api/me/bookmarks") {
+    const user = await authenticate(request);
+    await store.clearBookmarks(user.subject);
+    response.writeHead(204, { ...SECURITY_HEADERS, "Cache-Control": "no-store", "X-Robots-Tag": "noindex" });
+    return response.end();
+  }
+
+  if (bookmarkMatch && ["PUT", "DELETE"].includes(request.method || "")) {
+    const user = await authenticate(request);
+    const slug = normalizeSlug(decodeURIComponent(bookmarkMatch[1]));
+    if (request.method === "PUT") {
+      const profile = await store.getProfile(slug);
+      if (profile.ownerSubject === user.subject) {
+        throw new ValidationError("自分のプロフィールはブックマークできません。", 400, "OWN_PROFILE");
+      }
+      const slugs = await store.addBookmark(user.subject, slug);
+      return sendJson(response, 200, { slugs });
+    }
+    const slugs = await store.removeBookmark(user.subject, slug);
+    return sendJson(response, 200, { slugs });
   }
 
   if (request.method === "GET" && requestUrl.pathname === "/api/discover") {
@@ -195,6 +233,7 @@ async function handleApi(request, response, requestUrl) {
       const user = await authenticate(request);
       assertOwner(current, user);
       await store.deleteProfile(slug, user.subject);
+      await store.removeBookmark(user.subject, slug);
       invalidateProfileCatalog();
       response.writeHead(204, { ...SECURITY_HEADERS, "Cache-Control": "no-store", "X-Robots-Tag": "noindex" });
       return response.end();
@@ -254,7 +293,7 @@ async function serveProfile(request, pathname, response) {
   const slug = normalizeSlug(decodeURIComponent(pathname.slice(3)));
   const profile = publicProfile(await store.getProfile(slug));
   const template = await readFile(PROFILE_TEMPLATE_PATH, "utf8");
-  const title = `${profile.displayName}｜Port`;
+  const title = `${profile.displayName}｜URLPort`;
   const description = profile.headline || profile.bio || `${profile.displayName}のリンクプロフィール`;
   const image = absoluteUrl(profile.avatarUrl || profile.coverUrl || "/og-image.svg");
   const canonical = `https://port.rollprojects.com/u/${encodeURIComponent(slug)}`;
@@ -284,8 +323,10 @@ async function serveProfile(request, pathname, response) {
 async function serveStatic(pathname, request, response) {
   const routeFiles = new Map([
     ["/", "/index.html"],
+    ["/bookmarks", "/index.html"],
     ["/create", "/index.html"],
     ["/dashboard", "/index.html"],
+    ["/settings", "/index.html"],
   ]);
   const requestedPath = pathname.startsWith("/edit/") ? "/index.html" : routeFiles.get(pathname) || pathname;
   let safePath;
@@ -310,7 +351,7 @@ async function serveStatic(pathname, request, response) {
         "Cache-Control": "private, no-store",
         "Content-Length": Buffer.byteLength(html),
         "Content-Type": "text/html; charset=utf-8",
-        ...(["/create", "/dashboard"].includes(pathname) || pathname.startsWith("/edit/") ? { "X-Robots-Tag": "noindex, nofollow" } : {}),
+        ...(["/bookmarks", "/create", "/dashboard", "/settings"].includes(pathname) || pathname.startsWith("/edit/") ? { "X-Robots-Tag": "noindex, nofollow" } : {}),
       });
       if (request.method === "HEAD") return response.end();
       return response.end(html);
@@ -321,7 +362,7 @@ async function serveStatic(pathname, request, response) {
       "Cache-Control": requiresRevalidation ? "no-cache" : "public, max-age=3600",
       "Content-Length": fileStat.size,
       "Content-Type": MIME_TYPES.get(extension) || "application/octet-stream",
-      ...(["/create", "/dashboard"].includes(pathname) || pathname.startsWith("/edit/") ? { "X-Robots-Tag": "noindex, nofollow" } : {}),
+      ...(["/bookmarks", "/create", "/dashboard", "/settings"].includes(pathname) || pathname.startsWith("/edit/") ? { "X-Robots-Tag": "noindex, nofollow" } : {}),
     });
     if (request.method === "HEAD") return response.end();
     createReadStream(filePath).pipe(response);
@@ -333,9 +374,13 @@ async function serveStatic(pathname, request, response) {
 async function createBootstrapJson(request) {
   let user = null;
   let profiles = [];
+  let bookmarks = [];
   try {
     user = await authenticate(request);
-    profiles = (await store.getProfilesForOwner(user.subject)).map(profileSummary);
+    [profiles, bookmarks] = await Promise.all([
+      store.getProfilesForOwner(user.subject).then((items) => items.map(profileSummary)),
+      store.getBookmarks(user.subject),
+    ]);
   } catch (error) {
     if (!(error instanceof AuthError)) throw error;
   }
@@ -343,6 +388,7 @@ async function createBootstrapJson(request) {
     googleClientId: process.env.GOOGLE_CLIENT_ID || "",
     user,
     profiles,
+    bookmarks,
   }).replaceAll("<", "\\u003c");
 }
 
@@ -424,7 +470,7 @@ async function cleanupUnusedImages(slug, profile) {
 
 function enforceSameOriginMutation(request) {
   if (["GET", "HEAD"].includes(request.method || "")) return;
-  if (request.headers["x-port-request"] !== "1") {
+  if (request.headers["x-urlport-request"] !== "1") {
     throw new AuthError("リクエストを確認できません。", 403, "INVALID_REQUEST_ORIGIN");
   }
 }

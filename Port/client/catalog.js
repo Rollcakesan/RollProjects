@@ -49,22 +49,8 @@ export function paymentMark(id) {
   return PAYMENT_MARKS[id] || paymentType(id).label.slice(0, 2);
 }
 
-export function platformOptions(selected) {
-  return PLATFORMS.map((item) => `<option value="${item.id}" ${item.id === selected ? "selected" : ""}>${item.label}</option>`).join("");
-}
-
-export function brandIconMarkup(id, mark) {
-  const slug = BRAND_ICON_SLUGS[id];
-  return `<span class="brand-icon"><span>${escapeHtml(mark)}</span>${slug ? `<img data-brand-icon src="https://cdn.simpleicons.org/${encodeURIComponent(slug)}" alt="" loading="lazy">` : ""}</span>`;
-}
-
-export function bindBrandIconFallbacks(root = document) {
-  root?.querySelectorAll("img[data-brand-icon]").forEach((image) => {
-    if (image.dataset.fallbackBound) return;
-    image.dataset.fallbackBound = "true";
-    image.addEventListener("error", () => image.remove(), { once: true });
-    if (image.complete && image.naturalWidth === 0) image.remove();
-  });
+export function brandIconSlug(id) {
+  return BRAND_ICON_SLUGS[id] || "";
 }
 
 export function blankProfile() {
@@ -72,18 +58,9 @@ export function blankProfile() {
 }
 
 export function profileSummary(profile) {
-  return {
-    slug: profile.slug,
-    displayName: profile.displayName,
-    headline: profile.headline || "",
-    avatarUrl: profile.avatarUrl || "",
-  };
+  return { slug: profile.slug, displayName: profile.displayName, headline: profile.headline || "", avatarUrl: profile.avatarUrl || "" };
 }
 
 export function initials(value) {
   return String(value || "P").trim().split(/\s+/u).slice(0, 2).map((part) => part[0]).join("").toUpperCase();
-}
-
-export function escapeHtml(value) {
-  return String(value).replace(/[&<>"']/gu, (character) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[character]);
 }

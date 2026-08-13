@@ -3,10 +3,10 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Port</title>
+    <title>URLPort</title>
     <meta name="description" content="プロフィール、リンク、作品、振込・送金先。" />
     <meta name="robots" content="index, follow, max-image-preview:large" />
-    <meta property="og:title" content="Port" />
+    <meta property="og:title" content="URLPort" />
     <meta property="og:description" content="プロフィール、リンク、作品、振込・送金先。" />
     <meta property="og:type" content="website" />
     <meta property="og:url" content="https://port.rollprojects.com/" />
@@ -15,23 +15,12 @@
     <link rel="canonical" href="https://port.rollprojects.com/" />
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
     <link rel="manifest" href="/site.webmanifest" />
-    <link rel="stylesheet" href="/styles.css?v=2" />
+    <link rel="stylesheet" href="/styles.css?v=8" />
     <script id="session-data" type="application/json"><!--SESSION_JSON--></script>
     <script src="https://accounts.google.com/gsi/client" async defer></script>
-    <script src="/app.js?v=2" type="module"></script>
+    <script src="/react-app.js?v=2" type="module"></script>
   </head>
   <body>
-    <header class="site-header">
-      <a class="brand" href="/" aria-label="Port ホーム">
-        <span class="brand-mark">P</span><span>Port</span>
-      </a>
-      <div id="auth-nav" class="auth-nav"><a class="header-sign-in" href="/create">Sign in</a></div>
-    </header>
-    <main id="app" tabindex="-1"></main>
-    <footer class="site-footer">
-      <a class="brand brand-muted" href="/"><span class="brand-mark">P</span><span>Port</span></a>
-      <p>© 2026 RollProjects</p>
-    </footer>
-    <div id="toast" class="toast" role="status" aria-live="polite"></div>
+    <div id="root"></div>
   </body>
 </html>

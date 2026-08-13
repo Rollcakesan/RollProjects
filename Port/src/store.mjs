@@ -3,6 +3,7 @@ import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const DEFAULT_DATA_DIRECTORY = resolve(fileURLToPath(new URL("../.data", import.meta.url)));
+const STORED_SLUG_PATTERN = /^[a-z0-9](?:[a-z0-9_-]{1,30}[a-z0-9])?$/u;
 
 export class StoreError extends Error {
   constructor(message, status = 500, code = "STORE_ERROR") {
@@ -63,6 +64,35 @@ export class ProfileStore {
       }),
     );
     return profiles.filter(Boolean);
+  }
+
+  async getBookmarks(ownerSubject) {
+    try {
+      const data = await this.readJson(this.bookmarkObjectName(ownerSubject));
+      return Array.isArray(data.slugs)
+        ? [...new Set(data.slugs.filter((slug) => typeof slug === "string" && STORED_SLUG_PATTERN.test(slug)))].slice(0, 500)
+        : [];
+    } catch (error) {
+      if (error instanceof StoreError && error.status === 404) return [];
+      throw error;
+    }
+  }
+
+  async addBookmark(ownerSubject, slug) {
+    const slugs = await this.getBookmarks(ownerSubject);
+    if (!slugs.includes(slug)) slugs.unshift(slug);
+    await this.writeJson(this.bookmarkObjectName(ownerSubject), { slugs: slugs.slice(0, 500) }, false);
+    return slugs;
+  }
+
+  async removeBookmark(ownerSubject, slug) {
+    const slugs = (await this.getBookmarks(ownerSubject)).filter((candidate) => candidate !== slug);
+    await this.writeJson(this.bookmarkObjectName(ownerSubject), { slugs }, false);
+    return slugs;
+  }
+
+  async clearBookmarks(ownerSubject) {
+    await this.writeJson(this.bookmarkObjectName(ownerSubject), { slugs: [] }, false);
   }
 
   async getAllProfiles() {
@@ -129,6 +159,11 @@ export class ProfileStore {
     const subject = String(ownerSubject || "");
     if (!/^[a-zA-Z0-9_-]{3,128}$/u.test(subject)) throw new StoreError("所有者情報が不正です。", 400, "INVALID_OWNER");
     return `owners/${subject}.json`;
+  }
+
+  bookmarkObjectName(ownerSubject) {
+    const ownerObjectName = this.ownerObjectName(ownerSubject);
+    return `bookmarks/${ownerObjectName.slice("owners/".length)}`;
   }
 
   async putImage(slug, imageId, bytes) {

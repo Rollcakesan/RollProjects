@@ -15,6 +15,15 @@ test("local profile store creates, reads, updates and deletes profile data", asy
     assert.equal((await store.getProfilesForOwner("google-user-123")).length, 1);
     assert.deepEqual((await store.getAllProfiles()).map((profile) => profile.displayName).sort(), ["Another", "Test"]);
 
+    await store.addBookmark("google-user-123", "tester");
+    await store.addBookmark("google-user-123", "another");
+    await store.addBookmark("google-user-123", "tester");
+    assert.deepEqual(await store.getBookmarks("google-user-123"), ["another", "tester"]);
+    await store.removeBookmark("google-user-123", "another");
+    assert.deepEqual(await store.getBookmarks("google-user-123"), ["tester"]);
+    await store.clearBookmarks("google-user-123");
+    assert.deepEqual(await store.getBookmarks("google-user-123"), []);
+
     await store.updateProfile("tester", { displayName: "Updated", ownerSubject: "google-user-123" });
     assert.equal((await store.getProfile("tester")).displayName, "Updated");
 

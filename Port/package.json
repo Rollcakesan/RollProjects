@@ -1,5 +1,5 @@
 {
-  "name": "rollprojects-port",
+  "name": "rollprojects-urlport",
   "version": "1.0.0",
   "private": true,
   "type": "module",
@@ -7,9 +7,22 @@
     "node": ">=22"
   },
   "scripts": {
+    "build": "esbuild client/main.jsx --bundle --format=esm --target=es2022 --jsx=automatic --outfile=public/react-app.js --minify",
+    "predev": "npm run build",
     "dev": "node --watch src/server.mjs",
+    "prestart": "npm run build",
     "start": "node src/server.mjs",
     "test": "node --test",
-    "check": "node --check src/server.mjs && node --check src/store.mjs && node --check src/google-auth.mjs && node --check src/session-auth.mjs && node --check src/validation.mjs && node --check public/app.js && node --check public/catalog.js && node --check public/editor.js && node --check public/profile-view.js"
+    "check": "npm run build && node --check src/server.mjs && node --check src/store.mjs && node --check src/google-auth.mjs && node --check src/session-auth.mjs && node --check src/validation.mjs"
+  },
+  "dependencies": {
+    "@chakra-ui/react": "^3.36.1",
+    "@emotion/react": "^11.14.0",
+    "react": "^19.2.8",
+    "react-dom": "^19.2.8",
+    "react-icons": "^5.7.0"
+  },
+  "devDependencies": {
+    "esbuild": "^0.28.1"
   }
 }
