@@ -1,7 +1,7 @@
 export async function api(path, options = {}) {
   const headers = { ...options.headers };
   if (options.body) headers["Content-Type"] = "application/json";
-  if (options.auth && !["GET", "HEAD"].includes(options.method || "GET")) headers["X-URLPort-Request"] = "1";
+  if (!["GET", "HEAD"].includes(options.method || "GET")) headers["X-URLPort-Request"] = "1";
   const { auth: _auth, ...fetchOptions } = options;
   const response = await fetch(path, { credentials: "same-origin", ...fetchOptions, headers });
   if (response.status === 204) return {};

@@ -23,6 +23,7 @@ const MIME_TYPES = new Map([
   [".html", "text/html; charset=utf-8"],
   [".js", "text/javascript; charset=utf-8"],
   [".json", "application/json; charset=utf-8"],
+  [".png", "image/png"],
   [".svg", "image/svg+xml"],
   [".txt", "text/plain; charset=utf-8"],
   [".webmanifest", "application/manifest+json; charset=utf-8"],
@@ -74,8 +75,12 @@ const server = createServer(async (request, response) => {
       return await serveMedia(requestUrl.pathname, response);
     }
 
-    if (request.method === "GET" && requestUrl.pathname.startsWith("/u/")) {
+    if (["GET", "HEAD"].includes(request.method || "") && requestUrl.pathname.startsWith("/u/")) {
       return await serveProfile(request, requestUrl.pathname, response);
+    }
+
+    if (["GET", "HEAD"].includes(request.method || "") && requestUrl.pathname === "/sitemap.xml") {
+      return await serveSitemap(request, response);
     }
 
     if (!["GET", "HEAD"].includes(request.method || "")) {
@@ -295,19 +300,36 @@ async function serveProfile(request, pathname, response) {
   const template = await readFile(PROFILE_TEMPLATE_PATH, "utf8");
   const title = `${profile.displayName}｜URLPort`;
   const description = profile.headline || profile.bio || `${profile.displayName}のリンクプロフィール`;
-  const image = absoluteUrl(profile.avatarUrl || profile.coverUrl || "/og-image.svg");
+  const image = absoluteUrl(profile.coverUrl || profile.avatarUrl || "/og-image.png");
   const canonical = `https://port.rollprojects.com/u/${encodeURIComponent(slug)}`;
   const fallbackLinks = profile.links
     .map((link) => `<li><a href="${escapeAttribute(link.url)}">${escapeHtml(link.label)}</a></li>`)
     .join("");
   const fallback = `<section class="profile-fallback"><h1>${escapeHtml(profile.displayName)}</h1><p>${escapeHtml(description)}</p><ul>${fallbackLinks}</ul></section>`;
   const profileJson = JSON.stringify(profile).replaceAll("<", "\\u003c");
+  const profileJsonLd = JSON.stringify({
+    "@context": "https://schema.org",
+    "@type": "ProfilePage",
+    name: title,
+    url: canonical,
+    description,
+    mainEntity: {
+      "@type": "Person",
+      name: profile.displayName,
+      url: canonical,
+      description,
+      image,
+      sameAs: profile.links.map((link) => link.url).filter(Boolean),
+    },
+  }).replaceAll("<", "\\u003c");
   const bootstrapJson = await createBootstrapJson(request);
   const html = template
     .replaceAll("{{TITLE}}", escapeHtml(title))
     .replaceAll("{{DESCRIPTION}}", escapeAttribute(description))
     .replaceAll("{{IMAGE}}", escapeAttribute(image))
+    .replaceAll("{{IMAGE_ALT}}", escapeAttribute(`${profile.displayName}のプロフィール`))
     .replaceAll("{{CANONICAL}}", canonical)
+    .replace("<!--PROFILE_JSON_LD-->", profileJsonLd)
     .replace("<!--PROFILE_JSON-->", profileJson)
     .replace("<!--SESSION_JSON-->", bootstrapJson)
     .replace("<!--PROFILE_FALLBACK-->", fallback);
@@ -317,7 +339,31 @@ async function serveProfile(request, pathname, response) {
     "Content-Length": Buffer.byteLength(html),
     "Content-Type": "text/html; charset=utf-8",
   });
+  if (request.method === "HEAD") return response.end();
   response.end(html);
+}
+
+async function serveSitemap(request, response) {
+  const profiles = await getProfileCatalog();
+  const entries = [
+    "  <url><loc>https://port.rollprojects.com/</loc><changefreq>weekly</changefreq><priority>1.0</priority></url>",
+    ...profiles
+      .sort((left, right) => left.slug.localeCompare(right.slug))
+      .map((profile) => {
+        const lastmod = /^\d{4}-\d{2}-\d{2}/u.exec(profile.updatedAt || profile.createdAt || "")?.[0];
+        const modified = lastmod ? `<lastmod>${lastmod}</lastmod>` : "";
+        return `  <url><loc>https://port.rollprojects.com/u/${encodeURIComponent(profile.slug)}</loc>${modified}<changefreq>weekly</changefreq><priority>0.8</priority></url>`;
+      }),
+  ];
+  const body = `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${entries.join("\n")}\n</urlset>\n`;
+  response.writeHead(200, {
+    ...SECURITY_HEADERS,
+    "Cache-Control": "public, max-age=300",
+    "Content-Length": Buffer.byteLength(body),
+    "Content-Type": "application/xml; charset=utf-8",
+  });
+  if (request.method === "HEAD") return response.end();
+  response.end(body);
 }
 
 async function serveStatic(pathname, request, response) {

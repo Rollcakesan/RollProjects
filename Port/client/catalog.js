@@ -49,6 +49,12 @@ export function paymentMark(id) {
   return PAYMENT_MARKS[id] || paymentType(id).label.slice(0, 2);
 }
 
+export function normalizeUrlInput(value) {
+  const input = String(value || "").trim();
+  if (!input || /^https?:\/\//iu.test(input) || /^[a-z][a-z0-9+.-]*:/iu.test(input)) return input;
+  return `https://${input.replace(/^\/\//u, "")}`;
+}
+
 export function brandIconSlug(id) {
   return BRAND_ICON_SLUGS[id] || "";
 }

@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { Accordion, Alert, AspectRatio, Avatar, Badge, Box, Button, Card, Code, Container, Field as ChakraField, Flex, Heading, HStack, IconButton, Image, Input, NativeSelect, SimpleGrid, Stack, Tabs, Text, Textarea } from "@chakra-ui/react";
 import { LuCheck, LuExternalLink, LuGripVertical, LuImage, LuPlus, LuTrash2 } from "react-icons/lu";
 import { api } from "./api.js";
-import { PAYMENT_TYPES, PLATFORMS, blankProfile, platform, profileSummary } from "./catalog.js";
+import { PAYMENT_TYPES, PLATFORMS, blankProfile, normalizeUrlInput, platform, profileSummary } from "./catalog.js";
 import { ProfileView } from "./profile-components.jsx";
 import { LinkButton, LoadingState, MessagePage } from "./ui.jsx";
 
@@ -238,7 +238,7 @@ function LinkEditor({ link, index, open, sorting, onToggle, onChange, onRemove, 
       <SimpleGrid columns={{ base: 1, md: 2 }} gap="4">
         <Field label="サービス"><NativeSelect.Root><NativeSelect.Field value={link.platform} onChange={(event) => onChange("platform", event.target.value)}>{PLATFORMS.map((item) => <option key={item.id} value={item.id}>{item.label}</option>)}</NativeSelect.Field><NativeSelect.Indicator /></NativeSelect.Root></Field>
         <Field label="表示名"><Input value={link.label} onChange={(event) => onChange("label", event.target.value)} maxLength="80" placeholder="GitHub" /></Field>
-        <Field label="URL" required wide><Input type="url" value={link.url} onChange={(event) => onChange("url", event.target.value)} required placeholder="https://..." /></Field>
+        <Field label="URL" required wide helper="https:// は省略できます。"><Input type="text" inputMode="url" autoCapitalize="none" spellCheck={false} value={link.url} onChange={(event) => onChange("url", event.target.value)} onBlur={(event) => onChange("url", normalizeUrlInput(event.target.value))} required placeholder="example.com" /></Field>
         <Field label="説明" wide><Input value={link.description} onChange={(event) => onChange("description", event.target.value)} maxLength="180" placeholder="プロジェクトやリンクの説明" /></Field>
         <ChakraField.Root gridColumn="1 / -1"><ChakraField.Label>サムネイル</ChakraField.Label><HStack>{link.thumbnailUrl ? <Image src={link.thumbnailUrl} alt="" width="24" height="14" borderRadius="md" objectFit="cover" /> : <Flex width="24" height="14" align="center" justify="center" background="bg.muted" borderRadius="md"><LuImage /></Flex>}<Button asChild size="sm" variant="outline"><label><input hidden type="file" accept="image/jpeg,image/png,image/webp" onChange={(event) => onImage(`link:${link.id}`, event.target.files?.[0])} />画像を選択</label></Button>{link.thumbnailUrl ? <Button type="button" size="sm" colorPalette="red" variant="ghost" onClick={() => onClear(`link:${link.id}`)}>削除</Button> : null}</HStack></ChakraField.Root>
       </SimpleGrid><Flex justify="flex-end" marginTop="4"><Button type="button" size="sm" colorPalette="red" variant="ghost" onClick={onRemove}><LuTrash2 />このリンクを削除</Button></Flex>
@@ -254,7 +254,7 @@ function PaymentEditor({ payment, index, open, sorting, onToggle, onChange, onRe
         <Field label="表示名"><Input value={payment.label} onChange={(event) => onChange("label", event.target.value)} maxLength="80" placeholder="作品代金のお振込先" /></Field>
         <Field label="振込・送金先" required wide><Textarea value={payment.destination} onChange={(event) => onChange("destination", event.target.value)} maxLength="300" rows="3" required placeholder="銀行名・支店名・口座番号・名義、または送金ID" /></Field>
         <Field label="補足" wide><Input value={payment.note} onChange={(event) => onChange("note", event.target.value)} maxLength="240" placeholder="振込名義をメッセージでお知らせください" /></Field>
-        <Field label="送金ページURL" wide><Input type="url" value={payment.url} onChange={(event) => onChange("url", event.target.value)} placeholder="https://..." /></Field>
+        <Field label="送金ページURL" wide helper="https:// は省略できます。"><Input type="text" inputMode="url" autoCapitalize="none" spellCheck={false} value={payment.url} onChange={(event) => onChange("url", event.target.value)} onBlur={(event) => onChange("url", normalizeUrlInput(event.target.value))} placeholder="example.com/pay" /></Field>
       </SimpleGrid><Flex justify="flex-end" marginTop="4"><Button type="button" size="sm" colorPalette="red" variant="ghost" onClick={onRemove}><LuTrash2 />この振込・送金先を削除</Button></Flex>
     </SortableAccordion>
   );

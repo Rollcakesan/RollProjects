@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 630">
+  <rect width="1200" height="630" fill="#101827"/>
+  <path d="M0 0h1200v14H0z" fill="#e84d35"/>
+  <g stroke="#fff" stroke-opacity=".06"><path d="M0 105h1200M0 210h1200M0 315h1200M0 420h1200M0 525h1200"/><path d="M100 0v630M300 0v630M500 0v630M700 0v630M900 0v630M1100 0v630"/></g>
+  <circle cx="960" cy="315" r="210" fill="#198768"/>
+  <text x="90" y="205" font-family="Arial,sans-serif" font-size="54" font-weight="700" letter-spacing="8" fill="#fff">J / INFO</text>
+  <text x="90" y="360" font-family="Arial,sans-serif" font-size="86" font-weight="700" fill="#fff">公共情報ツール</text>
+  <text x="94" y="448" font-family="Arial,sans-serif" font-size="26" letter-spacing="2" fill="#aab3c0">防災・法令・地図・行政データ・図書</text>
+  <g fill="none" stroke="#fff" stroke-width="14" stroke-linecap="round" stroke-linejoin="round"><path d="M870 245h180v150H870z"/><path d="M900 215h120M915 285h90M915 325h90M915 365h55"/></g>
+</svg>

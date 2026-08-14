@@ -22,6 +22,16 @@ test("normalizeProfile strips credentials from URLs and caps fields", () => {
   assert.equal(profile.links[0].url, "https://example.com/path");
 });
 
+test("normalizeProfile adds https to links and payment URLs without a scheme", () => {
+  const profile = normalizeProfile({
+    displayName: "Test",
+    links: [{ url: "example.com/path" }],
+    payments: [{ destination: "Account", url: "pay.example.com/send" }],
+  });
+  assert.equal(profile.links[0].url, "https://example.com/path");
+  assert.equal(profile.payments[0].url, "https://pay.example.com/send");
+});
+
 test("normalizeProfile rejects unsafe URL schemes", () => {
   assert.throws(() => normalizeProfile({ displayName: "Test", links: [{ url: "javascript:alert(1)" }] }), ValidationError);
 });

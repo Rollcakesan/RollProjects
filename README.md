@@ -2,6 +2,8 @@
 
 `rollprojects` GCPプロジェクトで運用する小規模Webアプリのモノレポです。
 
+全体概要は[`PROJECTS_OVERVIEW.md`](./PROJECTS_OVERVIEW.md)を参照してください。
+
 ## Apps
 
 - [`DAdressMap`](./DAdressMap) — デジタルアドレスマップ

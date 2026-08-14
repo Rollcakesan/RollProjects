@@ -115,13 +115,18 @@ function imageUrl(value, allowDataImages) {
 }
 
 function externalUrl(value) {
-  const candidate = String(value || "").trim();
-  if (!candidate) return "";
+  const input = String(value || "").trim();
+  if (!input) return "";
+  const explicitScheme = /^[a-z][a-z0-9+.-]*:/iu.test(input);
+  if (explicitScheme && !/^https?:\/\//iu.test(input)) {
+    throw new ValidationError("URLはhttps://またはhttp://のみ使用できます。");
+  }
+  const candidate = explicitScheme ? input : `https://${input.replace(/^\/\//u, "")}`;
   let parsed;
   try {
     parsed = new URL(candidate);
   } catch {
-    throw new ValidationError("URLはhttps://またはhttp://から入力してください。");
+    throw new ValidationError("URLの形式を確認してください。");
   }
   if (!["https:", "http:"].includes(parsed.protocol)) {
     throw new ValidationError("URLはhttps://またはhttp://のみ使用できます。");
