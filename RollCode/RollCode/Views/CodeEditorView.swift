@@ -8,6 +8,7 @@ struct CodeEditorView: NSViewRepresentable {
     let searchRequest: EditorSearchRequest?
     let navigationRequest: EditorNavigationRequest?
     let tabWidth: Int
+    let fontSize: CGFloat
 
     func makeCoordinator() -> Coordinator {
         Coordinator(parent: self)
@@ -39,9 +40,13 @@ struct CodeEditorView: NSViewRepresentable {
             .foregroundColor: EditorPalette.foreground
         ]
         textView.textContainerInset = NSSize(width: 10, height: 10)
-        textView.font = EditorPalette.font
+        let editorFont = EditorPalette.font(size: fontSize)
+        textView.font = editorFont
         textView.textColor = EditorPalette.foreground
-        textView.defaultParagraphStyle = EditorPalette.paragraphStyle(tabWidth: tabWidth)
+        let paragraphStyle = EditorPalette.paragraphStyle(tabWidth: tabWidth, fontSize: fontSize)
+        textView.defaultParagraphStyle = paragraphStyle
+        textView.typingAttributes[.font] = editorFont
+        textView.typingAttributes[.paragraphStyle] = paragraphStyle
         textView.minSize = NSSize(width: 0, height: scrollView.contentSize.height)
         textView.maxSize = NSSize(width: CGFloat.greatestFiniteMagnitude, height: CGFloat.greatestFiniteMagnitude)
         textView.isVerticallyResizable = true
@@ -65,7 +70,12 @@ struct CodeEditorView: NSViewRepresentable {
     func updateNSView(_ scrollView: NSScrollView, context: Context) {
         context.coordinator.parent = self
         guard let textView = scrollView.documentView as? NSTextView else { return }
-        let paragraphStyle = EditorPalette.paragraphStyle(tabWidth: tabWidth)
+        let editorFont = EditorPalette.font(size: fontSize)
+        if textView.font != editorFont {
+            textView.font = editorFont
+            textView.typingAttributes[.font] = editorFont
+        }
+        let paragraphStyle = EditorPalette.paragraphStyle(tabWidth: tabWidth, fontSize: fontSize)
         textView.defaultParagraphStyle = paragraphStyle
         textView.typingAttributes[.paragraphStyle] = paragraphStyle
 
@@ -187,10 +197,10 @@ struct CodeEditorView: NSViewRepresentable {
             isApplyingAttributes = true
             textStorage.beginEditing()
             textStorage.setAttributes([
-                .font: EditorPalette.font,
+                .font: EditorPalette.font(size: parent.fontSize),
                 .foregroundColor: EditorPalette.foreground,
                 .backgroundColor: EditorPalette.background,
-                .paragraphStyle: EditorPalette.paragraphStyle(tabWidth: parent.tabWidth)
+                .paragraphStyle: EditorPalette.paragraphStyle(tabWidth: parent.tabWidth, fontSize: parent.fontSize)
             ], range: fullRange)
 
             for rule in SyntaxRules.rules(for: language) {
@@ -225,9 +235,13 @@ private enum EditorPalette {
     static var searchMatch: NSColor { RollCodeTheme.nsSearchMatch }
     static var font: NSFont { RollCodeTheme.editorFont }
 
-    static func paragraphStyle(tabWidth: Int) -> NSParagraphStyle {
+    static func font(size: CGFloat) -> NSFont {
+        .monospacedSystemFont(ofSize: size, weight: .regular)
+    }
+
+    static func paragraphStyle(tabWidth: Int, fontSize: CGFloat = 12.5) -> NSParagraphStyle {
         let style = NSMutableParagraphStyle()
-        let spaceWidth = (" " as NSString).size(withAttributes: [.font: font]).width
+        let spaceWidth = (" " as NSString).size(withAttributes: [.font: font(size: fontSize)]).width
         style.defaultTabInterval = spaceWidth * CGFloat(tabWidth)
         style.tabStops = []
         return style

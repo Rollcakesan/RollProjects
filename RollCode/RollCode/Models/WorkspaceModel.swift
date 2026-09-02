@@ -18,6 +18,10 @@ final class WorkspaceModel {
     var editorNavigationRequest: EditorNavigationRequest?
     var renamingURL: URL?
     var renamingName = ""
+    var creatingItemParentURL: URL?
+    var creatingItemIsDirectory = false
+    var creatingItemName = ""
+    private(set) var fontSize: CGFloat
     private(set) var tabWidth: Int
     private(set) var isLoadingTree = false
 
@@ -26,11 +30,14 @@ final class WorkspaceModel {
     @ObservationIgnored private var isCheckingExternalChanges = false
     private static let lastWorkspacePathKey = "RollCode.lastWorkspacePath"
     private static let tabWidthKey = "RollCode.editorTabWidth"
+    private static let fontSizeKey = "RollCode.editorFontSize"
 
     init(defaults: UserDefaults = .standard, restoresLastWorkspace: Bool = true) {
         self.defaults = defaults
         let savedTabWidth = defaults.integer(forKey: Self.tabWidthKey)
         self.tabWidth = [2, 4, 8].contains(savedTabWidth) ? savedTabWidth : 4
+        let savedFontSize = defaults.double(forKey: Self.fontSizeKey)
+        self.fontSize = savedFontSize >= 9 && savedFontSize <= 32 ? CGFloat(savedFontSize) : 12.5
         guard restoresLastWorkspace,
               let path = defaults.string(forKey: Self.lastWorkspacePathKey) else { return }
 
@@ -95,6 +102,23 @@ final class WorkspaceModel {
         guard [2, 4, 8].contains(width) else { return }
         tabWidth = width
         defaults.set(width, forKey: Self.tabWidthKey)
+    }
+
+    func zoomIn() {
+        setFontSize(min(fontSize + 1, 32))
+    }
+
+    func zoomOut() {
+        setFontSize(max(fontSize - 1, 9))
+    }
+
+    func resetZoom() {
+        setFontSize(12.5)
+    }
+
+    func setFontSize(_ size: CGFloat) {
+        fontSize = min(max(size, 9), 32)
+        defaults.set(Double(fontSize), forKey: Self.fontSizeKey)
     }
 
     func quickOpenFiles(matching query: String) -> [FileNode] {
@@ -313,6 +337,70 @@ final class WorkspaceModel {
     func cancelRename() {
         renamingURL = nil
         renamingName = ""
+    }
+
+    func requestCreateFile(in parentURL: URL) {
+        creatingItemParentURL = parentURL
+        creatingItemIsDirectory = false
+        creatingItemName = "untitled.txt"
+    }
+
+    func requestCreateFolder(in parentURL: URL) {
+        creatingItemParentURL = parentURL
+        creatingItemIsDirectory = true
+        creatingItemName = "New Folder"
+    }
+
+    func confirmCreateItem() {
+        guard let parentURL = creatingItemParentURL else { return }
+        let isDirectory = creatingItemIsDirectory
+        let name = creatingItemName.trimmed
+        creatingItemParentURL = nil
+        creatingItemName = ""
+
+        guard !name.isEmpty, name != ".", name != "..", !name.contains("/") else {
+            alertMessage = "Please enter a valid name."
+            return
+        }
+
+        let targetURL = parentURL.appendingPathComponent(name)
+        guard !FileManager.default.fileExists(atPath: targetURL.path) else {
+            alertMessage = "An item named \(name) already exists."
+            return
+        }
+
+        do {
+            if isDirectory {
+                try FileManager.default.createDirectory(at: targetURL, withIntermediateDirectories: true)
+            } else {
+                try Data().write(to: targetURL, options: .atomic)
+                openFile(targetURL)
+            }
+            refreshTree()
+        } catch {
+            alertMessage = "Could not create \(name): \(error.localizedDescription)"
+        }
+    }
+
+    func cancelCreateItem() {
+        creatingItemParentURL = nil
+        creatingItemName = ""
+    }
+
+    func deleteItem(at url: URL) {
+        let openDocsToClose = documents.filter { doc in
+            doc.url == url || doc.url.path.hasPrefix(url.path + "/")
+        }
+        for doc in openDocsToClose {
+            closeDocument(doc)
+        }
+
+        do {
+            try FileManager.default.trashItem(at: url, resultingItemURL: nil)
+            refreshTree()
+        } catch {
+            alertMessage = "Could not move \(url.lastPathComponent) to Trash: \(error.localizedDescription)"
+        }
     }
 
     func renameItem(at source: URL, to newName: String) throws(WorkspaceError) {

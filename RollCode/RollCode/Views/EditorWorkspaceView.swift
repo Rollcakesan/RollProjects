@@ -130,7 +130,8 @@ private struct EditorDocumentView: View {
                 searchTerm: searchTerm,
                 searchRequest: searchRequest,
                 navigationRequest: workspace.editorNavigationRequest,
-                tabWidth: workspace.tabWidth
+                tabWidth: workspace.tabWidth,
+                fontSize: workspace.fontSize
             )
         }
         .background {

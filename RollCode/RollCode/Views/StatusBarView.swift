@@ -25,13 +25,20 @@ struct StatusBarView: View {
 }
 
 private struct ActiveDocumentStatus: View {
+    @Environment(WorkspaceModel.self) private var workspace
     let document: EditorDocument
 
     var body: some View {
         Group {
             Text(document.language.displayName)
             Text("\(document.lineCount) lines")
+            Text(fontSizeText)
             Text("UTF-8")
         }
+    }
+
+    private var fontSizeText: String {
+        let size = workspace.fontSize
+        return size == floor(size) ? "\(Int(size)) pt" : String(format: "%.1f pt", size)
     }
 }

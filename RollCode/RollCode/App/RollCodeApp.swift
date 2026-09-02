@@ -45,6 +45,13 @@ struct RollCodeApp: App {
                     .disabled(workspace.activeDocument == nil)
             }
             CommandMenu("View") {
+                Button("Zoom In") { workspace.zoomIn() }
+                    .keyboardShortcut("+", modifiers: [.command])
+                Button("Zoom Out") { workspace.zoomOut() }
+                    .keyboardShortcut("-", modifiers: [.command])
+                Button("Actual Size") { workspace.resetZoom() }
+                    .keyboardShortcut("0", modifiers: [.command])
+                Divider()
                 Button(terminal.isVisible ? "Hide Terminal" : "Show Terminal") {
                     terminal.isVisible.toggle()
                 }

@@ -48,6 +48,13 @@ struct ContentView: View {
         } message: {
             Text("Enter a new name for \(workspace.renamingURL?.lastPathComponent ?? "this item").")
         }
+        .alert(workspace.creatingItemIsDirectory ? "New Folder" : "New File", isPresented: createBinding) {
+            TextField("Name", text: $workspace.creatingItemName)
+            Button("Create") { workspace.confirmCreateItem() }
+            Button("Cancel", role: .cancel) { workspace.cancelCreateItem() }
+        } message: {
+            Text("Enter a name for the new \(workspace.creatingItemIsDirectory ? "folder" : "file").")
+        }
         .sheet(isPresented: $workspace.isQuickOpenPresented) {
             QuickOpenView(isPresented: $workspace.isQuickOpenPresented)
         }
@@ -91,6 +98,13 @@ struct ContentView: View {
         Binding(
             get: { workspace.renamingURL != nil },
             set: { if !$0 { workspace.cancelRename() } }
+        )
+    }
+
+    private var createBinding: Binding<Bool> {
+        Binding(
+            get: { workspace.creatingItemParentURL != nil },
+            set: { if !$0 { workspace.cancelCreateItem() } }
         )
     }
 }

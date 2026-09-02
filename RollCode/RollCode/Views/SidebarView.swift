@@ -111,7 +111,13 @@ private struct FileContextMenu: View {
     let node: FileNode
 
     var body: some View {
+        let targetFolder = node.isDirectory ? node.url : node.url.deletingLastPathComponent()
+        Button("New File…") { workspace.requestCreateFile(in: targetFolder) }
+        Button("New Folder…") { workspace.requestCreateFolder(in: targetFolder) }
+        Divider()
         Button("Rename…") { workspace.requestRename(node.url) }
+        Button("Move to Trash", role: .destructive) { workspace.deleteItem(at: node.url) }
+        Divider()
         Button("Show in Finder") { workspace.revealInFinder(node.url) }
     }
 }

@@ -359,6 +359,65 @@ struct RollCodeTests {
             #expect(restoredWorkspace.rootURL == root.standardizedFileURL)
         }
     }
+
+    @Test("WorkspaceModel manages and persists font size zoom levels")
+    @MainActor
+    func workspaceManagesFontSizeZoom() throws {
+        let suiteName = "RollCodeTests.\(UUID().uuidString)"
+        let defaults = try #require(UserDefaults(suiteName: suiteName))
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+
+        let workspace = WorkspaceModel(defaults: defaults, restoresLastWorkspace: false)
+        #expect(workspace.fontSize == 12.5)
+
+        workspace.zoomIn()
+        #expect(workspace.fontSize == 13.5)
+
+        workspace.zoomOut()
+        workspace.zoomOut()
+        #expect(workspace.fontSize == 11.5)
+
+        workspace.resetZoom()
+        #expect(workspace.fontSize == 12.5)
+
+        workspace.setFontSize(35)
+        #expect(workspace.fontSize == 32)
+
+        workspace.setFontSize(5)
+        #expect(workspace.fontSize == 9)
+
+        let restored = WorkspaceModel(defaults: defaults, restoresLastWorkspace: false)
+        #expect(restored.fontSize == 9)
+    }
+
+    @Test("WorkspaceModel creates files and folders and moves to Trash")
+    @MainActor
+    func workspaceCreatesAndDeletesItems() throws {
+        try withTemporaryDirectory { root in
+            let workspace = WorkspaceModel(restoresLastWorkspace: false)
+            workspace.openWorkspace(root)
+
+            workspace.requestCreateFile(in: root)
+            workspace.creatingItemName = "test.swift"
+            workspace.confirmCreateItem()
+
+            let createdFile = root.appendingPathComponent("test.swift")
+            #expect(FileManager.default.fileExists(atPath: createdFile.path))
+            #expect(workspace.activeDocument?.url == createdFile)
+
+            workspace.requestCreateFolder(in: root)
+            workspace.creatingItemName = "Subfolder"
+            workspace.confirmCreateItem()
+
+            let createdFolder = root.appendingPathComponent("Subfolder")
+            var isDir: ObjCBool = false
+            #expect(FileManager.default.fileExists(atPath: createdFolder.path, isDirectory: &isDir) && isDir.boolValue)
+
+            workspace.deleteItem(at: createdFile)
+            #expect(!FileManager.default.fileExists(atPath: createdFile.path))
+            #expect(workspace.activeDocument == nil)
+        }
+    }
 }
 
 @MainActor
