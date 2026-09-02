@@ -3,6 +3,7 @@ import SwiftUI
 struct AgentPanelView: View {
     @Environment(AgentSession.self) private var agent
     @Environment(WorkspaceModel.self) private var workspace
+    @Environment(TerminalSession.self) private var terminal
     @State private var prompt = ""
     @FocusState private var promptFocused: Bool
 
@@ -21,6 +22,9 @@ struct AgentPanelView: View {
             }
         }
         .background(RollCodeTheme.sidebarBackground)
+        .onAppear {
+            agent.auth.refresh()
+        }
     }
 
     private var header: some View {
@@ -36,6 +40,8 @@ struct AgentPanelView: View {
                 .clipShape(Capsule())
         } trailing: {
             HStack(spacing: 7) {
+                authBadge
+
                 if agent.isRunning {
                     Button { agent.stop() } label: {
                         Image(systemName: "stop.fill")
@@ -54,9 +60,75 @@ struct AgentPanelView: View {
         }
     }
 
+    @ViewBuilder
+    private var authBadge: some View {
+        switch agent.auth.status {
+        case .loggedIn(_, let email, _):
+            HStack(spacing: 4) {
+                Circle()
+                    .fill(Color.green)
+                    .frame(width: 6, height: 6)
+                Text(email ?? "ChatGPT")
+                    .font(.system(size: 9))
+                    .foregroundStyle(RollCodeTheme.secondaryText)
+                    .lineLimit(1)
+            }
+            .help("Logged in to Codex via ChatGPT")
+        case .apiKey:
+            HStack(spacing: 4) {
+                Circle()
+                    .fill(Color.blue)
+                    .frame(width: 6, height: 6)
+                Text("API Key")
+                    .font(.system(size: 9))
+                    .foregroundStyle(RollCodeTheme.secondaryText)
+            }
+            .help("Authenticated via OPENAI_API_KEY")
+        case .unauthenticated:
+            Button {
+                agent.auth.requestLogin(in: terminal)
+            } label: {
+                HStack(spacing: 3) {
+                    Image(systemName: "person.crop.circle.badge.plus")
+                    Text("Log In")
+                }
+                .font(.system(size: 9, weight: .medium))
+            }
+            .buttonStyle(.bordered)
+            .controlSize(.mini)
+            .help("Log in with ChatGPT account via 'codex login'")
+        case .cliNotInstalled:
+            EmptyView()
+        }
+    }
+
     private var conversation: some View {
         ScrollView {
             LazyVStack(alignment: .leading, spacing: 10) {
+                if agent.auth.status == .unauthenticated {
+                    HStack(spacing: 8) {
+                        Image(systemName: "person.badge.key.fill")
+                            .foregroundStyle(RollCodeTheme.accent)
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("Codex Login")
+                                .font(.system(size: 11, weight: .medium))
+                                .foregroundStyle(RollCodeTheme.primaryText)
+                            Text("Log in with your ChatGPT account to use Codex without an API key.")
+                                .font(.system(size: 10))
+                                .foregroundStyle(RollCodeTheme.secondaryText)
+                        }
+                        Spacer()
+                        Button("Log In") {
+                            agent.auth.requestLogin(in: terminal)
+                        }
+                        .buttonStyle(.borderedProminent)
+                        .controlSize(.small)
+                    }
+                    .padding(8)
+                    .background(RollCodeTheme.elevatedBackground)
+                    .clipShape(RoundedRectangle(cornerRadius: 6))
+                }
+
                 if agent.entries.isEmpty {
                     VStack(alignment: .leading, spacing: 7) {
                         Text("What should I change?")

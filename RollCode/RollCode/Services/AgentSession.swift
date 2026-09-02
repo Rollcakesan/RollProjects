@@ -22,14 +22,19 @@ final class AgentSession {
     private(set) var threadID: String?
     private var runState = RunState.idle
 
+    let auth: CodexAuthService
     @ObservationIgnored let executableURL: URL?
     var onRunCompleted: (@MainActor @Sendable () -> Void)?
 
     @ObservationIgnored private var errorBuffer = ""
     @ObservationIgnored private var workspaceURL: URL?
 
-    init(executableURL: URL? = CodexExecutableLocator.locate()) {
+    init(
+        executableURL: URL? = CodexExecutableLocator.locate(),
+        auth: CodexAuthService = CodexAuthService()
+    ) {
         self.executableURL = executableURL
+        self.auth = auth
     }
 
     var isAvailable: Bool { executableURL != nil }
@@ -230,7 +235,14 @@ final class AgentSession {
             entries.append(.message(AgentMessage(role: .system, text: "Agent stopped.")))
         } else if exitCode != 0 {
             let detail = errorBuffer.trimmingCharacters(in: .whitespacesAndNewlines)
-            let message = detail.isEmpty ? "Codex exited with code \(exitCode)." : detail
+            let lower = detail.lowercased()
+            let message: String
+            if lower.contains("unauthorized") || lower.contains("login") || lower.contains("authentication") {
+                auth.refresh()
+                message = "Codex authentication required. Please click 'Log In' or run 'codex login' in the terminal.\n(\(detail))"
+            } else {
+                message = detail.isEmpty ? "Codex exited with code \(exitCode)." : detail
+            }
             entries.append(.message(AgentMessage(role: .system, text: message)))
         }
         onRunCompleted?()

@@ -614,6 +614,38 @@ struct RollCodeTests {
             #expect(doc.text == "disk modified")
         }
     }
+
+    @Test("CodexAuthService parses ChatGPT login mode and credentials")
+    @MainActor
+    func codexAuthServiceParsesChatGPTLogin() throws {
+        try withTemporaryDirectory { root in
+            let authFile = root.appending(path: "auth.json")
+            let payload = """
+            {"auth_mode":"chatgpt","OPENAI_API_KEY":null,"tokens":{"id_token":"eyJhbGciOiJSUzI1NiJ9.eyJlbWFpbCI6InRlc3RAZXhhbXBsZS5jb20iLCJodHRwczovL2FwaS5vcGVuYWkuY29tL2F1dGgiOnsiY2hhdGdwdF9wbGFuX3R5cGUiOiJwbHVzIn19.signature","access_token":"mock"}}
+            """
+            try payload.write(to: authFile, atomically: true, encoding: .utf8)
+
+            let service = CodexAuthService(authFileURL: authFile, isCLIAvailable: { true })
+            #expect(service.status == .loggedIn(mode: "ChatGPT", email: "test@example.com", plan: "plus"))
+            #expect(service.status.displayText == "test@example.com (Plus)")
+        }
+    }
+
+    @Test("CodexAuthService detects API key authentication")
+    @MainActor
+    func codexAuthServiceDetectsAPIKey() throws {
+        try withTemporaryDirectory { root in
+            let authFile = root.appending(path: "auth.json")
+            let payload = """
+            {"OPENAI_API_KEY":"sk-proj-test1234"}
+            """
+            try payload.write(to: authFile, atomically: true, encoding: .utf8)
+
+            let service = CodexAuthService(authFileURL: authFile, isCLIAvailable: { true })
+            #expect(service.status == .apiKey)
+            #expect(service.status.displayText == "API Key")
+        }
+    }
 }
 
 @MainActor

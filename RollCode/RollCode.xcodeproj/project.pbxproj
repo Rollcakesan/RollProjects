@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		101651C81DBC1CD7BB090EE2 /* CodexAuthService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 14E27D90A922B2F06EF834AD /* CodexAuthService.swift */; };
 		1464840D23149E96B3BD5F4F /* FileNode.swift in Sources */ = {isa = PBXBuildFile; fileRef = 328A8D80C05DF42F6C69D982 /* FileNode.swift */; };
 		1A8C632D8AAD6BADE387FD84 /* TerminalView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 06E3E5E96609BAC7EC257FA5 /* TerminalView.swift */; };
 		236857F5CF1898DC2CC54FD8 /* EditorDocument.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6052BD8029E5C5686780E276 /* EditorDocument.swift */; };
@@ -47,6 +48,7 @@
 
 /* Begin PBXFileReference section */
 		06E3E5E96609BAC7EC257FA5 /* TerminalView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TerminalView.swift; sourceTree = "<group>"; };
+		14E27D90A922B2F06EF834AD /* CodexAuthService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CodexAuthService.swift; sourceTree = "<group>"; };
 		1BD7FA7D88687B1494C4B3D0 /* EditorWorkspaceView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EditorWorkspaceView.swift; sourceTree = "<group>"; };
 		1F8C2201CCD6286378E4D647 /* RollCodeTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RollCodeTests.swift; sourceTree = "<group>"; };
 		2C6F410620414229ED11ECD0 /* GitChangesView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GitChangesView.swift; sourceTree = "<group>"; };
@@ -83,6 +85,7 @@
 			children = (
 				AA646C471ED0C5A0E214CEA4 /* AgentModels.swift */,
 				A549CD233C56C9F84396A847 /* AgentSession.swift */,
+				14E27D90A922B2F06EF834AD /* CodexAuthService.swift */,
 				8F5C0D8DA9486ACF50CC812A /* CodexEventParser.swift */,
 				50BCDAC7F3D1F9F9A3BD1D9F /* GitDiffService.swift */,
 				EE1CBC30691ED77150C53A0C /* TerminalSession.swift */,
@@ -281,6 +284,7 @@
 				ABFEB9698D7F1107FCCE094A /* AgentPanelView.swift in Sources */,
 				57558564A0CB286E9B5E4368 /* AgentSession.swift in Sources */,
 				D59906FAAE255735531190E5 /* CodeEditorView.swift in Sources */,
+				101651C81DBC1CD7BB090EE2 /* CodexAuthService.swift in Sources */,
 				363D65C9942CB9841923327A /* CodexEventParser.swift in Sources */,
 				58E50C1CFBA9F0F95EB8BDC5 /* ContentView.swift in Sources */,
 				236857F5CF1898DC2CC54FD8 /* EditorDocument.swift in Sources */,
