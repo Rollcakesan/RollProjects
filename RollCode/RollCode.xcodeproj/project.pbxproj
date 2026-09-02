@@ -14,8 +14,10 @@
 		34D92B120E17117437B4C83A /* RollCodeApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2F8771B99C9BA40F3DC618D /* RollCodeApp.swift */; };
 		41DA4DA7784C1173E4636615 /* QuickOpenView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 838061E9A81A90C22BBD98D3 /* QuickOpenView.swift */; };
 		52C6FEA5161F920474CE0DB0 /* QuickOpenMatcher.swift in Sources */ = {isa = PBXBuildFile; fileRef = 44977B11D03F860D685F7786 /* QuickOpenMatcher.swift */; };
+		57558564A0CB286E9B5E4368 /* AgentSession.swift in Sources */ = {isa = PBXBuildFile; fileRef = A549CD233C56C9F84396A847 /* AgentSession.swift */; };
 		58E50C1CFBA9F0F95EB8BDC5 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8C72D31622D2C578313E4592 /* ContentView.swift */; };
 		8C902C37A357B6D62BDE498A /* StatusBarView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 95C30C09271F19837D613065 /* StatusBarView.swift */; };
+		ABFEB9698D7F1107FCCE094A /* AgentPanelView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C9C767C9339F05FD8B88FF4D /* AgentPanelView.swift */; };
 		BA0A6FF1AC63E894958177DE /* WorkspaceModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 48D8E08B9D3380DF5FEF51D2 /* WorkspaceModel.swift */; };
 		D14EDE2AF7E1C44A04148482 /* EditorWorkspaceView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1BD7FA7D88687B1494C4B3D0 /* EditorWorkspaceView.swift */; };
 		D59906FAAE255735531190E5 /* CodeEditorView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 431906205771AD178AFE3D62 /* CodeEditorView.swift */; };
@@ -53,7 +55,9 @@
 		97AD5646F48C77219D92C517 /* RollCodeTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = RollCodeTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		988FB931D37AB17FC291259C /* WorkspaceToolbar.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkspaceToolbar.swift; sourceTree = "<group>"; };
 		A53F3A5C117C4C95F12CACBD /* RollCode.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = RollCode.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		A549CD233C56C9F84396A847 /* AgentSession.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AgentSession.swift; sourceTree = "<group>"; };
 		B2F8771B99C9BA40F3DC618D /* RollCodeApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RollCodeApp.swift; sourceTree = "<group>"; };
+		C9C767C9339F05FD8B88FF4D /* AgentPanelView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AgentPanelView.swift; sourceTree = "<group>"; };
 		D280C8447EC335A6A3B32529 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		EE1CBC30691ED77150C53A0C /* TerminalSession.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TerminalSession.swift; sourceTree = "<group>"; };
 		F19EA110FDE9DCE79DB3D1D8 /* SidebarView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SidebarView.swift; sourceTree = "<group>"; };
@@ -63,6 +67,7 @@
 		00BE4F6E0B545B2C434D5286 /* Services */ = {
 			isa = PBXGroup;
 			children = (
+				A549CD233C56C9F84396A847 /* AgentSession.swift */,
 				EE1CBC30691ED77150C53A0C /* TerminalSession.swift */,
 			);
 			path = Services;
@@ -83,6 +88,7 @@
 		1C38DC2F405F2DFE6A7EA57C /* Views */ = {
 			isa = PBXGroup;
 			children = (
+				C9C767C9339F05FD8B88FF4D /* AgentPanelView.swift */,
 				431906205771AD178AFE3D62 /* CodeEditorView.swift */,
 				8C72D31622D2C578313E4592 /* ContentView.swift */,
 				1BD7FA7D88687B1494C4B3D0 /* EditorWorkspaceView.swift */,
@@ -250,6 +256,8 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				ABFEB9698D7F1107FCCE094A /* AgentPanelView.swift in Sources */,
+				57558564A0CB286E9B5E4368 /* AgentSession.swift in Sources */,
 				D59906FAAE255735531190E5 /* CodeEditorView.swift in Sources */,
 				58E50C1CFBA9F0F95EB8BDC5 /* ContentView.swift in Sources */,
 				236857F5CF1898DC2CC54FD8 /* EditorDocument.swift in Sources */,

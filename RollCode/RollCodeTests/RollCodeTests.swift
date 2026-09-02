@@ -2,6 +2,88 @@ import XCTest
 @testable import RollCode
 
 final class RollCodeTests: XCTestCase {
+    func testCodexEventParserReadsThreadMessagesCommandsAndChanges() throws {
+        let thread = try XCTUnwrap(CodexEventParser.parse(
+            #"{"type":"thread.started","thread_id":"thread-123"}"#
+        ))
+        XCTAssertEqual(thread.threadID, "thread-123")
+
+        let message = try XCTUnwrap(CodexEventParser.parse(
+            #"{"type":"item.completed","item":{"id":"item-1","type":"agent_message","text":"Done"}}"#
+        ))
+        XCTAssertEqual(message.message, "Done")
+
+        let command = try XCTUnwrap(CodexEventParser.parse(
+            #"{"type":"item.completed","item":{"id":"item-2","type":"command_execution","command":"swift test","aggregated_output":"ok","exit_code":0,"status":"completed"}}"#
+        ))
+        XCTAssertEqual(command.activity?.title, "swift test")
+        XCTAssertEqual(command.activity?.detail, "ok")
+        XCTAssertEqual(command.activity?.state, .completed)
+
+        let change = try XCTUnwrap(CodexEventParser.parse(
+            #"{"type":"item.completed","item":{"id":"item-3","type":"file_change","changes":[{"path":"/tmp/App.swift","kind":"update"}],"status":"completed"}}"#
+        ))
+        XCTAssertEqual(change.changedFiles, ["/tmp/App.swift"])
+        XCTAssertEqual(change.activity?.state, .completed)
+    }
+
+    func testCodexEventParserReadsUsageAndFailures() throws {
+        let completed = try XCTUnwrap(CodexEventParser.parse(
+            #"{"type":"turn.completed","usage":{"input_tokens":20,"cached_input_tokens":10,"output_tokens":5}}"#
+        ))
+        XCTAssertEqual(completed.usage, "20 input · 10 cached · 5 output")
+
+        let failed = try XCTUnwrap(CodexEventParser.parse(
+            #"{"type":"turn.failed","error":{"message":"Authentication required"}}"#
+        ))
+        XCTAssertEqual(failed.error, "Authentication required")
+    }
+
+    func testWorkspaceSnapshotDetectsAddedChangedAndDeletedFiles() throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let changed = root.appendingPathComponent("changed.txt")
+        let deleted = root.appendingPathComponent("deleted.txt")
+        try "before".write(to: changed, atomically: true, encoding: .utf8)
+        try "delete".write(to: deleted, atomically: true, encoding: .utf8)
+        let before = WorkspaceSnapshot.capture(at: root)
+
+        try "after with a different size".write(to: changed, atomically: true, encoding: .utf8)
+        try FileManager.default.removeItem(at: deleted)
+        try "new".write(to: root.appendingPathComponent("added.txt"), atomically: true, encoding: .utf8)
+        let after = WorkspaceSnapshot.capture(at: root)
+
+        XCTAssertEqual(before.changedFiles(comparedTo: after), ["added.txt", "changed.txt", "deleted.txt"])
+    }
+
+    @MainActor
+    func testAgentSessionStreamsCodexJSONLines() async throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let executable = root.appendingPathComponent("fake-codex")
+        let script = """
+        #!/bin/zsh
+        printf '%s\\n' '{"type":"thread.started","thread_id":"fake-thread"}'
+        printf '%s\\n' '{"type":"item.completed","item":{"id":"message","type":"agent_message","text":"Finished"}}'
+        printf '%s\\n' '{"type":"turn.completed","usage":{"input_tokens":3,"cached_input_tokens":1,"output_tokens":2}}'
+        """
+        try script.write(to: executable, atomically: true, encoding: .utf8)
+        try FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: executable.path)
+
+        let agent = AgentSession(executableURL: executable)
+        agent.send("Do the work", in: root)
+        for _ in 0..<40 where agent.isRunning {
+            try await Task.sleep(nanoseconds: 50_000_000)
+        }
+
+        XCTAssertFalse(agent.isRunning)
+        XCTAssertEqual(agent.threadID, "fake-thread")
+        XCTAssertEqual(agent.messages.last?.text, "Finished")
+        XCTAssertEqual(agent.usageDescription, "3 input · 1 cached · 2 output")
+    }
+
     func testCodeLanguageDetection() {
         XCTAssertEqual(CodeLanguage(url: URL(fileURLWithPath: "/tmp/App.swift")), .swift)
         XCTAssertEqual(CodeLanguage(url: URL(fileURLWithPath: "/tmp/view.tsx")), .typescript)

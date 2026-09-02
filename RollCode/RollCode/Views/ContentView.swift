@@ -4,6 +4,7 @@ import SwiftUI
 struct ContentView: View {
     @EnvironmentObject private var workspace: WorkspaceModel
     @EnvironmentObject private var terminal: TerminalSession
+    @EnvironmentObject private var agent: AgentSession
 
     var body: some View {
         VStack(spacing: 0) {
@@ -24,6 +25,11 @@ struct ContentView: View {
                     }
                 }
                 .frame(minWidth: 520)
+
+                if agent.isVisible {
+                    AgentPanelView()
+                        .frame(minWidth: 280, idealWidth: 350, maxWidth: 520)
+                }
             }
 
             StatusBarView()

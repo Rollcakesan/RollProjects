@@ -5,6 +5,7 @@ import SwiftUI
 struct RollCodeApp: App {
     @StateObject private var workspace = WorkspaceModel()
     @StateObject private var terminal = TerminalSession()
+    @StateObject private var agent = AgentSession()
     @NSApplicationDelegateAdaptor private var appDelegate: RollCodeAppDelegate
 
     var body: some Scene {
@@ -12,14 +13,20 @@ struct RollCodeApp: App {
             ContentView()
                 .environmentObject(workspace)
                 .environmentObject(terminal)
+                .environmentObject(agent)
                 .preferredColorScheme(.dark)
                 .onAppear {
                     appDelegate.workspace = workspace
                     workspace.onWorkspaceChanged = { url in
                         terminal.start(in: url)
+                        agent.newThread()
+                    }
+                    agent.onRunCompleted = {
+                        workspace.refreshTree()
+                        workspace.checkForExternalChanges()
                     }
                 }
-                .frame(minWidth: 860, minHeight: 560)
+                .frame(minWidth: agent.isVisible ? 1080 : 860, minHeight: 560)
         }
         .windowStyle(.hiddenTitleBar)
         .windowToolbarStyle(.unifiedCompact(showsTitle: false))
@@ -43,6 +50,10 @@ struct RollCodeApp: App {
                     terminal.isVisible.toggle()
                 }
                 .keyboardShortcut("j", modifiers: [.command])
+                Button(agent.isVisible ? "Hide Agent" : "Show Agent") {
+                    agent.isVisible.toggle()
+                }
+                .keyboardShortcut("a", modifiers: [.command, .shift])
             }
             CommandMenu("Navigate") {
                 Button("Quick Open…") { workspace.presentQuickOpen() }

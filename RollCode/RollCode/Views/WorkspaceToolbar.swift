@@ -3,6 +3,7 @@ import SwiftUI
 struct WorkspaceToolbar: View {
     @EnvironmentObject private var workspace: WorkspaceModel
     @EnvironmentObject private var terminal: TerminalSession
+    @EnvironmentObject private var agent: AgentSession
 
     var body: some View {
         HStack(spacing: 10) {
@@ -25,6 +26,7 @@ struct WorkspaceToolbar: View {
 
             Spacer()
 
+            ToolbarButton(icon: "sparkles", help: "Toggle Agent (⇧⌘A)") { agent.isVisible.toggle() }
             ToolbarButton(icon: "magnifyingglass", help: "Quick Open (⌘P)") { workspace.presentQuickOpen() }
                 .disabled(workspace.rootURL == nil)
             ToolbarButton(icon: "folder", help: "Open Folder") { workspace.chooseFolder() }
