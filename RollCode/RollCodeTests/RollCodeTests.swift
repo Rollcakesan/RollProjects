@@ -239,6 +239,20 @@ struct RollCodeTests {
         }
     }
 
+    @Test("GitDiffService shows staged files before the first commit")
+    func gitDiffServiceSupportsRepositoryWithoutHead() throws {
+        try withTemporaryDirectory { root in
+            try runGit(["init", "--quiet"], in: root)
+            let file = root.appending(path: "first.txt")
+            try "first".write(to: file, atomically: true, encoding: .utf8)
+            try runGit(["add", "first.txt"], in: root)
+
+            let changes = try GitDiffService.changes(in: root)
+            #expect(changes.map(\.path) == ["first.txt"])
+            #expect(changes.first?.diff.contains("+first") == true)
+        }
+    }
+
     @Test("WorkspaceModel opens, modifies, and saves text files")
     @MainActor
     func workspaceOpensAndSavesTextFile() throws {
@@ -395,9 +409,30 @@ struct RollCodeTests {
             var isDir: ObjCBool = false
             #expect(FileManager.default.fileExists(atPath: createdFolder.path, isDirectory: &isDir) && isDir.boolValue)
 
-            workspace.deleteItem(at: createdFile)
+            workspace.requestDeleteItem(at: createdFile)
+            #expect(FileManager.default.fileExists(atPath: createdFile.path))
+            workspace.confirmDeleteItem()
             #expect(!FileManager.default.fileExists(atPath: createdFile.path))
             #expect(workspace.activeDocument == nil)
+        }
+    }
+
+    @Test("WorkspaceModel does not trash an open file with unsaved changes")
+    @MainActor
+    func workspaceProtectsDirtyFileFromDeletion() throws {
+        try withTemporaryDirectory { root in
+            let file = root.appending(path: "dirty.txt")
+            try "saved".write(to: file, atomically: true, encoding: .utf8)
+            let workspace = WorkspaceModel(restoresLastWorkspace: false)
+            workspace.openFile(file)
+            workspace.activeDocument?.text = "unsaved"
+
+            workspace.requestDeleteItem(at: file)
+            workspace.confirmDeleteItem()
+
+            #expect(FileManager.default.fileExists(atPath: file.path))
+            #expect(workspace.activeDocument?.text == "unsaved")
+            #expect(workspace.alertMessage != nil)
         }
     }
 
@@ -418,6 +453,108 @@ struct RollCodeTests {
 
             let changesAfter = try GitDiffService.changes(in: root)
             #expect(changesAfter.isEmpty)
+        }
+    }
+
+    @Test("GitDiffService limits changes and commits to an opened repository subfolder")
+    func gitDiffServiceScopesOperationsToWorkspace() throws {
+        try withTemporaryDirectory { root in
+            try runGit(["init", "--quiet"], in: root)
+            try runGit(["config", "user.email", "tester@example.com"], in: root)
+            try runGit(["config", "user.name", "Tester"], in: root)
+            let subfolder = root.appending(path: "Subproject")
+            try FileManager.default.createDirectory(at: subfolder, withIntermediateDirectories: true)
+            let outside = root.appending(path: "outside.txt")
+            let inside = subfolder.appending(path: "inside.txt")
+            try "base".write(to: outside, atomically: true, encoding: .utf8)
+            try "base".write(to: inside, atomically: true, encoding: .utf8)
+            try runGit(["add", "-A"], in: root)
+            try runGit(["commit", "--quiet", "-m", "Base"], in: root)
+
+            try "outside change".write(to: outside, atomically: true, encoding: .utf8)
+            try "inside change".write(to: inside, atomically: true, encoding: .utf8)
+
+            let changes = try GitDiffService.changes(in: subfolder)
+            #expect(changes.map(\.path) == ["inside.txt"])
+            #expect(changes.first?.diff.contains("+inside change") == true)
+
+            try GitDiffService.commit(in: subfolder, message: "Update subproject")
+            #expect(try GitDiffService.changes(in: subfolder).isEmpty)
+            #expect(try GitDiffService.changedPaths(in: root) == ["outside.txt"])
+            #expect(try runGitOutput(["show", "--pretty=format:", "--name-only", "HEAD"], in: root).trimmed == "Subproject/inside.txt")
+        }
+    }
+
+    @Test("GitDiffService restores staging state when commit fails")
+    func gitDiffServiceRestoresIndexAfterFailedCommit() throws {
+        try withTemporaryDirectory { root in
+            try runGit(["init", "--quiet"], in: root)
+            try runGit(["config", "user.email", "tester@example.com"], in: root)
+            try runGit(["config", "user.name", "Tester"], in: root)
+            let file = root.appending(path: "file.txt")
+            try "base".write(to: file, atomically: true, encoding: .utf8)
+            try runGit(["add", "-A"], in: root)
+            try runGit(["commit", "--quiet", "-m", "Base"], in: root)
+
+            try "changed".write(to: file, atomically: true, encoding: .utf8)
+            let hook = root.appending(path: ".git/hooks/pre-commit")
+            try "#!/bin/sh\nexit 1\n".write(to: hook, atomically: true, encoding: .utf8)
+            try FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: hook.path)
+
+            #expect(throws: GitDiffError.self) {
+                try GitDiffService.commit(in: root, message: "Rejected")
+            }
+            #expect(try runGitOutput(["diff", "--cached", "--name-only"], in: root).trimmed.isEmpty)
+            #expect(try GitDiffService.changedPaths(in: root) == ["file.txt"])
+        }
+    }
+
+    @Test("WorkspaceModel saves edited documents before Git commit")
+    @MainActor
+    func workspaceSavesDocumentsBeforeGitCommit() async throws {
+        try await withTemporaryDirectory { root in
+            try runGit(["init", "--quiet"], in: root)
+            try runGit(["config", "user.email", "tester@example.com"], in: root)
+            try runGit(["config", "user.name", "Tester"], in: root)
+            let file = root.appending(path: "file.txt")
+            try "base".write(to: file, atomically: true, encoding: .utf8)
+            try runGit(["add", "-A"], in: root)
+            try runGit(["commit", "--quiet", "-m", "Base"], in: root)
+
+            let workspace = WorkspaceModel(restoresLastWorkspace: false)
+            workspace.openWorkspace(root)
+            workspace.openFile(file)
+            workspace.activeDocument?.text = "editor change"
+
+            try await workspace.gitCommit(message: "Save editor change")
+
+            #expect(try String(contentsOf: file, encoding: .utf8) == "editor change")
+            #expect(workspace.activeDocument?.isDirty == false)
+            #expect(try GitDiffService.changedPaths(in: root).isEmpty)
+        }
+    }
+
+    @Test("WorkspaceModel keeps Save As bound to the initiating document")
+    @MainActor
+    func workspaceSaveAsKeepsOriginalDocument() throws {
+        try withTemporaryDirectory { root in
+            let firstURL = root.appending(path: "first.txt")
+            let secondURL = root.appending(path: "second.txt")
+            let destination = root.appending(path: "renamed.txt")
+            try "first".write(to: firstURL, atomically: true, encoding: .utf8)
+            try "second".write(to: secondURL, atomically: true, encoding: .utf8)
+            try "first".write(to: destination, atomically: true, encoding: .utf8)
+
+            let workspace = WorkspaceModel(restoresLastWorkspace: false)
+            workspace.openFile(firstURL)
+            let firstDocument = try #require(workspace.activeDocument)
+            workspace.saveActiveDocumentAs()
+            workspace.openFile(secondURL)
+
+            workspace.completeSaveActiveDocumentAs(destination: destination)
+
+            #expect(firstDocument.url == destination)
+            #expect(workspace.activeDocument?.url == secondURL)
         }
     }
 
@@ -495,6 +632,10 @@ private func withTemporaryDirectory<T>(_ operation: (URL) throws -> T) throws ->
 }
 
 private func runGit(_ arguments: [String], in directory: URL) throws {
+    _ = try runGitOutput(arguments, in: directory)
+}
+
+private func runGitOutput(_ arguments: [String], in directory: URL) throws -> String {
     let process = Process()
     let output = Pipe()
     process.executableURL = URL(fileURLWithPath: "/usr/bin/git")
@@ -507,4 +648,5 @@ private func runGit(_ arguments: [String], in directory: URL) throws {
     guard process.terminationStatus == 0 else {
         throw GitDiffError.commandFailed(String(decoding: data, as: UTF8.self))
     }
+    return String(decoding: data, as: UTF8.self)
 }

@@ -20,29 +20,47 @@ enum GitDiffError: LocalizedError, Sendable {
 
 enum GitDiffService {
     static func changes(in rootURL: URL) throws -> [GitChange] {
+        let repository = try repositoryContext(for: rootURL)
         let statusOutput = try runGit(
-            ["status", "--porcelain=v1", "-z", "--untracked-files=all"],
-            in: rootURL
+            ["status", "--porcelain=v1", "-z", "--untracked-files=all", "--", repository.pathspec],
+            in: repository.rootURL
         )
         let entries = statusEntries(from: statusOutput)
+        let hasHead = (try? runGit(["rev-parse", "--verify", "HEAD"], in: repository.rootURL)) != nil
 
         return try entries.map { entry in
             let diff: String
             if entry.status == "??" {
                 diff = try runGit(
                     ["diff", "--no-index", "--no-ext-diff", "--color=never", "--", "/dev/null", entry.path],
-                    in: rootURL,
+                    in: repository.rootURL,
                     allowedExitCodes: [0, 1]
                 )
             } else {
+                let comparison = hasHead ? ["HEAD"] : ["--cached"]
                 diff = try runGit(
-                    ["diff", "HEAD", "--no-ext-diff", "--color=never", "--", entry.path],
-                    in: rootURL
+                    ["diff"] + comparison + ["--no-ext-diff", "--color=never", "--", entry.path],
+                    in: repository.rootURL
                 )
             }
-            return GitChange(path: entry.path, status: entry.status, diff: diff)
+            return GitChange(
+                path: repository.workspacePath(for: entry.path),
+                status: entry.status,
+                diff: diff
+            )
         }
         .sorted { $0.path.localizedStandardCompare($1.path) == .orderedAscending }
+    }
+
+    static func changedPaths(in rootURL: URL) throws -> [String] {
+        let repository = try repositoryContext(for: rootURL)
+        let statusOutput = try runGit(
+            ["status", "--porcelain=v1", "-z", "--untracked-files=all", "--", repository.pathspec],
+            in: repository.rootURL
+        )
+        return statusEntries(from: statusOutput)
+            .map { repository.workspacePath(for: $0.path) }
+            .sorted()
     }
 
     static func commit(in rootURL: URL, message: String) throws {
@@ -50,8 +68,68 @@ enum GitDiffService {
         guard !trimmed.isEmpty else {
             throw GitDiffError.commandFailed("Commit message cannot be empty.")
         }
-        _ = try runGit(["add", "-A"], in: rootURL)
-        _ = try runGit(["commit", "-m", trimmed], in: rootURL)
+        let repository = try repositoryContext(for: rootURL)
+        let indexSnapshot = try GitIndexSnapshot.capture(in: repository.rootURL)
+        do {
+            _ = try runGit(["add", "-A", "--", repository.pathspec], in: repository.rootURL)
+            _ = try runGit(
+                ["commit", "-m", trimmed, "--", repository.pathspec],
+                in: repository.rootURL
+            )
+        } catch {
+            try indexSnapshot.restore()
+            throw error
+        }
+    }
+
+    private struct RepositoryContext {
+        let rootURL: URL
+        let workspacePrefix: String
+
+        var pathspec: String { workspacePrefix.isEmpty ? "." : workspacePrefix }
+
+        func workspacePath(for repositoryPath: String) -> String {
+            guard !workspacePrefix.isEmpty else { return repositoryPath }
+            let prefix = workspacePrefix + "/"
+            guard repositoryPath.hasPrefix(prefix) else { return repositoryPath }
+            return String(repositoryPath.dropFirst(prefix.count))
+        }
+    }
+
+    private struct GitIndexSnapshot {
+        let url: URL
+        let data: Data?
+
+        static func capture(in repositoryURL: URL) throws -> GitIndexSnapshot {
+            let path = try runGit(["rev-parse", "--git-path", "index"], in: repositoryURL).trimmed
+            let url = path.hasPrefix("/")
+                ? URL(fileURLWithPath: path)
+                : repositoryURL.appending(path: path)
+            let exists = FileManager.default.fileExists(atPath: url.path)
+            return GitIndexSnapshot(url: url, data: exists ? try Data(contentsOf: url) : nil)
+        }
+
+        func restore() throws {
+            if let data {
+                try data.write(to: url, options: .atomic)
+            } else if FileManager.default.fileExists(atPath: url.path) {
+                try FileManager.default.removeItem(at: url)
+            }
+        }
+    }
+
+    private static func repositoryContext(for workspaceURL: URL) throws -> RepositoryContext {
+        let repositoryPath = try runGit(["rev-parse", "--show-toplevel"], in: workspaceURL).trimmed
+        let repositoryURL = URL(fileURLWithPath: repositoryPath, isDirectory: true).standardizedFileURL
+        let workspaceURL = workspaceURL.standardizedFileURL
+        let rootPrefix = repositoryURL.path.hasSuffix("/") ? repositoryURL.path : repositoryURL.path + "/"
+        guard workspaceURL == repositoryURL || workspaceURL.path.hasPrefix(rootPrefix) else {
+            throw GitDiffError.commandFailed("The workspace is outside the Git repository.")
+        }
+        let prefix = workspaceURL == repositoryURL
+            ? ""
+            : String(workspaceURL.path.dropFirst(rootPrefix.count))
+        return RepositoryContext(rootURL: repositoryURL, workspacePrefix: prefix)
     }
 
     private static func statusEntries(from output: String) -> [(status: String, path: String)] {

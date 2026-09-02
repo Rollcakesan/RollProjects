@@ -60,10 +60,25 @@ extension WorkspaceModel {
 
     func gitCommit(message: String) async throws {
         guard let rootURL else { return }
+        guard saveDocuments(in: rootURL) else {
+            throw GitDiffError.commandFailed("Save edited files before committing.")
+        }
         try await Task.detached(priority: .userInitiated) {
             try GitDiffService.commit(in: rootURL, message: message)
         }.value
         refreshTree()
+    }
+
+    private func saveDocuments(in rootURL: URL) -> Bool {
+        let rootPath = rootURL.standardizedFileURL.path
+        let prefix = rootPath.hasSuffix("/") ? rootPath : rootPath + "/"
+        return documents
+            .filter { document in
+                let path = document.url.standardizedFileURL.path
+                return path == rootPath || path.hasPrefix(prefix)
+            }
+            .filter(\.isDirty)
+            .allSatisfy { save($0) }
     }
 
     private func searchableFiles() async -> [WorkspaceSearchFile] {

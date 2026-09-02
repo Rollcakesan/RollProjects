@@ -116,7 +116,7 @@ private struct FileContextMenu: View {
         Button("New Folder…") { workspace.requestCreateFolder(in: targetFolder) }
         Divider()
         Button("Rename…") { workspace.requestRename(node.url) }
-        Button("Move to Trash", role: .destructive) { workspace.deleteItem(at: node.url) }
+        Button("Move to Trash", role: .destructive) { workspace.requestDeleteItem(at: node.url) }
         Divider()
         Button("Show in Finder") { workspace.revealInFinder(node.url) }
     }

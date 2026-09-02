@@ -78,6 +78,16 @@ struct ContentView: View {
             Text("Your changes will be lost if you close this tab without saving.")
         }
         .confirmationDialog(
+            "Move \(workspace.deletingURL?.lastPathComponent ?? "item") to Trash?",
+            isPresented: deleteBinding,
+            titleVisibility: .visible
+        ) {
+            Button("Move to Trash", role: .destructive) { workspace.confirmDeleteItem() }
+            Button("Cancel", role: .cancel) { workspace.cancelDeleteItem() }
+        } message: {
+            Text("The item can be recovered from Trash.")
+        }
+        .confirmationDialog(
             "\(workspace.externalConflict?.documentName ?? "File") changed on disk.",
             isPresented: externalConflictBinding,
             titleVisibility: .visible
@@ -89,12 +99,15 @@ struct ContentView: View {
         }
         .fileExporter(
             isPresented: $workspace.isSavingActiveDocumentAs,
-            document: workspace.activeDocument.map { TextDocumentFile(text: $0.text) },
+            document: workspace.documentBeingSavedAs.map { TextDocumentFile(text: $0.text) },
             contentType: .plainText,
-            defaultFilename: workspace.activeDocument?.name ?? "Untitled"
+            defaultFilename: workspace.documentBeingSavedAs?.name ?? "Untitled"
         ) { result in
-            if case .success(let destination) = result {
+            switch result {
+            case .success(let destination):
                 workspace.completeSaveActiveDocumentAs(destination: destination)
+            case .failure:
+                workspace.cancelSaveActiveDocumentAs()
             }
         }
         .fileImporter(
@@ -136,6 +149,13 @@ struct ContentView: View {
         Binding(
             get: { workspace.externalConflict != nil },
             set: { if !$0 { workspace.resolveExternalConflict(reload: false) } }
+        )
+    }
+
+    private var deleteBinding: Binding<Bool> {
+        Binding(
+            get: { workspace.deletingURL != nil },
+            set: { if !$0 { workspace.cancelDeleteItem() } }
         )
     }
 

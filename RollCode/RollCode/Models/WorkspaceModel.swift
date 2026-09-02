@@ -21,9 +21,11 @@ final class WorkspaceModel {
     var creatingItemParentURL: URL?
     var creatingItemIsDirectory = false
     var creatingItemName = ""
+    var deletingURL: URL?
     var unconfirmedClosingDocument: EditorDocument?
     var externalConflict: ExternalConflict?
     var isSavingActiveDocumentAs = false
+    private var savingDocumentID: UUID?
     private(set) var fontSize: CGFloat
     private(set) var tabWidth: Int
     private(set) var isLoadingTree = false
@@ -184,23 +186,11 @@ final class WorkspaceModel {
     }
 
     func createFile() {
-        let panel = NSSavePanel()
-        panel.title = "Create a new file"
-        panel.prompt = "Create"
-        panel.directoryURL = rootURL
-        panel.nameFieldStringValue = "untitled.swift"
-        guard panel.runModal() == .OK, let url = panel.url else { return }
-
-        do {
-            guard !FileManager.default.fileExists(atPath: url.path) else {
-                throw WorkspaceError.fileAlreadyExists
-            }
-            try Data().write(to: url, options: .atomic)
-            refreshTree()
-            openFile(url)
-        } catch {
-            alertMessage = "Could not create the file: \(error.localizedDescription)"
+        guard let rootURL else {
+            chooseFolder()
+            return
         }
+        requestCreateFile(in: rootURL)
     }
 
     func saveActiveDocument() {
@@ -209,20 +199,25 @@ final class WorkspaceModel {
     }
 
     func saveActiveDocumentAs() {
-        guard activeDocument != nil else { return }
+        guard let activeDocument else { return }
+        savingDocumentID = activeDocument.id
         isSavingActiveDocumentAs = true
     }
 
+    var documentBeingSavedAs: EditorDocument? {
+        documents.first { $0.id == savingDocumentID }
+    }
+
     func completeSaveActiveDocumentAs(destination: URL) {
-        guard let document = activeDocument else { return }
-        do {
-            try document.text.write(to: destination, atomically: true, encoding: .utf8)
-            document.url = destination
-            document.markSaved(modificationDate: destination.modificationDate)
-            refreshTree()
-        } catch {
-            alertMessage = "Could not save the file: \(error.localizedDescription)"
-        }
+        guard let document = documentBeingSavedAs else { return }
+        savingDocumentID = nil
+        document.url = destination
+        document.markSaved(modificationDate: destination.modificationDate)
+        refreshTree()
+    }
+
+    func cancelSaveActiveDocumentAs() {
+        savingDocumentID = nil
     }
 
     @discardableResult
@@ -402,16 +397,30 @@ final class WorkspaceModel {
         creatingItemName = ""
     }
 
-    func deleteItem(at url: URL) {
-        let openDocsToClose = documents.filter { doc in
-            doc.url == url || doc.url.path.hasPrefix(url.path + "/")
+    func requestDeleteItem(at url: URL) {
+        deletingURL = url
+    }
+
+    func cancelDeleteItem() {
+        deletingURL = nil
+    }
+
+    func confirmDeleteItem() {
+        guard let url = deletingURL else { return }
+        deletingURL = nil
+        let affectedDocuments = documents.filter { document in
+            document.url == url || document.url.path.hasPrefix(url.path + "/")
         }
-        for doc in openDocsToClose {
-            closeDocument(doc)
+        guard !affectedDocuments.contains(where: \.isDirty) else {
+            alertMessage = "Save or close edited files inside \(url.lastPathComponent) before moving it to Trash."
+            return
         }
 
         do {
             try FileManager.default.trashItem(at: url, resultingItemURL: nil)
+            for document in affectedDocuments {
+                forceCloseDocument(document)
+            }
             refreshTree()
         } catch {
             alertMessage = "Could not move \(url.lastPathComponent) to Trash: \(error.localizedDescription)"

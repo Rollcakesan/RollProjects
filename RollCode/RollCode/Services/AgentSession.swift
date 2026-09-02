@@ -198,8 +198,18 @@ final class AgentSession {
         return URL(fileURLWithPath: path).relativePath(from: workspaceURL)
     }
 
-    private func finish(_ process: Process, exitCode: Int32) {
+    private func finish(_ process: Process, exitCode: Int32) async {
         guard runState.process === process else { return }
+        let changedPaths: [String]
+        if let workspaceURL {
+            changedPaths = await Task.detached(priority: .utility) {
+                (try? GitDiffService.changedPaths(in: workspaceURL)) ?? []
+            }.value
+        } else {
+            changedPaths = []
+        }
+        guard runState.process === process else { return }
+
         let stopped: Bool
         let resetThread: Bool
         switch runState {
@@ -214,9 +224,7 @@ final class AgentSession {
         }
         runState = .idle
 
-        if let workspaceURL, let changes = try? GitDiffService.changes(in: workspaceURL) {
-            mergeChangedFiles(changes.map(\.path))
-        }
+        mergeChangedFiles(changedPaths)
 
         if stopped {
             entries.append(.message(AgentMessage(role: .system, text: "Agent stopped.")))
