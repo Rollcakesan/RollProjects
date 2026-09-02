@@ -1,4 +1,3 @@
-import AppKit
 import SwiftUI
 
 struct WorkspaceSearchView: View {
@@ -9,6 +8,7 @@ struct WorkspaceSearchView: View {
     @State private var matches: [WorkspaceSearchMatch] = []
     @State private var isSearching = false
     @State private var isReplacing = false
+    @State private var isConfirmingReplaceAll = false
     @State private var statusMessage = ""
     @FocusState private var searchFocused: Bool
 
@@ -39,7 +39,7 @@ struct WorkspaceSearchView: View {
                         .clipShape(RoundedRectangle(cornerRadius: 5))
                         .overlay(RoundedRectangle(cornerRadius: 5).stroke(RollCodeTheme.divider))
 
-                    Button("Replace All") { confirmReplaceAll() }
+                    Button("Replace All") { isConfirmingReplaceAll = true }
                         .buttonStyle(.borderedProminent)
                         .controlSize(.small)
                         .disabled(matches.isEmpty || isReplacing)
@@ -91,6 +91,18 @@ struct WorkspaceSearchView: View {
             isPresented = false
             return .handled
         }
+        .confirmationDialog(
+            "Replace all matches?",
+            isPresented: $isConfirmingReplaceAll,
+            titleVisibility: .visible
+        ) {
+            Button("Replace All", role: .destructive) {
+                performReplaceAll()
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("This writes the replacement to every matching file in the project.")
+        }
     }
 
     private var summary: String {
@@ -119,14 +131,7 @@ struct WorkspaceSearchView: View {
         isSearching = false
     }
 
-    private func confirmReplaceAll() {
-        let response = NSAlert.confirm(
-            title: "Replace all matches?",
-            message: "This writes the replacement to every matching file in the project.",
-            buttons: ["Replace All", "Cancel"]
-        )
-        guard response == .alertFirstButtonReturn else { return }
-
+    private func performReplaceAll() {
         isReplacing = true
         Task {
             let result = await workspace.replaceWorkspaceOccurrences(of: query, with: replacement)

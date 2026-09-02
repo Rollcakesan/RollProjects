@@ -143,14 +143,9 @@ private struct EditorDocumentView: View {
     }
 
     private var matchDescription: String {
-        guard !searchTerm.isEmpty else { return "" }
-        var count = 0
-        var searchRange: Range<String.Index>? = document.text.startIndex..<document.text.endIndex
-        while let range = searchRange,
-              let found = document.text.range(of: searchTerm, options: .caseInsensitive, range: range) {
-            count += 1
-            searchRange = found.upperBound < document.text.endIndex ? found.upperBound..<document.text.endIndex : nil
-        }
+        guard !searchTerm.isEmpty,
+              let regex = try? Regex(NSRegularExpression.escapedPattern(for: searchTerm)).ignoresCase() else { return "" }
+        let count = document.text.matches(of: regex).count
         return count == 1 ? "1 match" : "\(count) matches"
     }
 
