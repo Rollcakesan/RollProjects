@@ -255,6 +255,7 @@ final class AgentSession {
 enum CodexExecutableLocator {
     static func locate(environment: [String: String] = ProcessInfo.processInfo.environment) -> URL? {
         var candidates = [
+            "/Applications/ChatGPT.app/Contents/Resources/codex",
             "/opt/homebrew/bin/codex",
             "/usr/local/bin/codex"
         ]
