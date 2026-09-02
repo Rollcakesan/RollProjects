@@ -28,6 +28,7 @@ struct RollCodeApp: App {
                 }
                 .frame(minWidth: agent.isVisible ? 1080 : 860, minHeight: 560)
         }
+        .defaultSize(width: 1280, height: 820)
         .windowToolbarStyle(.unified(showsTitle: false))
         .commands {
             CommandGroup(replacing: .newItem) {

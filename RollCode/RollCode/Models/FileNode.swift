@@ -74,7 +74,10 @@ extension URL {
 
     func relativeParentPath(from base: URL?) -> String {
         let parent = deletingLastPathComponent()
-        let relative = parent.relativePath(from: base).trimmingCharacters(in: CharacterSet(charactersIn: "/"))
+        var relative = String(parent.relativePath(from: base).trimmingPrefix("/"))
+        if relative.hasSuffix("/") {
+            relative.removeLast()
+        }
         return relative.isEmpty ? "." : relative
     }
 

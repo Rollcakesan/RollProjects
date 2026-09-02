@@ -420,6 +420,63 @@ struct RollCodeTests {
             #expect(changesAfter.isEmpty)
         }
     }
+
+    @Test("WorkspaceModel safely prompts for unsaved document on close")
+    @MainActor
+    func workspacePromptsForUnsavedDocumentOnClose() throws {
+        try withTemporaryDirectory { root in
+            let file = root.appending(path: "dirty.txt")
+            try "initial".write(to: file, atomically: true, encoding: .utf8)
+
+            let workspace = WorkspaceModel(restoresLastWorkspace: false)
+            workspace.openFile(file)
+            let doc = try #require(workspace.activeDocument)
+            doc.text = "modified"
+
+            workspace.closeDocument(doc)
+            #expect(workspace.unconfirmedClosingDocument?.id == doc.id)
+            #expect(workspace.documents.count == 1)
+
+            workspace.cancelCloseDocument()
+            #expect(workspace.unconfirmedClosingDocument == nil)
+            #expect(workspace.documents.count == 1)
+
+            workspace.closeDocument(doc)
+            workspace.confirmCloseDocument(save: true)
+            #expect(workspace.unconfirmedClosingDocument == nil)
+            #expect(workspace.documents.isEmpty)
+            #expect(try String(contentsOf: file, encoding: .utf8) == "modified")
+        }
+    }
+
+    @Test("WorkspaceModel handles external change conflicts without blocking")
+    @MainActor
+    func workspaceHandlesExternalChangeConflict() throws {
+        try withTemporaryDirectory { root in
+            let file = root.appending(path: "conflict.txt")
+            try "disk original".write(to: file, atomically: true, encoding: .utf8)
+
+            let workspace = WorkspaceModel(restoresLastWorkspace: false)
+            workspace.openFile(file)
+            let doc = try #require(workspace.activeDocument)
+            doc.text = "editor edit"
+
+            try "disk modified".write(to: file, atomically: true, encoding: .utf8)
+            try FileManager.default.setAttributes(
+                [.modificationDate: Date().addingTimeInterval(2)],
+                ofItemAtPath: file.path
+            )
+
+            workspace.checkForExternalChanges()
+            #expect(workspace.externalConflict?.documentID == doc.id)
+            #expect(workspace.externalConflict?.diskText == "disk modified")
+            #expect(doc.text == "editor edit")
+
+            workspace.resolveExternalConflict(reload: true)
+            #expect(workspace.externalConflict == nil)
+            #expect(doc.text == "disk modified")
+        }
+    }
 }
 
 @MainActor

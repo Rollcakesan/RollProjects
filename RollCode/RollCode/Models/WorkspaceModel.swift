@@ -21,6 +21,9 @@ final class WorkspaceModel {
     var creatingItemParentURL: URL?
     var creatingItemIsDirectory = false
     var creatingItemName = ""
+    var unconfirmedClosingDocument: EditorDocument?
+    var externalConflict: ExternalConflict?
+    var isSavingActiveDocumentAs = false
     private(set) var fontSize: CGFloat
     private(set) var tabWidth: Int
     private(set) var isLoadingTree = false
@@ -206,14 +209,12 @@ final class WorkspaceModel {
     }
 
     func saveActiveDocumentAs() {
-        guard let document = activeDocument else { return }
-        let panel = NSSavePanel()
-        panel.title = "Save file as"
-        panel.prompt = "Save"
-        panel.directoryURL = document.url.deletingLastPathComponent()
-        panel.nameFieldStringValue = document.name
-        guard panel.runModal() == .OK, let destination = panel.url else { return }
+        guard activeDocument != nil else { return }
+        isSavingActiveDocumentAs = true
+    }
 
+    func completeSaveActiveDocumentAs(destination: URL) {
+        guard let document = activeDocument else { return }
         do {
             try document.text.write(to: destination, atomically: true, encoding: .utf8)
             document.url = destination
@@ -247,22 +248,26 @@ final class WorkspaceModel {
 
     func closeDocument(_ document: EditorDocument) {
         if document.isDirty {
-            let response = NSAlert.confirm(
-                title: "Save changes to \(document.name)?",
-                message: "Your changes will be lost if you close this tab without saving.",
-                buttons: ["Save", "Cancel", "Don’t Save"]
-            )
-
-            switch response {
-            case .alertFirstButtonReturn:
-                guard save(document) else { return }
-            case .alertThirdButtonReturn:
-                break
-            default:
-                return
-            }
+            unconfirmedClosingDocument = document
+            return
         }
+        forceCloseDocument(document)
+    }
 
+    func confirmCloseDocument(save: Bool) {
+        guard let document = unconfirmedClosingDocument else { return }
+        unconfirmedClosingDocument = nil
+        if save {
+            guard self.save(document) else { return }
+        }
+        forceCloseDocument(document)
+    }
+
+    func cancelCloseDocument() {
+        unconfirmedClosingDocument = nil
+    }
+
+    func forceCloseDocument(_ document: EditorDocument) {
         guard let index = documents.firstIndex(where: { $0.id == document.id }) else { return }
         documents.remove(at: index)
         if activeDocumentID == document.id {
@@ -299,17 +304,27 @@ final class WorkspaceModel {
                 continue
             }
 
-            let response = NSAlert.confirm(
-                title: "\(document.name) changed on disk.",
-                message: "Reload the file or keep the changes currently open in RollCode?",
-                buttons: ["Keep Editor Version", "Reload from Disk"]
+            externalConflict = ExternalConflict(
+                documentID: document.id,
+                documentName: document.name,
+                diskText: diskText,
+                modificationDate: currentDate
             )
-            if response == .alertSecondButtonReturn {
-                document.replaceFromDisk(text: diskText, modificationDate: currentDate)
-            } else {
-                document.recordDiskModificationDate(currentDate)
-            }
         }
+    }
+
+    func resolveExternalConflict(reload: Bool) {
+        guard let conflict = externalConflict,
+              let document = documents.first(where: { $0.id == conflict.documentID }) else {
+            externalConflict = nil
+            return
+        }
+        if reload {
+            document.replaceFromDisk(text: conflict.diskText, modificationDate: conflict.modificationDate)
+        } else {
+            document.recordDiskModificationDate(conflict.modificationDate)
+        }
+        externalConflict = nil
     }
 
     func revealInFinder(_ url: URL) {
@@ -430,12 +445,18 @@ final class WorkspaceModel {
                 document.url = destination
             } else if document.url.path.hasPrefix(sourcePrefix) {
                 let suffix = String(document.url.path.dropFirst(sourcePrefix.count))
-                document.url = destination.appendingPathComponent(suffix)
+                document.url = destination.appending(path: suffix)
             }
         }
         refreshTree()
     }
+}
 
+struct ExternalConflict: Equatable, Sendable {
+    let documentID: UUID
+    let documentName: String
+    let diskText: String
+    let modificationDate: Date?
 }
 
 enum WorkspaceError: LocalizedError, Sendable {

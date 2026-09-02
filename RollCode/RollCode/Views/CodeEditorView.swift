@@ -32,7 +32,9 @@ struct CodeEditorView: NSViewRepresentable {
         textView.isAutomaticQuoteSubstitutionEnabled = false
         textView.isAutomaticDashSubstitutionEnabled = false
         textView.isAutomaticTextReplacementEnabled = false
+        textView.isAutomaticTextCompletionEnabled = false
         textView.isContinuousSpellCheckingEnabled = false
+        textView.writingToolsBehavior = .none
         textView.backgroundColor = EditorPalette.background
         textView.insertionPointColor = EditorPalette.caret
         textView.selectedTextAttributes = [

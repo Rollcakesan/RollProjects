@@ -1,10 +1,12 @@
 import AppKit
 import SwiftUI
+import UniformTypeIdentifiers
 
 struct ContentView: View {
     @Environment(WorkspaceModel.self) private var workspace
     @Environment(TerminalSession.self) private var terminal
     @Environment(AgentSession.self) private var agent
+    @Environment(\.scenePhase) private var scenePhase
 
     var body: some View {
         @Bindable var workspace = workspace
@@ -64,6 +66,37 @@ struct ContentView: View {
         .sheet(isPresented: $workspace.isGitChangesPresented) {
             GitChangesView(isPresented: $workspace.isGitChangesPresented)
         }
+        .confirmationDialog(
+            "Save changes to \(workspace.unconfirmedClosingDocument?.name ?? "file")?",
+            isPresented: confirmCloseBinding,
+            titleVisibility: .visible
+        ) {
+            Button("Save") { workspace.confirmCloseDocument(save: true) }
+            Button("Don't Save", role: .destructive) { workspace.confirmCloseDocument(save: false) }
+            Button("Cancel", role: .cancel) { workspace.cancelCloseDocument() }
+        } message: {
+            Text("Your changes will be lost if you close this tab without saving.")
+        }
+        .confirmationDialog(
+            "\(workspace.externalConflict?.documentName ?? "File") changed on disk.",
+            isPresented: externalConflictBinding,
+            titleVisibility: .visible
+        ) {
+            Button("Reload from Disk") { workspace.resolveExternalConflict(reload: true) }
+            Button("Keep Editor Version", role: .cancel) { workspace.resolveExternalConflict(reload: false) }
+        } message: {
+            Text("Reload the file or keep the changes currently open in RollCode?")
+        }
+        .fileExporter(
+            isPresented: $workspace.isSavingActiveDocumentAs,
+            document: workspace.activeDocument.map { TextDocumentFile(text: $0.text) },
+            contentType: .plainText,
+            defaultFilename: workspace.activeDocument?.name ?? "Untitled"
+        ) { result in
+            if case .success(let destination) = result {
+                workspace.completeSaveActiveDocumentAs(destination: destination)
+            }
+        }
         .fileImporter(
             isPresented: $workspace.isFolderPickerPresented,
             allowedContentTypes: [.folder],
@@ -78,8 +111,10 @@ struct ContentView: View {
                 terminal.start(in: workspace.rootURL ?? FileManager.default.homeDirectoryForCurrentUser)
             }
         }
-        .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
-            workspace.checkForExternalChanges()
+        .onChange(of: scenePhase) { _, newPhase in
+            if newPhase == .active {
+                workspace.checkForExternalChanges()
+            }
         }
         .task {
             while !Task.isCancelled {
@@ -88,6 +123,20 @@ struct ContentView: View {
                 workspace.checkForExternalChanges()
             }
         }
+    }
+
+    private var confirmCloseBinding: Binding<Bool> {
+        Binding(
+            get: { workspace.unconfirmedClosingDocument != nil },
+            set: { if !$0 { workspace.cancelCloseDocument() } }
+        )
+    }
+
+    private var externalConflictBinding: Binding<Bool> {
+        Binding(
+            get: { workspace.externalConflict != nil },
+            set: { if !$0 { workspace.resolveExternalConflict(reload: false) } }
+        )
     }
 
     private var alertBinding: Binding<Bool> {
@@ -204,5 +253,24 @@ struct PanelHeader<Leading: View, Trailing: View>: View {
         }
         .padding(.horizontal, 11)
         .frame(height: 34)
+    }
+}
+
+private struct TextDocumentFile: FileDocument {
+    static var readableContentTypes: [UTType] { [.plainText, .utf8PlainText, .sourceCode] }
+    var text: String
+
+    init(text: String) { self.text = text }
+
+    init(configuration: ReadConfiguration) throws {
+        if let data = configuration.file.regularFileContents {
+            text = String(decoding: data, as: UTF8.self)
+        } else {
+            text = ""
+        }
+    }
+
+    func fileWrapper(configuration: WriteConfiguration) throws -> FileWrapper {
+        FileWrapper(regularFileWithContents: Data(text.utf8))
     }
 }
