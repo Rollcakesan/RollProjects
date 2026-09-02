@@ -55,42 +55,37 @@ struct AgentPanelView: View {
     }
 
     private var conversation: some View {
-        ScrollViewReader { proxy in
-            ScrollView {
-                LazyVStack(alignment: .leading, spacing: 10) {
-                    if agent.entries.isEmpty {
-                        VStack(alignment: .leading, spacing: 7) {
-                            Text("What should I change?")
-                                .font(.system(size: 15, weight: .medium))
-                                .foregroundStyle(RollCodeTheme.primaryText)
-                            Text("Codex can inspect the workspace, edit files, and run tests. Changes are applied automatically.")
-                                .font(.system(size: 11))
-                                .foregroundStyle(RollCodeTheme.secondaryText)
-                                .fixedSize(horizontal: false, vertical: true)
-                        }
-                        .padding(.top, 8)
+        ScrollView {
+            LazyVStack(alignment: .leading, spacing: 10) {
+                if agent.entries.isEmpty {
+                    VStack(alignment: .leading, spacing: 7) {
+                        Text("What should I change?")
+                            .font(.system(size: 15, weight: .medium))
+                            .foregroundStyle(RollCodeTheme.primaryText)
+                        Text("Codex can inspect the workspace, edit files, and run tests. Changes are applied automatically.")
+                            .font(.system(size: 11))
+                            .foregroundStyle(RollCodeTheme.secondaryText)
+                            .fixedSize(horizontal: false, vertical: true)
                     }
-
-                    ForEach(agent.entries) { entry in
-                        entryView(entry)
-                    }
-
-                    if agent.isRunning {
-                        HStack(spacing: 6) {
-                            ProgressView().controlSize(.small)
-                            Text("Codex is working…")
-                                .font(.system(size: 10))
-                                .foregroundStyle(RollCodeTheme.secondaryText)
-                        }
-                    }
-                    Color.clear.frame(height: 1).id("agent-bottom")
+                    .padding(.top, 8)
                 }
-                .padding(10)
+
+                ForEach(agent.entries) { entry in
+                    entryView(entry)
+                }
+
+                if agent.isRunning {
+                    HStack(spacing: 6) {
+                        ProgressView().controlSize(.small)
+                        Text("Codex is working…")
+                            .font(.system(size: 10))
+                            .foregroundStyle(RollCodeTheme.secondaryText)
+                    }
+                }
             }
-            .onChange(of: agent.entries) { _, _ in
-                proxy.scrollTo("agent-bottom", anchor: .bottom)
-            }
+            .padding(10)
         }
+        .defaultScrollAnchor(.bottom)
     }
 
     @ViewBuilder
@@ -115,28 +110,49 @@ struct AgentPanelView: View {
                 Text("CHANGES")
                     .font(.system(size: 9, weight: .bold))
                 Spacer()
-                Label("Applied", systemImage: "checkmark.circle.fill")
-                    .font(.system(size: 9, weight: .medium))
-                    .foregroundStyle(Color.green.opacity(0.85))
+                Button {
+                    workspace.presentGitChanges()
+                } label: {
+                    Label("Review Diffs", systemImage: "arrow.triangle.merge")
+                        .font(.system(size: 9, weight: .medium))
+                        .foregroundStyle(RollCodeTheme.accent)
+                }
+                .buttonStyle(.plain)
+                .help("Open Git diff preview (⇧⌘G)")
             }
             .foregroundStyle(RollCodeTheme.secondaryText)
 
             ForEach(paths, id: \.self) { path in
-                Button { openChangedFile(path) } label: {
-                    HStack(spacing: 6) {
-                        Image(systemName: "doc.text")
-                            .font(.system(size: 10))
-                        Text(path)
-                            .font(.system(size: 10, design: .monospaced))
-                            .lineLimit(1)
-                        Spacer(minLength: 0)
+                HStack(spacing: 4) {
+                    Button { openChangedFile(path) } label: {
+                        HStack(spacing: 6) {
+                            Image(systemName: "doc.text")
+                                .font(.system(size: 10))
+                            Text(path)
+                                .font(.system(size: 10, design: .monospaced))
+                                .lineLimit(1)
+                            Spacer(minLength: 0)
+                        }
+                        .padding(.horizontal, 7)
+                        .frame(height: 25)
+                        .background(RollCodeTheme.elevatedBackground)
+                        .clipShape(RoundedRectangle(cornerRadius: 4))
                     }
-                    .padding(.horizontal, 7)
-                    .frame(height: 25)
-                    .background(RollCodeTheme.elevatedBackground)
-                    .clipShape(RoundedRectangle(cornerRadius: 4))
+                    .buttonStyle(.plain)
+
+                    Button {
+                        workspace.presentGitChanges()
+                    } label: {
+                        Image(systemName: "plus.forwardslash.minus")
+                            .font(.system(size: 10))
+                            .foregroundStyle(RollCodeTheme.secondaryText)
+                            .frame(width: 25, height: 25)
+                            .background(RollCodeTheme.elevatedBackground)
+                            .clipShape(RoundedRectangle(cornerRadius: 4))
+                    }
+                    .buttonStyle(.plain)
+                    .help("Inspect Diff")
                 }
-                .buttonStyle(.plain)
             }
         }
     }

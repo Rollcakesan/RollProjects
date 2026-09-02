@@ -33,7 +33,6 @@
 		EB01FC710A9944AF50ECC29B /* RollCodeTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1F8C2201CCD6286378E4D647 /* RollCodeTests.swift */; };
 		EB4E46972CC51A25E72AF525 /* WorkspaceToolbar.swift in Sources */ = {isa = PBXBuildFile; fileRef = 988FB931D37AB17FC291259C /* WorkspaceToolbar.swift */; };
 		F6E0EA9CBF792581BEBD500C /* EditorSmartEditing.swift in Sources */ = {isa = PBXBuildFile; fileRef = 39D36B8757FCD6E258124A17 /* EditorSmartEditing.swift */; };
-		FFAF1D9EC68F54BE0F63FBEE /* WorkspaceSnapshot.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB420D7E4616641CFA2FD977 /* WorkspaceSnapshot.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -69,7 +68,6 @@
 		A549CD233C56C9F84396A847 /* AgentSession.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AgentSession.swift; sourceTree = "<group>"; };
 		AA646C471ED0C5A0E214CEA4 /* AgentModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AgentModels.swift; sourceTree = "<group>"; };
 		B2F8771B99C9BA40F3DC618D /* RollCodeApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RollCodeApp.swift; sourceTree = "<group>"; };
-		BB420D7E4616641CFA2FD977 /* WorkspaceSnapshot.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkspaceSnapshot.swift; sourceTree = "<group>"; };
 		C1EF577A1E4C1B7B5F6D3124 /* WorkspaceSearch.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkspaceSearch.swift; sourceTree = "<group>"; };
 		C9C767C9339F05FD8B88FF4D /* AgentPanelView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AgentPanelView.swift; sourceTree = "<group>"; };
 		D280C8447EC335A6A3B32529 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
@@ -89,7 +87,6 @@
 				50BCDAC7F3D1F9F9A3BD1D9F /* GitDiffService.swift */,
 				EE1CBC30691ED77150C53A0C /* TerminalSession.swift */,
 				C1EF577A1E4C1B7B5F6D3124 /* WorkspaceSearch.swift */,
-				BB420D7E4616641CFA2FD977 /* WorkspaceSnapshot.swift */,
 			);
 			path = Services;
 			sourceTree = "<group>";
@@ -303,7 +300,6 @@
 				BA0A6FF1AC63E894958177DE /* WorkspaceModel.swift in Sources */,
 				63D1D6DFB6232A48A25FC1EB /* WorkspaceSearch.swift in Sources */,
 				3208B22FFEDE7B5AF7079A76 /* WorkspaceSearchView.swift in Sources */,
-				FFAF1D9EC68F54BE0F63FBEE /* WorkspaceSnapshot.swift in Sources */,
 				EB4E46972CC51A25E72AF525 /* WorkspaceToolbar.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;

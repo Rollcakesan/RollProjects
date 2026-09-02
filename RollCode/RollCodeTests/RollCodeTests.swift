@@ -66,24 +66,6 @@ struct RollCodeTests {
         #expect(activity.detail.contains("\"count\":2"))
     }
 
-    @Test("WorkspaceSnapshot detects added, changed, and deleted files")
-    func workspaceSnapshotDetectsAddedChangedAndDeletedFiles() throws {
-        try withTemporaryDirectory { root in
-            let changed = root.appendingPathComponent("changed.txt")
-            let deleted = root.appendingPathComponent("deleted.txt")
-            try "before".write(to: changed, atomically: true, encoding: .utf8)
-            try "delete".write(to: deleted, atomically: true, encoding: .utf8)
-            let before = WorkspaceSnapshot.capture(at: root)
-
-            try "after with a different size".write(to: changed, atomically: true, encoding: .utf8)
-            try FileManager.default.removeItem(at: deleted)
-            try "new".write(to: root.appendingPathComponent("added.txt"), atomically: true, encoding: .utf8)
-            let after = WorkspaceSnapshot.capture(at: root)
-
-            #expect(before.changedFiles(comparedTo: after) == ["added.txt", "changed.txt", "deleted.txt"])
-        }
-    }
-
     @Test("AgentSession streams Codex JSON Lines and tracks state changes")
     @MainActor
     func agentSessionStreamsCodexJSONLines() async throws {

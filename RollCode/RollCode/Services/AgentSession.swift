@@ -27,7 +27,6 @@ final class AgentSession {
 
     @ObservationIgnored private var errorBuffer = ""
     @ObservationIgnored private var workspaceURL: URL?
-    @ObservationIgnored private var baselineSnapshot: WorkspaceSnapshot?
 
     init(executableURL: URL? = CodexExecutableLocator.locate()) {
         self.executableURL = executableURL
@@ -47,7 +46,6 @@ final class AgentSession {
         entries.append(.message(AgentMessage(role: .user, text: prompt)))
         errorBuffer = ""
         self.workspaceURL = workspaceURL.standardizedFileURL
-        baselineSnapshot = WorkspaceSnapshot.capture(at: workspaceURL)
 
         let process = Process()
         let standardOutput = Pipe()
@@ -216,11 +214,9 @@ final class AgentSession {
         }
         runState = .idle
 
-        if let workspaceURL, let baselineSnapshot {
-            let finalSnapshot = WorkspaceSnapshot.capture(at: workspaceURL)
-            mergeChangedFiles(baselineSnapshot.changedFiles(comparedTo: finalSnapshot))
+        if let workspaceURL, let changes = try? GitDiffService.changes(in: workspaceURL) {
+            mergeChangedFiles(changes.map(\.path))
         }
-        self.baselineSnapshot = nil
 
         if stopped {
             entries.append(.message(AgentMessage(role: .system, text: "Agent stopped.")))
