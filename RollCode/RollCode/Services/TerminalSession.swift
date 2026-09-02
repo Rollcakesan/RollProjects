@@ -22,7 +22,7 @@ final class TerminalSession {
         let process = Process()
         process.executableURL = URL(fileURLWithPath: "/bin/zsh")
         process.currentDirectoryURL = directory
-        process.arguments = ["-f", "-i"]
+        process.arguments = ["-l", "-i"]
 
         let outputPipe = Pipe()
         let errorPipe = Pipe()
