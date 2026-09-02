@@ -61,7 +61,7 @@ struct AgentPanelView: View {
         ScrollViewReader { proxy in
             ScrollView {
                 LazyVStack(alignment: .leading, spacing: 10) {
-                    if agent.messages.isEmpty && agent.activities.isEmpty {
+                    if agent.entries.isEmpty {
                         VStack(alignment: .leading, spacing: 7) {
                             Text("What should I change?")
                                 .font(.system(size: 15, weight: .medium))
@@ -74,57 +74,8 @@ struct AgentPanelView: View {
                         .padding(.top, 8)
                     }
 
-                    ForEach(agent.messages) { message in
-                        AgentMessageView(message: message)
-                    }
-
-                    if !agent.activities.isEmpty {
-                        VStack(alignment: .leading, spacing: 5) {
-                            Text("ACTIVITY")
-                                .font(.system(size: 9, weight: .bold))
-                                .foregroundStyle(RollCodeTheme.secondaryText)
-                            ForEach(agent.activities) { activity in
-                                AgentActivityView(activity: activity)
-                            }
-                        }
-                    }
-
-                    if !agent.changedFiles.isEmpty {
-                        VStack(alignment: .leading, spacing: 4) {
-                            HStack {
-                                Text("CHANGES")
-                                    .font(.system(size: 9, weight: .bold))
-                                Spacer()
-                                Label("Applied", systemImage: "checkmark.circle.fill")
-                                    .font(.system(size: 9, weight: .medium))
-                                    .foregroundStyle(Color.green.opacity(0.85))
-                            }
-                            .foregroundStyle(RollCodeTheme.secondaryText)
-
-                            ForEach(agent.changedFiles, id: \.self) { path in
-                                Button { openChangedFile(path) } label: {
-                                    HStack(spacing: 6) {
-                                        Image(systemName: "doc.text")
-                                            .font(.system(size: 10))
-                                        Text(path)
-                                            .font(.system(size: 10, design: .monospaced))
-                                            .lineLimit(1)
-                                        Spacer(minLength: 0)
-                                    }
-                                    .padding(.horizontal, 7)
-                                    .frame(height: 25)
-                                    .background(RollCodeTheme.elevatedBackground)
-                                    .clipShape(RoundedRectangle(cornerRadius: 4))
-                                }
-                                .buttonStyle(.plain)
-                            }
-                        }
-                    }
-
-                    if let usage = agent.usageDescription {
-                        Text(usage)
-                            .font(.system(size: 9, design: .monospaced))
-                            .foregroundStyle(RollCodeTheme.secondaryText)
+                    ForEach(agent.entries) { entry in
+                        entryView(entry)
                     }
 
                     if agent.isRunning {
@@ -139,11 +90,56 @@ struct AgentPanelView: View {
                 }
                 .padding(10)
             }
-            .onChange(of: agent.messages.count) { _, _ in
+            .onChange(of: agent.entries) { _, _ in
                 proxy.scrollTo("agent-bottom", anchor: .bottom)
             }
-            .onChange(of: agent.activities) { _, _ in
-                proxy.scrollTo("agent-bottom", anchor: .bottom)
+        }
+    }
+
+    @ViewBuilder
+    private func entryView(_ entry: AgentEntry) -> some View {
+        switch entry {
+        case .message(let message):
+            AgentMessageView(message: message)
+        case .activity(let activity):
+            AgentActivityView(activity: activity)
+        case .changes(let paths):
+            changedFilesView(paths)
+        case .usage(let description):
+            Text(description)
+                .font(.system(size: 9, design: .monospaced))
+                .foregroundStyle(RollCodeTheme.secondaryText)
+        }
+    }
+
+    private func changedFilesView(_ paths: [String]) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            HStack {
+                Text("CHANGES")
+                    .font(.system(size: 9, weight: .bold))
+                Spacer()
+                Label("Applied", systemImage: "checkmark.circle.fill")
+                    .font(.system(size: 9, weight: .medium))
+                    .foregroundStyle(Color.green.opacity(0.85))
+            }
+            .foregroundStyle(RollCodeTheme.secondaryText)
+
+            ForEach(paths, id: \.self) { path in
+                Button { openChangedFile(path) } label: {
+                    HStack(spacing: 6) {
+                        Image(systemName: "doc.text")
+                            .font(.system(size: 10))
+                        Text(path)
+                            .font(.system(size: 10, design: .monospaced))
+                            .lineLimit(1)
+                        Spacer(minLength: 0)
+                    }
+                    .padding(.horizontal, 7)
+                    .frame(height: 25)
+                    .background(RollCodeTheme.elevatedBackground)
+                    .clipShape(RoundedRectangle(cornerRadius: 4))
+                }
+                .buttonStyle(.plain)
             }
         }
     }

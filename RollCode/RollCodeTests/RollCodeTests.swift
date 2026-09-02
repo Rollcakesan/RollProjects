@@ -6,37 +6,56 @@ final class RollCodeTests: XCTestCase {
         let thread = try XCTUnwrap(CodexEventParser.parse(
             #"{"type":"thread.started","thread_id":"thread-123"}"#
         ))
-        XCTAssertEqual(thread.threadID, "thread-123")
+        XCTAssertEqual(thread, .threadStarted("thread-123"))
 
         let message = try XCTUnwrap(CodexEventParser.parse(
             #"{"type":"item.completed","item":{"id":"item-1","type":"agent_message","text":"Done"}}"#
         ))
-        XCTAssertEqual(message.message, "Done")
+        XCTAssertEqual(message, .message("Done"))
 
         let command = try XCTUnwrap(CodexEventParser.parse(
             #"{"type":"item.completed","item":{"id":"item-2","type":"command_execution","command":"swift test","aggregated_output":"ok","exit_code":0,"status":"completed"}}"#
         ))
-        XCTAssertEqual(command.activity?.title, "swift test")
-        XCTAssertEqual(command.activity?.detail, "ok")
-        XCTAssertEqual(command.activity?.state, .completed)
+        guard case .activity(let commandActivity, let commandFiles) = command else {
+            return XCTFail("Expected an activity")
+        }
+        XCTAssertEqual(commandActivity.title, "swift test")
+        XCTAssertEqual(commandActivity.detail, "ok")
+        XCTAssertEqual(commandActivity.state, .completed)
+        XCTAssertEqual(commandFiles, [])
 
         let change = try XCTUnwrap(CodexEventParser.parse(
             #"{"type":"item.completed","item":{"id":"item-3","type":"file_change","changes":[{"path":"/tmp/App.swift","kind":"update"}],"status":"completed"}}"#
         ))
-        XCTAssertEqual(change.changedFiles, ["/tmp/App.swift"])
-        XCTAssertEqual(change.activity?.state, .completed)
+        guard case .activity(let changeActivity, let changedFiles) = change else {
+            return XCTFail("Expected a file change activity")
+        }
+        XCTAssertEqual(changedFiles, ["/tmp/App.swift"])
+        XCTAssertEqual(changeActivity.state, .completed)
     }
 
     func testCodexEventParserReadsUsageAndFailures() throws {
         let completed = try XCTUnwrap(CodexEventParser.parse(
             #"{"type":"turn.completed","usage":{"input_tokens":20,"cached_input_tokens":10,"output_tokens":5}}"#
         ))
-        XCTAssertEqual(completed.usage, "20 input · 10 cached · 5 output")
+        XCTAssertEqual(completed, .usage("20 input · 10 cached · 5 output"))
 
         let failed = try XCTUnwrap(CodexEventParser.parse(
             #"{"type":"turn.failed","error":{"message":"Authentication required"}}"#
         ))
-        XCTAssertEqual(failed.error, "Authentication required")
+        XCTAssertEqual(failed, .error("Authentication required"))
+    }
+
+    func testCodexEventParserDecodesStructuredToolResults() throws {
+        let event = try XCTUnwrap(CodexEventParser.parse(
+            #"{"type":"item.completed","item":{"id":"tool-1","type":"mcp_tool_call","server":"files","tool":"read","result":{"ok":true,"count":2}}}"#
+        ))
+        guard case .activity(let activity, _) = event else {
+            return XCTFail("Expected a tool activity")
+        }
+        XCTAssertEqual(activity.title, "files · read")
+        XCTAssertTrue(activity.detail.contains("\"ok\":true"))
+        XCTAssertTrue(activity.detail.contains("\"count\":2"))
     }
 
     func testWorkspaceSnapshotDetectsAddedChangedAndDeletedFiles() throws {
@@ -66,6 +85,7 @@ final class RollCodeTests: XCTestCase {
         let script = """
         #!/bin/zsh
         printf '%s\\n' '{"type":"thread.started","thread_id":"fake-thread"}'
+        printf '%s\\n' '{"type":"item.completed","item":{"id":"change","type":"file_change","changes":[{"path":"Sources/App.swift","kind":"update"}],"status":"completed"}}'
         printf '%s\\n' '{"type":"item.completed","item":{"id":"message","type":"agent_message","text":"Finished"}}'
         printf '%s\\n' '{"type":"turn.completed","usage":{"input_tokens":3,"cached_input_tokens":1,"output_tokens":2}}'
         """
@@ -80,8 +100,12 @@ final class RollCodeTests: XCTestCase {
 
         XCTAssertFalse(agent.isRunning)
         XCTAssertEqual(agent.threadID, "fake-thread")
-        XCTAssertEqual(agent.messages.last?.text, "Finished")
-        XCTAssertEqual(agent.usageDescription, "3 input · 1 cached · 2 output")
+        XCTAssertTrue(agent.entries.contains { entry in
+            guard case .message(let message) = entry else { return false }
+            return message.role == .assistant && message.text == "Finished"
+        })
+        XCTAssertTrue(agent.entries.contains(.changes(["Sources/App.swift"])))
+        XCTAssertTrue(agent.entries.contains(.usage("3 input · 1 cached · 2 output")))
     }
 
     func testCodeLanguageDetection() {

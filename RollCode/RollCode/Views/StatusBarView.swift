@@ -30,7 +30,7 @@ private struct ActiveDocumentStatus: View {
     var body: some View {
         Group {
             Text(document.language.displayName)
-            Text("\(document.text.components(separatedBy: .newlines).count) lines")
+            Text("\(document.lineCount) lines")
             Text("UTF-8")
         }
     }

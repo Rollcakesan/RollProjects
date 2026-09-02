@@ -114,7 +114,7 @@ private struct QuickOpenRow: View {
 
     var body: some View {
         HStack(spacing: 10) {
-            Image(systemName: icon)
+            Image(systemName: node.iconName)
                 .font(.system(size: 12))
                 .foregroundStyle(isSelected ? RollCodeTheme.accent : RollCodeTheme.secondaryText)
                 .frame(width: 18)
@@ -137,15 +137,5 @@ private struct QuickOpenRow: View {
         .background(isSelected ? RollCodeTheme.selection : Color.clear)
         .clipShape(RoundedRectangle(cornerRadius: 5))
         .contentShape(Rectangle())
-    }
-
-    private var icon: String {
-        switch CodeLanguage(url: node.url) {
-        case .swift: return "swift"
-        case .json: return "curlybraces"
-        case .shell: return "terminal"
-        case .html, .css: return "globe"
-        default: return "doc.text"
-        }
     }
 }

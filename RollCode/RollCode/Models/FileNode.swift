@@ -7,6 +7,10 @@ struct FileNode: Identifiable, Hashable {
 
     var id: URL { url }
     var name: String { url.lastPathComponent }
+    var iconName: String {
+        if isDirectory { return "folder.fill" }
+        return CodeLanguage(url: url).systemImageName
+    }
 
     static let ignoredDirectoryNames: Set<String> = [
         ".git", ".build", ".swiftpm", "DerivedData", "node_modules", "Pods"
@@ -57,5 +61,20 @@ struct FileNode: Identifiable, Hashable {
     var flattenedFiles: [FileNode] {
         if !isDirectory { return [self] }
         return (children ?? []).flatMap(\.flattenedFiles)
+    }
+}
+
+extension URL {
+    func relativePath(from base: URL?) -> String {
+        guard let base else { return path }
+        let basePath = base.path.hasSuffix("/") ? base.path : base.path + "/"
+        guard path.hasPrefix(basePath) else { return path }
+        return String(path.dropFirst(basePath.count))
+    }
+
+    func relativeParentPath(from base: URL?) -> String {
+        let parent = deletingLastPathComponent()
+        let relative = parent.relativePath(from: base).trimmingCharacters(in: CharacterSet(charactersIn: "/"))
+        return relative.isEmpty ? "." : relative
     }
 }

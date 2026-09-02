@@ -17,6 +17,7 @@ final class EditorDocument: ObservableObject, Identifiable {
     var name: String { url.lastPathComponent }
     var isDirty: Bool { text != savedText }
     var language: CodeLanguage { CodeLanguage(url: url) }
+    var lineCount: Int { text.count(where: \.isNewline) + 1 }
 
     func markSaved(modificationDate: Date? = nil) {
         savedText = text
@@ -78,6 +79,18 @@ enum CodeLanguage: String {
         case .yaml: return "YAML"
         case .plainText: return "Plain Text"
         default: return rawValue.prefix(1).uppercased() + rawValue.dropFirst()
+        }
+    }
+
+    var systemImageName: String {
+        switch self {
+        case .swift: return "swift"
+        case .json: return "curlybraces"
+        case .shell: return "terminal"
+        case .markdown: return "text.document"
+        case .cFamily: return "c.square"
+        case .html, .css: return "globe"
+        default: return "doc.text"
         }
     }
 }

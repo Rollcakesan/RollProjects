@@ -101,10 +101,7 @@ final class WorkspaceModel: ObservableObject {
     }
 
     func relativePath(for url: URL) -> String {
-        guard let rootURL else { return url.path }
-        let rootPath = rootURL.path.hasSuffix("/") ? rootURL.path : rootURL.path + "/"
-        guard url.path.hasPrefix(rootPath) else { return url.path }
-        return String(url.path.dropFirst(rootPath.count))
+        url.relativePath(from: rootURL)
     }
 
     func refreshTree() {

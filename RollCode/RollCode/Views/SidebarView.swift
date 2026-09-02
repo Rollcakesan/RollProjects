@@ -115,7 +115,7 @@ private struct FileRowLabel: View {
                 Color.clear.frame(width: 10, height: 1)
             }
 
-            Image(systemName: node.isDirectory ? "folder.fill" : fileIcon)
+            Image(systemName: node.iconName)
                 .font(.system(size: 11))
                 .foregroundStyle(node.isDirectory ? Color(red: 0.45, green: 0.64, blue: 0.95) : RollCodeTheme.secondaryText)
                 .frame(width: 14)
@@ -131,18 +131,6 @@ private struct FileRowLabel: View {
         .frame(height: 23)
         .contentShape(Rectangle())
     }
-
-    private var fileIcon: String {
-        switch CodeLanguage(url: node.url) {
-        case .swift: return "swift"
-        case .json: return "curlybraces"
-        case .cFamily: return "c.square"
-        case .markdown: return "text.document"
-        case .html, .css: return "globe"
-        case .shell: return "terminal"
-        default: return "doc.text"
-        }
-    }
 }
 
 private struct FilteredFileRow: View {
@@ -156,7 +144,7 @@ private struct FilteredFileRow: View {
                 Text(node.name)
                     .font(.system(size: 12))
                     .foregroundStyle(RollCodeTheme.primaryText)
-                Text(relativeParentPath)
+                Text(node.url.relativeParentPath(from: rootURL))
                     .font(.system(size: 10))
                     .foregroundStyle(RollCodeTheme.secondaryText)
                     .lineLimit(1)
@@ -168,14 +156,6 @@ private struct FilteredFileRow: View {
         }
         .buttonStyle(.plain)
         .contextMenu { FileContextMenu(node: node) }
-    }
-
-    private var relativeParentPath: String {
-        let parent = node.url.deletingLastPathComponent().path
-        let root = rootURL.path
-        guard parent.hasPrefix(root) else { return parent }
-        let relative = String(parent.dropFirst(root.count)).trimmingCharacters(in: CharacterSet(charactersIn: "/"))
-        return relative.isEmpty ? "." : relative
     }
 }
 

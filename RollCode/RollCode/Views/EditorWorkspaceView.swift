@@ -49,7 +49,7 @@ private struct EditorTab: View {
 
     var body: some View {
         HStack(spacing: 7) {
-            Image(systemName: document.language == .swift ? "swift" : "doc.text")
+            Image(systemName: document.language.systemImageName)
                 .font(.system(size: 10))
                 .foregroundStyle(isActive ? RollCodeTheme.accent : RollCodeTheme.secondaryText)
             Text(document.name)
@@ -143,7 +143,13 @@ private struct EditorDocumentView: View {
 
     private var matchDescription: String {
         guard !searchTerm.isEmpty else { return "" }
-        let count = document.text.lowercased().components(separatedBy: searchTerm.lowercased()).count - 1
+        var count = 0
+        var searchRange: Range<String.Index>? = document.text.startIndex..<document.text.endIndex
+        while let range = searchRange,
+              let found = document.text.range(of: searchTerm, options: .caseInsensitive, range: range) {
+            count += 1
+            searchRange = found.upperBound < document.text.endIndex ? found.upperBound..<document.text.endIndex : nil
+        }
         return count == 1 ? "1 match" : "\(count) matches"
     }
 
