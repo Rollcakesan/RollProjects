@@ -1,4 +1,3 @@
-import Darwin
 import Foundation
 import Observation
 
@@ -8,11 +7,10 @@ final class TerminalSession {
     var output = ""
     var isVisible = true
     private(set) var isRunning = false
-
-    @ObservationIgnored private var childPID: pid_t?
-    @ObservationIgnored private var masterHandle: FileHandle?
-    @ObservationIgnored private var outputContinuation: AsyncStream<String>.Continuation?
     private(set) var workingDirectory: URL?
+
+    @ObservationIgnored private var process: Process?
+    @ObservationIgnored private var inputPipe: Pipe?
     @ObservationIgnored private var commandHistory: [String] = []
     @ObservationIgnored private var historyIndex: Int?
 
@@ -21,47 +19,54 @@ final class TerminalSession {
         workingDirectory = directory
         output = "RollCode Terminal — \(directory.path)\n"
 
-        do {
-            let process = try PTYProcess.launch(in: directory)
-            childPID = process.pid
-            masterHandle = process.handle
-            isRunning = true
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: "/bin/zsh")
+        process.currentDirectoryURL = directory
+        process.arguments = ["-f", "-i"]
 
-            let handle = process.handle
-            let outputStream = AsyncStream<String> { continuation in
-                outputContinuation = continuation
-                handle.readabilityHandler = { fileHandle in
-                    let data = fileHandle.availableData
-                    guard !data.isEmpty else {
-                        continuation.finish()
-                        return
-                    }
-                    continuation.yield(String(decoding: data, as: UTF8.self))
-                }
-                continuation.onTermination = { @Sendable _ in
-                    handle.readabilityHandler = nil
-                }
-            }
+        let outputPipe = Pipe()
+        let errorPipe = Pipe()
+        let inputPipe = Pipe()
+        
+        process.standardOutput = outputPipe
+        process.standardError = errorPipe
+        process.standardInput = inputPipe
 
+        var environment = ProcessInfo.processInfo.environment
+        environment["TERM"] = "dumb"
+        environment["PS1"] = "❯ "
+        environment["CLICOLOR"] = "1"
+        process.environment = environment
+
+        self.process = process
+        self.inputPipe = inputPipe
+
+        let readHandler: @Sendable (FileHandle) -> Void = { [weak self] handle in
+            let data = handle.availableData
+            guard !data.isEmpty else { return }
+            let text = String(decoding: data, as: UTF8.self)
             Task { @MainActor [weak self] in
-                for await chunk in outputStream {
-                    self?.appendOutput(TerminalOutputCleaner.clean(chunk))
-                }
+                self?.appendOutput(TerminalOutputCleaner.clean(text))
             }
+        }
 
-            let pid = process.pid
-            Task.detached(priority: .utility) { [weak self] in
-                var status: Int32 = 0
-                _ = waitpid(pid, &status, 0)
-                await MainActor.run { [weak self] in
-                    guard self?.childPID == pid else { return }
-                    self?.finishOutputStream()
-                    self?.masterHandle = nil
-                    self?.childPID = nil
-                    self?.isRunning = false
-                    self?.appendOutput("\n[Shell exited]\n")
-                }
+        outputPipe.fileHandleForReading.readabilityHandler = readHandler
+        errorPipe.fileHandleForReading.readabilityHandler = readHandler
+
+        process.terminationHandler = { [weak self] _ in
+            outputPipe.fileHandleForReading.readabilityHandler = nil
+            errorPipe.fileHandleForReading.readabilityHandler = nil
+            Task { @MainActor [weak self] in
+                self?.isRunning = false
+                self?.process = nil
+                self?.inputPipe = nil
+                self?.appendOutput("\n[Shell exited]\n")
             }
+        }
+
+        do {
+            try process.run()
+            isRunning = true
         } catch {
             appendOutput("Could not start zsh: \(error.localizedDescription)\n")
         }
@@ -71,6 +76,9 @@ final class TerminalSession {
         let command = command.trimmingCharacters(in: .newlines)
         guard !command.isEmpty else { return }
         remember(command)
+        
+        appendOutput("\(command)\n")
+        
         guard write(command + "\n") else {
             appendOutput("\n[Shell is not running]\n")
             return
@@ -111,14 +119,9 @@ final class TerminalSession {
     }
 
     func stop() {
-        finishOutputStream()
-        if let childPID {
-            _ = kill(-childPID, SIGHUP)
-            _ = kill(childPID, SIGHUP)
-        }
-        try? masterHandle?.close()
-        masterHandle = nil
-        childPID = nil
+        process?.terminate()
+        process = nil
+        inputPipe = nil
         isRunning = false
     }
 
@@ -138,9 +141,9 @@ final class TerminalSession {
     }
 
     private func write(_ data: Data) -> Bool {
-        guard isRunning, let masterHandle else { return false }
+        guard isRunning, let inputPipe else { return false }
         do {
-            try masterHandle.write(contentsOf: data)
+            try inputPipe.fileHandleForWriting.write(contentsOf: data)
             return true
         } catch {
             appendOutput("\n[Terminal write failed: \(error.localizedDescription)]\n")
@@ -156,82 +159,7 @@ final class TerminalSession {
     }
 
     deinit {
-        outputContinuation?.finish()
-        masterHandle?.readabilityHandler = nil
-        if let childPID {
-            _ = kill(-childPID, SIGHUP)
-            _ = kill(childPID, SIGHUP)
-        }
-        try? masterHandle?.close()
-    }
-
-    private func finishOutputStream() {
-        outputContinuation?.finish()
-        outputContinuation = nil
-        masterHandle?.readabilityHandler = nil
-    }
-}
-
-private enum PTYProcess {
-    struct Result: Sendable {
-        let pid: pid_t
-        let handle: FileHandle
-    }
-
-    static func launch(in directory: URL) throws -> Result {
-        guard let executable = strdup("/bin/zsh"),
-              let argumentZero = strdup("zsh"),
-              let noStartupFiles = strdup("-f"),
-              let interactive = strdup("-i"),
-              let directoryPath = strdup(directory.path) else {
-            throw PTYError.couldNotPrepareArguments
-        }
-
-        let arguments = UnsafeMutablePointer<UnsafeMutablePointer<CChar>?>.allocate(capacity: 4)
-        arguments[0] = argumentZero
-        arguments[1] = noStartupFiles
-        arguments[2] = interactive
-        arguments[3] = nil
-
-        var masterFD: Int32 = -1
-        var windowSize = winsize(ws_row: 30, ws_col: 120, ws_xpixel: 0, ws_ypixel: 0)
-        let pid = forkpty(&masterFD, nil, nil, &windowSize)
-
-        if pid == 0 {
-            _ = chdir(directoryPath)
-            _ = setenv("TERM", "xterm-256color", 1)
-            _ = setenv("CLICOLOR", "1", 1)
-            _ = setenv("PS1", "❯ ", 1)
-            _ = setenv("HISTFILE", "/dev/null", 1)
-            execv(executable, arguments)
-            _exit(127)
-        }
-
-        free(executable)
-        free(argumentZero)
-        free(noStartupFiles)
-        free(interactive)
-        free(directoryPath)
-        arguments.deallocate()
-
-        guard pid > 0, masterFD >= 0 else {
-            throw PTYError.couldNotLaunch(errno)
-        }
-        return Result(pid: pid, handle: FileHandle(fileDescriptor: masterFD, closeOnDealloc: true))
-    }
-}
-
-private enum PTYError: LocalizedError {
-    case couldNotPrepareArguments
-    case couldNotLaunch(Int32)
-
-    var errorDescription: String? {
-        switch self {
-        case .couldNotPrepareArguments:
-            return "Could not prepare the shell process."
-        case let .couldNotLaunch(code):
-            return String(cString: strerror(code))
-        }
+        process?.terminate()
     }
 }
 

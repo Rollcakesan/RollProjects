@@ -47,28 +47,32 @@ enum EditorSmartEditing {
         let lineRange = source.lineRange(for: NSRange(location: range.location, length: 0))
         let prefixRange = NSRange(location: lineRange.location, length: range.location - lineRange.location)
         let prefix = source.substring(with: prefixRange)
-        let indentation = String(prefix.prefix { $0 == " " || $0 == "\t" })
-        let trimmedPrefix = prefix.trimmingCharacters(in: .whitespaces)
-        let opensBlock = trimmedPrefix.last.map { "{[(:".contains($0) } == true
+        
+        let indentMatch = prefix.firstMatch(of: #/^[ \t]*/#)
+        let indentation = indentMatch.map { String($0.0) } ?? ""
+        
+        let trimmed = prefix.trimmingCharacters(in: .whitespaces)
+        let opensBlock = trimmed.last.map { "{[(:".contains($0) } == true
         let extraIndent = opensBlock ? String(repeating: " ", count: max(1, tabWidth)) : ""
-        let nextCharacter = range.location < source.length
-            ? source.substring(with: NSRange(location: range.location, length: 1))
-            : ""
-        let closesBlock = ["}", "]", ")"].contains(nextCharacter)
+        
+        let nextChar = range.location < source.length ? source.substring(with: NSRange(location: range.location, length: 1)) : ""
+        let closesBlock = ["}", "]", ")"].contains(nextChar)
+
+        let replacement: String
+        let selectionOffset: Int
 
         if opensBlock && closesBlock {
             let firstLine = "\n" + indentation + extraIndent
-            let replacement = firstLine + "\n" + indentation
-            return EditorSmartEdit(
-                replacement: replacement,
-                selection: NSRange(location: range.location + firstLine.utf16.count, length: 0)
-            )
+            replacement = firstLine + "\n" + indentation
+            selectionOffset = firstLine.utf16.count
+        } else {
+            replacement = "\n" + indentation + extraIndent
+            selectionOffset = replacement.utf16.count
         }
 
-        let replacement = "\n" + indentation + extraIndent
         return EditorSmartEdit(
             replacement: replacement,
-            selection: NSRange(location: range.location + replacement.utf16.count, length: 0)
+            selection: NSRange(location: range.location + selectionOffset, length: 0)
         )
     }
 
