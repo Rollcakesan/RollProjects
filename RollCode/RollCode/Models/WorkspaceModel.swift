@@ -12,6 +12,8 @@ final class WorkspaceModel {
     var fileFilter = ""
     var alertMessage: String?
     var isQuickOpenPresented = false
+    var renamingURL: URL?
+    var renamingName = ""
     private(set) var tabWidth: Int
     private(set) var isLoadingTree = false
 
@@ -278,23 +280,26 @@ final class WorkspaceModel {
     }
 
     func requestRename(_ url: URL) {
-        let field = NSTextField(string: url.lastPathComponent)
-        field.frame = NSRect(x: 0, y: 0, width: 300, height: 24)
-        field.selectText(nil)
+        renamingURL = url
+        renamingName = url.lastPathComponent
+    }
 
-        let response = NSAlert.confirm(
-            title: "Rename \(url.lastPathComponent)",
-            message: "Enter a new name.",
-            buttons: ["Rename", "Cancel"],
-            accessoryView: field
-        )
-        guard response == .alertFirstButtonReturn else { return }
+    func confirmRename() {
+        guard let url = renamingURL else { return }
+        let targetName = renamingName
+        renamingURL = nil
+        renamingName = ""
 
         do {
-            try renameItem(at: url, to: field.stringValue)
+            try renameItem(at: url, to: targetName)
         } catch {
             alertMessage = "Could not rename \(url.lastPathComponent): \(error.localizedDescription)"
         }
+    }
+
+    func cancelRename() {
+        renamingURL = nil
+        renamingName = ""
     }
 
     func renameItem(at source: URL, to newName: String) throws(WorkspaceError) {

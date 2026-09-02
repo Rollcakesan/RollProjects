@@ -41,6 +41,13 @@ struct ContentView: View {
         } message: {
             Text(workspace.alertMessage ?? "")
         }
+        .alert("Rename", isPresented: renameBinding) {
+            TextField("New name", text: $workspace.renamingName)
+            Button("Rename") { workspace.confirmRename() }
+            Button("Cancel", role: .cancel) { workspace.cancelRename() }
+        } message: {
+            Text("Enter a new name for \(workspace.renamingURL?.lastPathComponent ?? "this item").")
+        }
         .sheet(isPresented: $workspace.isQuickOpenPresented) {
             QuickOpenView(isPresented: $workspace.isQuickOpenPresented)
         }
@@ -62,6 +69,13 @@ struct ContentView: View {
         Binding(
             get: { workspace.alertMessage != nil },
             set: { if !$0 { workspace.alertMessage = nil } }
+        )
+    }
+
+    private var renameBinding: Binding<Bool> {
+        Binding(
+            get: { workspace.renamingURL != nil },
+            set: { if !$0 { workspace.cancelRename() } }
         )
     }
 }
