@@ -6,6 +6,8 @@ struct GitChangesView: View {
     @State private var changes: [GitChange] = []
     @State private var selectedPath: String?
     @State private var isLoading = false
+    @State private var isCommitting = false
+    @State private var commitMessage = ""
     @State private var errorMessage: String?
 
     private var selectedChange: GitChange? {
@@ -15,13 +17,13 @@ struct GitChangesView: View {
     var body: some View {
         VStack(spacing: 0) {
             PanelHeader("GIT CHANGES") {
-                if isLoading { ProgressView().controlSize(.small) }
+                if isLoading || isCommitting { ProgressView().controlSize(.small) }
             } trailing: {
                 Button { Task { await loadChanges() } } label: {
                     Image(systemName: "arrow.clockwise")
                 }
                 .buttonStyle(.plain)
-                .disabled(isLoading)
+                .disabled(isLoading || isCommitting)
                 Button { isPresented = false } label: {
                     Image(systemName: "xmark")
                 }
@@ -50,15 +52,41 @@ struct GitChangesView: View {
                             .listRowInsets(EdgeInsets(top: 2, leading: 6, bottom: 2, trailing: 6))
                             .listRowBackground(selectedPath == change.path ? RollCodeTheme.selection : Color.clear)
                             .listRowSeparator(.hidden)
+                            .onTapGesture(count: 2) {
+                                openInEditor(change.path)
+                            }
                     }
                     .listStyle(.plain)
                     .scrollContentBackground(.hidden)
                     .frame(minWidth: 210, idealWidth: 250, maxWidth: 320)
                     .background(RollCodeTheme.sidebarBackground)
 
-                    GitDiffPreview(change: selectedChange)
-                        .frame(minWidth: 520)
+                    GitDiffPreview(change: selectedChange) {
+                        if let selectedPath { openInEditor(selectedPath) }
+                    }
+                    .frame(minWidth: 520)
                 }
+
+                Divider().overlay(RollCodeTheme.divider)
+
+                HStack(spacing: 8) {
+                    TextField("Commit message (Enter to commit)", text: $commitMessage)
+                        .textFieldStyle(.plain)
+                        .font(.system(size: 11))
+                        .padding(.horizontal, 8)
+                        .frame(height: 28)
+                        .background(RollCodeTheme.elevatedBackground)
+                        .clipShape(RoundedRectangle(cornerRadius: 5))
+                        .overlay(RoundedRectangle(cornerRadius: 5).stroke(RollCodeTheme.divider))
+                        .onSubmit { performCommit() }
+
+                    Button("Commit") { performCommit() }
+                        .buttonStyle(.borderedProminent)
+                        .controlSize(.small)
+                        .disabled(commitMessage.trimmed.isEmpty || isCommitting || changes.isEmpty)
+                }
+                .padding(8)
+                .background(RollCodeTheme.windowBackground)
             }
         }
         .frame(width: 900, height: 580)
@@ -67,6 +95,29 @@ struct GitChangesView: View {
         .onKeyPress(.escape) {
             isPresented = false
             return .handled
+        }
+    }
+
+    private func openInEditor(_ path: String) {
+        guard let rootURL = workspace.rootURL else { return }
+        let targetURL = rootURL.appendingPathComponent(path)
+        workspace.openFile(targetURL)
+        isPresented = false
+    }
+
+    private func performCommit() {
+        let message = commitMessage.trimmed
+        guard !message.isEmpty, !isCommitting else { return }
+        isCommitting = true
+        Task {
+            do {
+                try await workspace.gitCommit(message: message)
+                commitMessage = ""
+                await loadChanges()
+            } catch {
+                errorMessage = error.localizedDescription
+            }
+            isCommitting = false
         }
     }
 
@@ -115,6 +166,7 @@ private struct GitChangeRow: View {
 
 private struct GitDiffPreview: View {
     let change: GitChange?
+    var onOpenInEditor: (() -> Void)? = nil
 
     var body: some View {
         if let change {
@@ -123,6 +175,11 @@ private struct GitDiffPreview: View {
                     Text(change.path)
                         .font(.system(size: 11, weight: .medium))
                     Spacer()
+                    if let onOpenInEditor {
+                        Button("Open in Editor") { onOpenInEditor() }
+                            .buttonStyle(.bordered)
+                            .controlSize(.small)
+                    }
                 }
                 .padding(.horizontal, 12)
                 .frame(height: 34)

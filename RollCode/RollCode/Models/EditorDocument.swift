@@ -9,6 +9,7 @@ final class EditorDocument: Identifiable {
     var text: String
     private(set) var savedText: String
     private(set) var diskModificationDate: Date?
+    var isPreviewMode = false
 
     init(url: URL, text: String, diskModificationDate: Date? = nil) {
         self.url = url

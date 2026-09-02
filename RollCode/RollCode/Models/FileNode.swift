@@ -79,8 +79,9 @@ extension URL {
     }
 
     var modificationDate: Date? {
-        let attributes = try? FileManager.default.attributesOfItem(atPath: path)
-        return attributes?[.modificationDate] as? Date
+        var url = self
+        url.removeAllCachedResourceValues()
+        return (try? url.resourceValues(forKeys: [.contentModificationDateKey]))?.contentModificationDate
     }
 }
 

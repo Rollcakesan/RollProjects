@@ -58,6 +58,14 @@ extension WorkspaceModel {
         }.value
     }
 
+    func gitCommit(message: String) async throws {
+        guard let rootURL else { return }
+        try await Task.detached(priority: .userInitiated) {
+            try GitDiffService.commit(in: rootURL, message: message)
+        }.value
+        refreshTree()
+    }
+
     private func searchableFiles() async -> [WorkspaceSearchFile] {
         let urls = workspaceFiles.map(\.url)
         let openFiles = Dictionary(uniqueKeysWithValues: documents.map {

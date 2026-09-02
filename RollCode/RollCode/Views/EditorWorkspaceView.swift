@@ -92,6 +92,9 @@ private struct EditorDocumentView: View {
     @State private var searchTerm = ""
     @State private var showsSearch = false
     @State private var searchRequest: EditorSearchRequest?
+    @State private var showsGoToLine = false
+    @State private var targetLine = ""
+    @FocusState private var goToLineFocused: Bool
 
     var body: some View {
         VStack(spacing: 0) {
@@ -122,24 +125,81 @@ private struct EditorDocumentView: View {
                 .padding(.horizontal, 10)
                 .frame(height: 37)
                 .background(RollCodeTheme.elevatedBackground)
+            } else if showsGoToLine {
+                HStack(spacing: 8) {
+                    Text("Go to line:")
+                        .font(.system(size: 11, weight: .medium))
+                        .foregroundStyle(RollCodeTheme.secondaryText)
+                    TextField("1..\(document.lineCount)", text: $targetLine)
+                        .textFieldStyle(.plain)
+                        .font(.system(size: 11))
+                        .frame(width: 80, height: 24)
+                        .padding(.horizontal, 6)
+                        .background(RollCodeTheme.windowBackground)
+                        .clipShape(RoundedRectangle(cornerRadius: 4))
+                        .overlay(RoundedRectangle(cornerRadius: 4).stroke(RollCodeTheme.divider))
+                        .focused($goToLineFocused)
+                        .onSubmit(performGoToLine)
+                    Button("Go") { performGoToLine() }
+                        .buttonStyle(.borderedProminent)
+                        .controlSize(.small)
+                    Spacer()
+                    Button { showsGoToLine = false; targetLine = "" } label: {
+                        Image(systemName: "xmark")
+                    }
+                    .buttonStyle(.plain)
+                    .foregroundStyle(RollCodeTheme.secondaryText)
+                }
+                .padding(.horizontal, 10)
+                .frame(height: 37)
+                .background(RollCodeTheme.elevatedBackground)
+                .onAppear { goToLineFocused = true }
             }
 
-            CodeEditorView(
-                text: $document.text,
-                language: document.language,
-                searchTerm: searchTerm,
-                searchRequest: searchRequest,
-                navigationRequest: workspace.editorNavigationRequest,
-                tabWidth: workspace.tabWidth,
-                fontSize: workspace.fontSize
-            )
+            if document.language == .markdown {
+                HStack {
+                    Spacer()
+                    Button {
+                        document.isPreviewMode.toggle()
+                    } label: {
+                        Label(
+                            document.isPreviewMode ? "Source" : "Preview",
+                            systemImage: document.isPreviewMode ? "doc.plaintext" : "eye"
+                        )
+                        .font(.system(size: 10, weight: .medium))
+                    }
+                    .buttonStyle(.bordered)
+                    .controlSize(.small)
+                }
+                .padding(.horizontal, 10)
+                .padding(.vertical, 4)
+                .background(RollCodeTheme.windowBackground)
+            }
+
+            if document.isPreviewMode && document.language == .markdown {
+                MarkdownPreviewView(text: document.text)
+            } else {
+                CodeEditorView(
+                    text: $document.text,
+                    language: document.language,
+                    searchTerm: searchTerm,
+                    searchRequest: searchRequest,
+                    navigationRequest: workspace.editorNavigationRequest,
+                    tabWidth: workspace.tabWidth,
+                    fontSize: workspace.fontSize
+                )
+            }
         }
         .background {
-            Button("") { showsSearch = true }
-                .keyboardShortcut("f", modifiers: .command)
-                .buttonStyle(.plain)
-                .frame(width: 0, height: 0)
-                .opacity(0)
+            Group {
+                Button("") { showsSearch = true; showsGoToLine = false }
+                    .keyboardShortcut("f", modifiers: .command)
+                Button("") { showsGoToLine = true; showsSearch = false }
+                    .keyboardShortcut("l", modifiers: .command)
+            }
+            .buttonStyle(.plain)
+            .frame(width: 0, height: 0)
+            .opacity(0)
         }
     }
 
@@ -153,6 +213,36 @@ private struct EditorDocumentView: View {
     private func find(_ direction: EditorSearchRequest.Direction) {
         guard !searchTerm.isEmpty else { return }
         searchRequest = EditorSearchRequest(direction: direction)
+    }
+
+    private func performGoToLine() {
+        guard let line = Int(targetLine.trimmed), line > 0 else { return }
+        workspace.editorNavigationRequest = EditorNavigationRequest(line: line)
+        showsGoToLine = false
+        targetLine = ""
+    }
+}
+
+private struct MarkdownPreviewView: View {
+    let text: String
+
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 12) {
+                if let attributed = try? AttributedString(markdown: text, options: .init(interpretedSyntax: .inlineOnlyPreservingWhitespace)) {
+                    Text(attributed)
+                        .textSelection(.enabled)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                } else {
+                    Text(text)
+                        .textSelection(.enabled)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                }
+            }
+            .padding(20)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(RollCodeTheme.editorBackground)
     }
 }
 

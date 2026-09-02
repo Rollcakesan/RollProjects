@@ -400,6 +400,26 @@ struct RollCodeTests {
             #expect(workspace.activeDocument == nil)
         }
     }
+
+    @Test("GitDiffService commits changes and updates status")
+    func gitDiffServiceCommitsChanges() throws {
+        try withTemporaryDirectory { root in
+            try runGit(["init"], in: root)
+            try runGit(["config", "user.email", "tester@example.com"], in: root)
+            try runGit(["config", "user.name", "Tester"], in: root)
+
+            let testFile = root.appendingPathComponent("file.txt")
+            try "hello".write(to: testFile, atomically: true, encoding: .utf8)
+
+            let changesBefore = try GitDiffService.changes(in: root)
+            #expect(!changesBefore.isEmpty)
+
+            try GitDiffService.commit(in: root, message: "Initial commit")
+
+            let changesAfter = try GitDiffService.changes(in: root)
+            #expect(changesAfter.isEmpty)
+        }
+    }
 }
 
 @MainActor

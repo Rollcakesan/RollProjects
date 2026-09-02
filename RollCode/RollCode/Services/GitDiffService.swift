@@ -45,6 +45,15 @@ enum GitDiffService {
         .sorted { $0.path.localizedStandardCompare($1.path) == .orderedAscending }
     }
 
+    static func commit(in rootURL: URL, message: String) throws {
+        let trimmed = message.trimmed
+        guard !trimmed.isEmpty else {
+            throw GitDiffError.commandFailed("Commit message cannot be empty.")
+        }
+        _ = try runGit(["add", "-A"], in: rootURL)
+        _ = try runGit(["commit", "-m", trimmed], in: rootURL)
+    }
+
     private static func statusEntries(from output: String) -> [(status: String, path: String)] {
         let fields = output.split(separator: "\0", omittingEmptySubsequences: true).map(String.init)
         var entries: [(String, String)] = []
