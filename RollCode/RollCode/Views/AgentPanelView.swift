@@ -24,12 +24,9 @@ struct AgentPanelView: View {
     }
 
     private var header: some View {
-        HStack(spacing: 7) {
+        PanelHeader("AGENT") {
             Image(systemName: "sparkles")
                 .foregroundStyle(RollCodeTheme.accent)
-            Text("AGENT")
-                .font(.system(size: 10, weight: .bold))
-                .foregroundStyle(RollCodeTheme.secondaryText)
             Text("AUTO APPLY")
                 .font(.system(size: 8, weight: .bold))
                 .foregroundStyle(Color.green.opacity(0.9))
@@ -37,24 +34,24 @@ struct AgentPanelView: View {
                 .padding(.vertical, 3)
                 .background(Color.green.opacity(0.12))
                 .clipShape(Capsule())
-            Spacer()
-            if agent.isRunning {
-                Button { agent.stop() } label: {
-                    Image(systemName: "stop.fill")
-                        .foregroundStyle(Color.red.opacity(0.9))
+        } trailing: {
+            HStack(spacing: 7) {
+                if agent.isRunning {
+                    Button { agent.stop() } label: {
+                        Image(systemName: "stop.fill")
+                            .foregroundStyle(Color.red.opacity(0.9))
+                    }
+                    .buttonStyle(.plain)
+                    .help("Stop Agent")
+                }
+                Button { agent.newThread() } label: {
+                    Image(systemName: "plus")
                 }
                 .buttonStyle(.plain)
-                .help("Stop Agent")
+                .disabled(agent.isRunning)
+                .help("New Thread")
             }
-            Button { agent.newThread() } label: {
-                Image(systemName: "plus")
-            }
-            .buttonStyle(.plain)
-            .disabled(agent.isRunning)
-            .help("New Thread")
         }
-        .padding(.horizontal, 11)
-        .frame(height: 34)
     }
 
     private var conversation: some View {

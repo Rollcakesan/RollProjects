@@ -196,12 +196,12 @@ struct CodeEditorView: NSViewRepresentable {
 
 @MainActor
 private enum EditorPalette {
-    static let background = NSColor(red: 0.115, green: 0.12, blue: 0.14, alpha: 1)
-    static let foreground = NSColor(white: 0.86, alpha: 1)
-    static let caret = NSColor(red: 0.40, green: 0.61, blue: 0.98, alpha: 1)
-    static let selection = NSColor(red: 0.20, green: 0.32, blue: 0.52, alpha: 1)
-    static let searchMatch = NSColor(red: 0.64, green: 0.43, blue: 0.12, alpha: 0.9)
-    static let font = NSFont.monospacedSystemFont(ofSize: 12.5, weight: .regular)
+    static var background: NSColor { RollCodeTheme.nsEditorBackground }
+    static var foreground: NSColor { RollCodeTheme.nsForeground }
+    static var caret: NSColor { RollCodeTheme.nsCaret }
+    static var selection: NSColor { RollCodeTheme.nsSelection }
+    static var searchMatch: NSColor { RollCodeTheme.nsSearchMatch }
+    static var font: NSFont { RollCodeTheme.editorFont }
 
     static func paragraphStyle(tabWidth: Int) -> NSParagraphStyle {
         let style = NSMutableParagraphStyle()

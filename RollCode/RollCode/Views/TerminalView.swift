@@ -7,32 +7,30 @@ struct TerminalView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            HStack(spacing: 8) {
+            PanelHeader("TERMINAL") {
                 Image(systemName: "terminal")
                     .font(.system(size: 11, weight: .semibold))
-                Text("TERMINAL")
-                    .font(.system(size: 10, weight: .bold))
                 Circle()
                     .fill(terminal.isRunning ? Color.green.opacity(0.75) : Color.red.opacity(0.75))
                     .frame(width: 6, height: 6)
-                Spacer()
-                Button { terminal.interrupt() } label: {
-                    Image(systemName: "stop.circle")
-                }
-                .buttonStyle(.plain)
-                .help("Interrupt Running Command (Ctrl+C)")
-                Button("Clear") { terminal.clear() }
+            } trailing: {
+                HStack(spacing: 8) {
+                    Button { terminal.interrupt() } label: {
+                        Image(systemName: "stop.circle")
+                    }
                     .buttonStyle(.plain)
-                    .font(.system(size: 10))
-                Button { terminal.restart() } label: {
-                    Image(systemName: "arrow.clockwise")
+                    .help("Interrupt Running Command (Ctrl+C)")
+                    Button("Clear") { terminal.clear() }
+                        .buttonStyle(.plain)
+                        .font(.system(size: 10))
+                    Button { terminal.restart() } label: {
+                        Image(systemName: "arrow.clockwise")
+                    }
+                    .buttonStyle(.plain)
+                    .help("Restart Terminal")
                 }
-                .buttonStyle(.plain)
-                .help("Restart Terminal")
+                .foregroundStyle(RollCodeTheme.secondaryText)
             }
-            .foregroundStyle(RollCodeTheme.secondaryText)
-            .padding(.horizontal, 10)
-            .frame(height: 29)
             .background(RollCodeTheme.windowBackground)
 
             Divider().overlay(RollCodeTheme.divider)

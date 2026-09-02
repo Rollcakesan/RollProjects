@@ -83,7 +83,7 @@ final class WorkspaceModel {
     }
 
     func quickOpenFiles(matching query: String) -> [FileNode] {
-        let normalized = query.trimmingCharacters(in: .whitespacesAndNewlines)
+        let normalized = query.trimmed
         let files = workspaceFiles
         guard !normalized.isEmpty else { return Array(files.prefix(100)) }
 
@@ -208,14 +208,13 @@ final class WorkspaceModel {
 
     func closeDocument(_ document: EditorDocument) {
         if document.isDirty {
-            let alert = NSAlert()
-            alert.messageText = "Save changes to \(document.name)?"
-            alert.informativeText = "Your changes will be lost if you close this tab without saving."
-            alert.addButton(withTitle: "Save")
-            alert.addButton(withTitle: "Cancel")
-            alert.addButton(withTitle: "Don’t Save")
+            let response = NSAlert.confirm(
+                title: "Save changes to \(document.name)?",
+                message: "Your changes will be lost if you close this tab without saving.",
+                buttons: ["Save", "Cancel", "Don’t Save"]
+            )
 
-            switch alert.runModal() {
+            switch response {
             case .alertFirstButtonReturn:
                 guard save(document) else { return }
             case .alertThirdButtonReturn:
@@ -261,12 +260,12 @@ final class WorkspaceModel {
                 continue
             }
 
-            let alert = NSAlert()
-            alert.messageText = "\(document.name) changed on disk."
-            alert.informativeText = "Reload the file or keep the changes currently open in RollCode?"
-            alert.addButton(withTitle: "Keep Editor Version")
-            alert.addButton(withTitle: "Reload from Disk")
-            if alert.runModal() == .alertSecondButtonReturn {
+            let response = NSAlert.confirm(
+                title: "\(document.name) changed on disk.",
+                message: "Reload the file or keep the changes currently open in RollCode?",
+                buttons: ["Keep Editor Version", "Reload from Disk"]
+            )
+            if response == .alertSecondButtonReturn {
                 document.replaceFromDisk(text: diskText, modificationDate: currentDate)
             } else {
                 document.recordDiskModificationDate(currentDate)
@@ -283,13 +282,13 @@ final class WorkspaceModel {
         field.frame = NSRect(x: 0, y: 0, width: 300, height: 24)
         field.selectText(nil)
 
-        let alert = NSAlert()
-        alert.messageText = "Rename \(url.lastPathComponent)"
-        alert.informativeText = "Enter a new name."
-        alert.accessoryView = field
-        alert.addButton(withTitle: "Rename")
-        alert.addButton(withTitle: "Cancel")
-        guard alert.runModal() == .alertFirstButtonReturn else { return }
+        let response = NSAlert.confirm(
+            title: "Rename \(url.lastPathComponent)",
+            message: "Enter a new name.",
+            buttons: ["Rename", "Cancel"],
+            accessoryView: field
+        )
+        guard response == .alertFirstButtonReturn else { return }
 
         do {
             try renameItem(at: url, to: field.stringValue)
@@ -299,7 +298,7 @@ final class WorkspaceModel {
     }
 
     func renameItem(at source: URL, to newName: String) throws(WorkspaceError) {
-        let trimmedName = newName.trimmingCharacters(in: .whitespacesAndNewlines)
+        let trimmedName = newName.trimmed
         guard !trimmedName.isEmpty,
               trimmedName != ".",
               trimmedName != "..",

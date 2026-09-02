@@ -86,14 +86,13 @@ final class RollCodeAppDelegate: NSObject, NSApplicationDelegate {
     func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
         guard let workspace, workspace.hasUnsavedDocuments else { return .terminateNow }
 
-        let alert = NSAlert()
-        alert.messageText = "You have unsaved changes."
-        alert.informativeText = "Save all edited files before quitting RollCode?"
-        alert.addButton(withTitle: "Save All")
-        alert.addButton(withTitle: "Cancel")
-        alert.addButton(withTitle: "Discard Changes")
+        let response = NSAlert.confirm(
+            title: "You have unsaved changes.",
+            message: "Save all edited files before quitting RollCode?",
+            buttons: ["Save All", "Cancel", "Discard Changes"]
+        )
 
-        switch alert.runModal() {
+        switch response {
         case .alertFirstButtonReturn:
             return workspace.saveAllDocuments() ? .terminateNow : .terminateCancel
         case .alertThirdButtonReturn:
@@ -101,5 +100,24 @@ final class RollCodeAppDelegate: NSObject, NSApplicationDelegate {
         default:
             return .terminateCancel
         }
+    }
+}
+
+@MainActor
+extension NSAlert {
+    static func confirm(
+        title: String,
+        message: String,
+        buttons: [String],
+        accessoryView: NSView? = nil
+    ) -> NSApplication.ModalResponse {
+        let alert = NSAlert()
+        alert.messageText = title
+        alert.informativeText = message
+        alert.accessoryView = accessoryView
+        for button in buttons {
+            alert.addButton(withTitle: button)
+        }
+        return alert.runModal()
     }
 }

@@ -6,17 +6,11 @@ struct SidebarView: View {
     var body: some View {
         @Bindable var workspace = workspace
         VStack(spacing: 0) {
-            HStack {
-                Text("PROJECT")
-                    .font(.system(size: 10, weight: .bold))
-                    .foregroundStyle(RollCodeTheme.secondaryText)
-                Spacer()
+            PanelHeader("PROJECT") {
                 if workspace.isLoadingTree {
                     ProgressView().controlSize(.small)
                 }
             }
-            .padding(.horizontal, 12)
-            .frame(height: 34)
 
             SearchField(text: $workspace.fileFilter, prompt: "Filter files")
                 .padding(.horizontal, 9)

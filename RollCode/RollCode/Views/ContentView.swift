@@ -66,7 +66,9 @@ struct ContentView: View {
     }
 }
 
+@MainActor
 enum RollCodeTheme {
+    // SwiftUI Colors
     static let windowBackground = Color(red: 0.075, green: 0.078, blue: 0.09)
     static let sidebarBackground = Color(red: 0.09, green: 0.094, blue: 0.108)
     static let editorBackground = Color(red: 0.115, green: 0.12, blue: 0.14)
@@ -76,6 +78,14 @@ enum RollCodeTheme {
     static let primaryText = Color(white: 0.88)
     static let secondaryText = Color(white: 0.56)
     static let divider = Color.white.opacity(0.08)
+
+    // AppKit NSColors
+    static let nsEditorBackground = NSColor(red: 0.115, green: 0.12, blue: 0.14, alpha: 1)
+    static let nsForeground = NSColor(white: 0.86, alpha: 1)
+    static let nsCaret = NSColor(red: 0.40, green: 0.61, blue: 0.98, alpha: 1)
+    static let nsSelection = NSColor(red: 0.20, green: 0.32, blue: 0.52, alpha: 1)
+    static let nsSearchMatch = NSColor(red: 0.64, green: 0.43, blue: 0.12, alpha: 0.9)
+    static let editorFont = NSFont.monospacedSystemFont(ofSize: 12.5, weight: .regular)
 }
 
 struct EmptyStateView<Actions: View>: View {
@@ -119,5 +129,34 @@ struct EmptyStateView<Actions: View>: View {
             Spacer()
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+}
+
+struct PanelHeader<Leading: View, Trailing: View>: View {
+    let title: String
+    @ViewBuilder var leading: Leading
+    @ViewBuilder var trailing: Trailing
+
+    init(
+        _ title: String,
+        @ViewBuilder leading: () -> Leading = { EmptyView() },
+        @ViewBuilder trailing: () -> Trailing = { EmptyView() }
+    ) {
+        self.title = title
+        self.leading = leading()
+        self.trailing = trailing()
+    }
+
+    var body: some View {
+        HStack(spacing: 7) {
+            leading
+            Text(title)
+                .font(.system(size: 10, weight: .bold))
+                .foregroundStyle(RollCodeTheme.secondaryText)
+            Spacer()
+            trailing
+        }
+        .padding(.horizontal, 11)
+        .frame(height: 34)
     }
 }

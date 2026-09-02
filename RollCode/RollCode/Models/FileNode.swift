@@ -45,7 +45,7 @@ struct FileNode: Identifiable, Hashable, Sendable {
     }
 
     func matchingFiles(_ query: String) -> [FileNode] {
-        let normalized = query.trimmingCharacters(in: .whitespacesAndNewlines)
+        let normalized = query.trimmed
         guard !normalized.isEmpty else { return [] }
 
         var matches: [FileNode] = []
@@ -81,5 +81,15 @@ extension URL {
     var modificationDate: Date? {
         let attributes = try? FileManager.default.attributesOfItem(atPath: path)
         return attributes?[.modificationDate] as? Date
+    }
+}
+
+extension String {
+    var trimmed: String {
+        trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    var isBlank: Bool {
+        trimmed.isEmpty
     }
 }
