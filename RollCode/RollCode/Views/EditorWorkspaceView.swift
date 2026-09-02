@@ -1,3 +1,4 @@
+import AppKit
 import SwiftUI
 
 struct EditorWorkspaceView: View {
@@ -77,13 +78,20 @@ private struct EditorTab: View {
         .overlay(alignment: .trailing) { RollCodeTheme.divider.frame(width: 1) }
         .contentShape(Rectangle())
         .onTapGesture(perform: select)
+        .contextMenu {
+            Button("Show in Finder") {
+                NSWorkspace.shared.activateFileViewerSelecting([document.url])
+            }
+        }
     }
 }
 
 private struct EditorDocumentView: View {
+    @EnvironmentObject private var workspace: WorkspaceModel
     @ObservedObject var document: EditorDocument
     @State private var searchTerm = ""
     @State private var showsSearch = false
+    @State private var searchRequest: EditorSearchRequest?
 
     var body: some View {
         VStack(spacing: 0) {
@@ -95,6 +103,16 @@ private struct EditorDocumentView: View {
                         .font(.system(size: 10))
                         .foregroundStyle(RollCodeTheme.secondaryText)
                     Spacer()
+                    Button { find(.previous) } label: {
+                        Image(systemName: "chevron.up")
+                    }
+                    .buttonStyle(.plain)
+                    .help("Previous Match")
+                    Button { find(.next) } label: {
+                        Image(systemName: "chevron.down")
+                    }
+                    .buttonStyle(.plain)
+                    .help("Next Match")
                     Button { showsSearch = false; searchTerm = "" } label: {
                         Image(systemName: "xmark")
                     }
@@ -106,7 +124,13 @@ private struct EditorDocumentView: View {
                 .background(RollCodeTheme.elevatedBackground)
             }
 
-            CodeEditorView(text: $document.text, language: document.language, searchTerm: searchTerm)
+            CodeEditorView(
+                text: $document.text,
+                language: document.language,
+                searchTerm: searchTerm,
+                searchRequest: searchRequest,
+                tabWidth: workspace.tabWidth
+            )
         }
         .background {
             Button("") { showsSearch = true }
@@ -121,6 +145,11 @@ private struct EditorDocumentView: View {
         guard !searchTerm.isEmpty else { return "" }
         let count = document.text.lowercased().components(separatedBy: searchTerm.lowercased()).count - 1
         return count == 1 ? "1 match" : "\(count) matches"
+    }
+
+    private func find(_ direction: EditorSearchRequest.Direction) {
+        guard !searchTerm.isEmpty else { return }
+        searchRequest = EditorSearchRequest(direction: direction)
     }
 }
 

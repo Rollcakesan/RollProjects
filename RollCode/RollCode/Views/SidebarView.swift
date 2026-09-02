@@ -81,6 +81,7 @@ private struct FileTreeItem: View {
                     )
                 }
                 .buttonStyle(.plain)
+                .contextMenu { FileContextMenu(node: node) }
 
                 if isExpanded {
                     ForEach(node.children ?? []) { child in
@@ -93,6 +94,7 @@ private struct FileTreeItem: View {
                 FileRowLabel(node: node, depth: depth, disclosureIcon: nil)
             }
             .buttonStyle(.plain)
+            .contextMenu { FileContextMenu(node: node) }
         }
     }
 }
@@ -165,6 +167,7 @@ private struct FilteredFileRow: View {
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
+        .contextMenu { FileContextMenu(node: node) }
     }
 
     private var relativeParentPath: String {
@@ -173,6 +176,16 @@ private struct FilteredFileRow: View {
         guard parent.hasPrefix(root) else { return parent }
         let relative = String(parent.dropFirst(root.count)).trimmingCharacters(in: CharacterSet(charactersIn: "/"))
         return relative.isEmpty ? "." : relative
+    }
+}
+
+private struct FileContextMenu: View {
+    @EnvironmentObject private var workspace: WorkspaceModel
+    let node: FileNode
+
+    var body: some View {
+        Button("Rename…") { workspace.requestRename(node.url) }
+        Button("Show in Finder") { workspace.revealInFinder(node.url) }
     }
 }
 

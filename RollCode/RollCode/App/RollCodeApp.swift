@@ -44,6 +44,27 @@ struct RollCodeApp: App {
                 }
                 .keyboardShortcut("j", modifiers: [.command])
             }
+            CommandMenu("Navigate") {
+                Button("Quick Open…") { workspace.presentQuickOpen() }
+                    .keyboardShortcut("p", modifiers: [.command])
+                Divider()
+                Button("Close Editor") { workspace.closeActiveDocument() }
+                    .keyboardShortcut("w", modifiers: [.command])
+                    .disabled(workspace.activeDocument == nil)
+            }
+            CommandMenu("Editor") {
+                Picker(
+                    "Tab Width",
+                    selection: Binding(
+                        get: { workspace.tabWidth },
+                        set: { workspace.setTabWidth($0) }
+                    )
+                ) {
+                    Text("2 Spaces").tag(2)
+                    Text("4 Spaces").tag(4)
+                    Text("8 Spaces").tag(8)
+                }
+            }
         }
     }
 }

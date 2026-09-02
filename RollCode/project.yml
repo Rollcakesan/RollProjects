@@ -31,6 +31,7 @@ targets:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.rollprojects.RollCode
         PRODUCT_NAME: RollCode
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         ENABLE_APP_SANDBOX: NO
         GENERATE_INFOPLIST_FILE: NO
   RollCodeTests:

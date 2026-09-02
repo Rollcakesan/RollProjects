@@ -10,7 +10,10 @@
 		1464840D23149E96B3BD5F4F /* FileNode.swift in Sources */ = {isa = PBXBuildFile; fileRef = 328A8D80C05DF42F6C69D982 /* FileNode.swift */; };
 		1A8C632D8AAD6BADE387FD84 /* TerminalView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 06E3E5E96609BAC7EC257FA5 /* TerminalView.swift */; };
 		236857F5CF1898DC2CC54FD8 /* EditorDocument.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6052BD8029E5C5686780E276 /* EditorDocument.swift */; };
+		2DDB137832AEE3A1B86BA30A /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 8650E1550FF5B564D5154EF5 /* Assets.xcassets */; };
 		34D92B120E17117437B4C83A /* RollCodeApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2F8771B99C9BA40F3DC618D /* RollCodeApp.swift */; };
+		41DA4DA7784C1173E4636615 /* QuickOpenView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 838061E9A81A90C22BBD98D3 /* QuickOpenView.swift */; };
+		52C6FEA5161F920474CE0DB0 /* QuickOpenMatcher.swift in Sources */ = {isa = PBXBuildFile; fileRef = 44977B11D03F860D685F7786 /* QuickOpenMatcher.swift */; };
 		58E50C1CFBA9F0F95EB8BDC5 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8C72D31622D2C578313E4592 /* ContentView.swift */; };
 		8C902C37A357B6D62BDE498A /* StatusBarView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 95C30C09271F19837D613065 /* StatusBarView.swift */; };
 		BA0A6FF1AC63E894958177DE /* WorkspaceModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 48D8E08B9D3380DF5FEF51D2 /* WorkspaceModel.swift */; };
@@ -20,6 +23,7 @@
 		E9D3DE8C6724FE8BE147974F /* TerminalSession.swift in Sources */ = {isa = PBXBuildFile; fileRef = EE1CBC30691ED77150C53A0C /* TerminalSession.swift */; };
 		EB01FC710A9944AF50ECC29B /* RollCodeTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1F8C2201CCD6286378E4D647 /* RollCodeTests.swift */; };
 		EB4E46972CC51A25E72AF525 /* WorkspaceToolbar.swift in Sources */ = {isa = PBXBuildFile; fileRef = 988FB931D37AB17FC291259C /* WorkspaceToolbar.swift */; };
+		F6E0EA9CBF792581BEBD500C /* EditorSmartEditing.swift in Sources */ = {isa = PBXBuildFile; fileRef = 39D36B8757FCD6E258124A17 /* EditorSmartEditing.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -37,9 +41,13 @@
 		1BD7FA7D88687B1494C4B3D0 /* EditorWorkspaceView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EditorWorkspaceView.swift; sourceTree = "<group>"; };
 		1F8C2201CCD6286378E4D647 /* RollCodeTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RollCodeTests.swift; sourceTree = "<group>"; };
 		328A8D80C05DF42F6C69D982 /* FileNode.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FileNode.swift; sourceTree = "<group>"; };
+		39D36B8757FCD6E258124A17 /* EditorSmartEditing.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EditorSmartEditing.swift; sourceTree = "<group>"; };
 		431906205771AD178AFE3D62 /* CodeEditorView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CodeEditorView.swift; sourceTree = "<group>"; };
+		44977B11D03F860D685F7786 /* QuickOpenMatcher.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QuickOpenMatcher.swift; sourceTree = "<group>"; };
 		48D8E08B9D3380DF5FEF51D2 /* WorkspaceModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkspaceModel.swift; sourceTree = "<group>"; };
 		6052BD8029E5C5686780E276 /* EditorDocument.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EditorDocument.swift; sourceTree = "<group>"; };
+		838061E9A81A90C22BBD98D3 /* QuickOpenView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QuickOpenView.swift; sourceTree = "<group>"; };
+		8650E1550FF5B564D5154EF5 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		8C72D31622D2C578313E4592 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
 		95C30C09271F19837D613065 /* StatusBarView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StatusBarView.swift; sourceTree = "<group>"; };
 		97AD5646F48C77219D92C517 /* RollCodeTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = RollCodeTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -64,7 +72,9 @@
 			isa = PBXGroup;
 			children = (
 				6052BD8029E5C5686780E276 /* EditorDocument.swift */,
+				39D36B8757FCD6E258124A17 /* EditorSmartEditing.swift */,
 				328A8D80C05DF42F6C69D982 /* FileNode.swift */,
+				44977B11D03F860D685F7786 /* QuickOpenMatcher.swift */,
 				48D8E08B9D3380DF5FEF51D2 /* WorkspaceModel.swift */,
 			);
 			path = Models;
@@ -76,6 +86,7 @@
 				431906205771AD178AFE3D62 /* CodeEditorView.swift */,
 				8C72D31622D2C578313E4592 /* ContentView.swift */,
 				1BD7FA7D88687B1494C4B3D0 /* EditorWorkspaceView.swift */,
+				838061E9A81A90C22BBD98D3 /* QuickOpenView.swift */,
 				F19EA110FDE9DCE79DB3D1D8 /* SidebarView.swift */,
 				95C30C09271F19837D613065 /* StatusBarView.swift */,
 				06E3E5E96609BAC7EC257FA5 /* TerminalView.swift */,
@@ -104,6 +115,7 @@
 		A6C62E6A62DF2ECCA9D20ECC /* Resources */ = {
 			isa = PBXGroup;
 			children = (
+				8650E1550FF5B564D5154EF5 /* Assets.xcassets */,
 				D280C8447EC335A6A3B32529 /* Info.plist */,
 			);
 			path = Resources;
@@ -146,6 +158,7 @@
 			buildConfigurationList = 83F5ED22D474D639FDCDF89B /* Build configuration list for PBXNativeTarget "RollCode" */;
 			buildPhases = (
 				EE7930298DDAA249A23D02D1 /* Sources */,
+				8C520F979E8A3BD26518EFB5 /* Resources */,
 			);
 			buildRules = (
 			);
@@ -213,6 +226,17 @@
 		};
 /* End PBXProject section */
 
+/* Begin PBXResourcesBuildPhase section */
+		8C520F979E8A3BD26518EFB5 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				2DDB137832AEE3A1B86BA30A /* Assets.xcassets in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
 /* Begin PBXSourcesBuildPhase section */
 		BB888A1C4F67C7C5ED2124D7 /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
@@ -229,8 +253,11 @@
 				D59906FAAE255735531190E5 /* CodeEditorView.swift in Sources */,
 				58E50C1CFBA9F0F95EB8BDC5 /* ContentView.swift in Sources */,
 				236857F5CF1898DC2CC54FD8 /* EditorDocument.swift in Sources */,
+				F6E0EA9CBF792581BEBD500C /* EditorSmartEditing.swift in Sources */,
 				D14EDE2AF7E1C44A04148482 /* EditorWorkspaceView.swift in Sources */,
 				1464840D23149E96B3BD5F4F /* FileNode.swift in Sources */,
+				52C6FEA5161F920474CE0DB0 /* QuickOpenMatcher.swift in Sources */,
+				41DA4DA7784C1173E4636615 /* QuickOpenView.swift in Sources */,
 				34D92B120E17117437B4C83A /* RollCodeApp.swift in Sources */,
 				DE6BF8C0C0BCACF4BB84013E /* SidebarView.swift in Sources */,
 				8C902C37A357B6D62BDE498A /* StatusBarView.swift in Sources */,

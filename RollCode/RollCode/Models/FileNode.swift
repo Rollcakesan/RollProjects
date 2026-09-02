@@ -53,4 +53,9 @@ struct FileNode: Identifiable, Hashable {
         }
         return matches
     }
+
+    var flattenedFiles: [FileNode] {
+        if !isDirectory { return [self] }
+        return (children ?? []).flatMap(\.flattenedFiles)
+    }
 }

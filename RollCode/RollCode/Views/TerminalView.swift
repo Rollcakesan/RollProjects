@@ -16,6 +16,11 @@ struct TerminalView: View {
                     .fill(terminal.isRunning ? Color.green.opacity(0.75) : Color.red.opacity(0.75))
                     .frame(width: 6, height: 6)
                 Spacer()
+                Button { terminal.interrupt() } label: {
+                    Image(systemName: "stop.circle")
+                }
+                .buttonStyle(.plain)
+                .help("Interrupt Running Command (Ctrl+C)")
                 Button("Clear") { terminal.clear() }
                     .buttonStyle(.plain)
                     .font(.system(size: 10))
@@ -57,6 +62,14 @@ struct TerminalView: View {
                     .font(.system(size: 11, design: .monospaced))
                     .focused($inputFocused)
                     .onSubmit(runCommand)
+                    .onKeyPress(.upArrow) {
+                        command = terminal.previousCommand()
+                        return .handled
+                    }
+                    .onKeyPress(.downArrow) {
+                        command = terminal.nextCommand()
+                        return .handled
+                    }
             }
             .padding(.horizontal, 10)
             .frame(height: 29)

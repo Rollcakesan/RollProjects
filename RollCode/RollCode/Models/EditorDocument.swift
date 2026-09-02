@@ -5,20 +5,43 @@ final class EditorDocument: ObservableObject, Identifiable {
     @Published var url: URL
     @Published var text: String
     @Published private(set) var savedText: String
+    private(set) var diskModificationDate: Date?
 
-    init(url: URL, text: String) {
+    init(url: URL, text: String, diskModificationDate: Date? = nil) {
         self.url = url
         self.text = text
         self.savedText = text
+        self.diskModificationDate = diskModificationDate
     }
 
     var name: String { url.lastPathComponent }
     var isDirty: Bool { text != savedText }
     var language: CodeLanguage { CodeLanguage(url: url) }
 
-    func markSaved() {
+    func markSaved(modificationDate: Date? = nil) {
         savedText = text
+        diskModificationDate = modificationDate
     }
+
+    func replaceFromDisk(text: String, modificationDate: Date?) {
+        self.text = text
+        savedText = text
+        diskModificationDate = modificationDate
+    }
+
+    func recordDiskModificationDate(_ date: Date?) {
+        diskModificationDate = date
+    }
+}
+
+struct EditorSearchRequest: Equatable {
+    enum Direction {
+        case previous
+        case next
+    }
+
+    let id = UUID()
+    let direction: Direction
 }
 
 enum CodeLanguage: String {

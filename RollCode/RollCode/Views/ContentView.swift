@@ -1,3 +1,4 @@
+import AppKit
 import SwiftUI
 
 struct ContentView: View {
@@ -33,10 +34,21 @@ struct ContentView: View {
         } message: {
             Text(workspace.alertMessage ?? "")
         }
+        .sheet(isPresented: $workspace.isQuickOpenPresented) {
+            QuickOpenView(isPresented: $workspace.isQuickOpenPresented)
+                .environmentObject(workspace)
+        }
         .onAppear {
             if !terminal.isRunning {
                 terminal.start(in: workspace.rootURL ?? FileManager.default.homeDirectoryForCurrentUser)
             }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
+            workspace.checkForExternalChanges()
+        }
+        .onReceive(Timer.publish(every: 2, on: .main, in: .common).autoconnect()) { _ in
+            guard NSApp.isActive else { return }
+            workspace.checkForExternalChanges()
         }
     }
 

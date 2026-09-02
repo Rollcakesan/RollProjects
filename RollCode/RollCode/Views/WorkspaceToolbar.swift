@@ -25,6 +25,8 @@ struct WorkspaceToolbar: View {
 
             Spacer()
 
+            ToolbarButton(icon: "magnifyingglass", help: "Quick Open (⌘P)") { workspace.presentQuickOpen() }
+                .disabled(workspace.rootURL == nil)
             ToolbarButton(icon: "folder", help: "Open Folder") { workspace.chooseFolder() }
             ToolbarButton(icon: "arrow.clockwise", help: "Refresh Files") { workspace.refreshTree() }
                 .disabled(workspace.rootURL == nil)

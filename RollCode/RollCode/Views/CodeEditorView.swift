@@ -5,6 +5,8 @@ struct CodeEditorView: NSViewRepresentable {
     @Binding var text: String
     let language: CodeLanguage
     let searchTerm: String
+    let searchRequest: EditorSearchRequest?
+    let tabWidth: Int
 
     func makeCoordinator() -> Coordinator {
         Coordinator(parent: self)
@@ -38,6 +40,7 @@ struct CodeEditorView: NSViewRepresentable {
         textView.textContainerInset = NSSize(width: 10, height: 10)
         textView.font = EditorPalette.font
         textView.textColor = EditorPalette.foreground
+        textView.defaultParagraphStyle = EditorPalette.paragraphStyle(tabWidth: tabWidth)
         textView.minSize = NSSize(width: 0, height: scrollView.contentSize.height)
         textView.maxSize = NSSize(width: CGFloat.greatestFiniteMagnitude, height: CGFloat.greatestFiniteMagnitude)
         textView.isVerticallyResizable = true
@@ -61,6 +64,9 @@ struct CodeEditorView: NSViewRepresentable {
     func updateNSView(_ scrollView: NSScrollView, context: Context) {
         context.coordinator.parent = self
         guard let textView = scrollView.documentView as? NSTextView else { return }
+        let paragraphStyle = EditorPalette.paragraphStyle(tabWidth: tabWidth)
+        textView.defaultParagraphStyle = paragraphStyle
+        textView.typingAttributes[.paragraphStyle] = paragraphStyle
 
         if textView.string != text {
             let selection = textView.selectedRange()
@@ -68,6 +74,7 @@ struct CodeEditorView: NSViewRepresentable {
             textView.setSelectedRange(NSRange(location: min(selection.location, text.utf16.count), length: 0))
         }
         context.coordinator.applyHighlighting(language: language, searchTerm: searchTerm)
+        context.coordinator.handleSearchRequest(searchRequest, query: searchTerm)
         context.coordinator.ruler?.needsDisplay = true
     }
 
@@ -76,6 +83,8 @@ struct CodeEditorView: NSViewRepresentable {
         weak var textView: NSTextView?
         weak var ruler: LineNumberRulerView?
         private var isApplyingAttributes = false
+        private var isPerformingSmartEdit = false
+        private var lastSearchRequestID: UUID?
 
         init(parent: CodeEditorView) {
             self.parent = parent
@@ -88,6 +97,65 @@ struct CodeEditorView: NSViewRepresentable {
             ruler?.needsDisplay = true
         }
 
+        func textView(
+            _ textView: NSTextView,
+            shouldChangeTextIn affectedCharRange: NSRange,
+            replacementString: String?
+        ) -> Bool {
+            guard !isPerformingSmartEdit,
+                  let replacementString,
+                  let edit = EditorSmartEditing.edit(
+                    for: replacementString,
+                    in: textView.string,
+                    range: affectedCharRange,
+                    tabWidth: parent.tabWidth
+                  ) else { return true }
+
+            isPerformingSmartEdit = true
+            textView.insertText(edit.replacement, replacementRange: affectedCharRange)
+            textView.setSelectedRange(edit.selection)
+            isPerformingSmartEdit = false
+            parent.text = textView.string
+            applyHighlighting(language: parent.language, searchTerm: parent.searchTerm)
+            ruler?.needsDisplay = true
+            return false
+        }
+
+        func handleSearchRequest(_ request: EditorSearchRequest?, query: String) {
+            guard let request,
+                  request.id != lastSearchRequestID,
+                  !query.isEmpty,
+                  let textView else { return }
+            lastSearchRequestID = request.id
+
+            let text = textView.string as NSString
+            let selection = textView.selectedRange()
+            let fullRange = NSRange(location: 0, length: text.length)
+            let match: NSRange
+
+            switch request.direction {
+            case .next:
+                let start = min(NSMaxRange(selection), text.length)
+                let remaining = NSRange(location: start, length: text.length - start)
+                let next = text.range(of: query, options: .caseInsensitive, range: remaining)
+                match = next.location == NSNotFound
+                    ? text.range(of: query, options: .caseInsensitive, range: fullRange)
+                    : next
+            case .previous:
+                let end = min(selection.location, text.length)
+                let preceding = NSRange(location: 0, length: end)
+                let previous = text.range(of: query, options: [.caseInsensitive, .backwards], range: preceding)
+                match = previous.location == NSNotFound
+                    ? text.range(of: query, options: [.caseInsensitive, .backwards], range: fullRange)
+                    : previous
+            }
+
+            guard match.location != NSNotFound else { return }
+            textView.setSelectedRange(match)
+            textView.scrollRangeToVisible(match)
+            textView.window?.makeFirstResponder(textView)
+        }
+
         func applyHighlighting(language: CodeLanguage, searchTerm: String) {
             guard let textStorage = textView?.textStorage else { return }
             let fullRange = NSRange(location: 0, length: textStorage.length)
@@ -98,7 +166,8 @@ struct CodeEditorView: NSViewRepresentable {
             textStorage.setAttributes([
                 .font: EditorPalette.font,
                 .foregroundColor: EditorPalette.foreground,
-                .backgroundColor: EditorPalette.background
+                .backgroundColor: EditorPalette.background,
+                .paragraphStyle: EditorPalette.paragraphStyle(tabWidth: parent.tabWidth)
             ], range: fullRange)
 
             for rule in SyntaxRules.rules(for: language) {
@@ -131,6 +200,14 @@ private enum EditorPalette {
     static let selection = NSColor(red: 0.20, green: 0.32, blue: 0.52, alpha: 1)
     static let searchMatch = NSColor(red: 0.64, green: 0.43, blue: 0.12, alpha: 0.9)
     static let font = NSFont.monospacedSystemFont(ofSize: 12.5, weight: .regular)
+
+    static func paragraphStyle(tabWidth: Int) -> NSParagraphStyle {
+        let style = NSMutableParagraphStyle()
+        let spaceWidth = (" " as NSString).size(withAttributes: [.font: font]).width
+        style.defaultTabInterval = spaceWidth * CGFloat(tabWidth)
+        style.tabStops = []
+        return style
+    }
 }
 
 private struct SyntaxRule {
