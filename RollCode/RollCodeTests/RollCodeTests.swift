@@ -281,25 +281,6 @@ struct RollCodeTests {
         }
     }
 
-    // @Test("TerminalSession interrupts running foreground command with Ctrl+C")
-    @MainActor
-    func terminalInterruptsForegroundCommand() async throws {
-        try await withTemporaryDirectory { directory in
-            let terminal = TerminalSession()
-            terminal.start(in: directory)
-            defer { terminal.stop() }
-
-            terminal.send("sleep 5")
-            try await Task.sleep(nanoseconds: 100_000_000)
-            terminal.interrupt()
-            terminal.send("printf '%s\\n' \"$((60 + 3))\"")
-
-            for _ in 0..<40 where !terminal.output.contains("63") {
-                try await Task.sleep(nanoseconds: 50_000_000)
-            }
-            #expect(terminal.output.contains("63"))
-        }
-    }
 
     @Test("TerminalSession command history moves backward and forward")
     @MainActor

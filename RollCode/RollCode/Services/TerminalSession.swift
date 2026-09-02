@@ -86,10 +86,11 @@ final class TerminalSession {
     }
 
     func interrupt() {
-        guard write(Data([3])) else {
+        guard isRunning, let process else {
             appendOutput("\n[Shell is not running]\n")
             return
         }
+        process.interrupt()
     }
 
     func clear() {
@@ -136,12 +137,7 @@ final class TerminalSession {
     }
 
     private func write(_ text: String) -> Bool {
-        guard let data = text.data(using: .utf8) else { return false }
-        return write(data)
-    }
-
-    private func write(_ data: Data) -> Bool {
-        guard isRunning, let inputPipe else { return false }
+        guard isRunning, let inputPipe, let data = text.data(using: .utf8) else { return false }
         do {
             try inputPipe.fileHandleForWriting.write(contentsOf: data)
             return true
