@@ -23,8 +23,8 @@ struct SidebarView: View {
                     ScrollView {
                         LazyVStack(alignment: .leading, spacing: 1) {
                             if workspace.fileFilter.isEmpty {
-                                ForEach(root.children ?? []) { node in
-                                    FileTreeItem(node: node, depth: 0)
+                                OutlineGroup(root.children ?? [], children: \.children) { node in
+                                    FileNodeRow(node: node)
                                 }
                             } else {
                                 ForEach(root.matchingFiles(workspace.fileFilter)) { node in
@@ -52,59 +52,12 @@ struct SidebarView: View {
     }
 }
 
-private struct FileTreeItem: View {
+private struct FileNodeRow: View {
     @Environment(WorkspaceModel.self) private var workspace
     let node: FileNode
-    let depth: Int
-    @State private var isExpanded = false
 
     var body: some View {
-        if node.isDirectory {
-            VStack(alignment: .leading, spacing: 1) {
-                Button {
-                    isExpanded.toggle()
-                } label: {
-                    FileRowLabel(
-                        node: node,
-                        depth: depth,
-                        disclosureIcon: isExpanded ? "chevron.down" : "chevron.right"
-                    )
-                }
-                .buttonStyle(.plain)
-                .contextMenu { FileContextMenu(node: node) }
-
-                if isExpanded {
-                    ForEach(node.children ?? []) { child in
-                        FileTreeItem(node: child, depth: depth + 1)
-                    }
-                }
-            }
-        } else {
-            Button { workspace.openFile(node.url) } label: {
-                FileRowLabel(node: node, depth: depth, disclosureIcon: nil)
-            }
-            .buttonStyle(.plain)
-            .contextMenu { FileContextMenu(node: node) }
-        }
-    }
-}
-
-private struct FileRowLabel: View {
-    let node: FileNode
-    let depth: Int
-    let disclosureIcon: String?
-
-    var body: some View {
-        HStack(spacing: 5) {
-            if let disclosureIcon {
-                Image(systemName: disclosureIcon)
-                    .font(.system(size: 8, weight: .bold))
-                    .frame(width: 10)
-                    .foregroundStyle(RollCodeTheme.secondaryText)
-            } else {
-                Color.clear.frame(width: 10, height: 1)
-            }
-
+        HStack(spacing: 6) {
             Image(systemName: node.iconName)
                 .font(.system(size: 11))
                 .foregroundStyle(node.isDirectory ? Color(red: 0.45, green: 0.64, blue: 0.95) : RollCodeTheme.secondaryText)
@@ -116,10 +69,14 @@ private struct FileRowLabel: View {
                 .lineLimit(1)
             Spacer(minLength: 0)
         }
-        .padding(.leading, CGFloat(depth) * 13)
-        .padding(.horizontal, 5)
         .frame(height: 23)
         .contentShape(Rectangle())
+        .onTapGesture {
+            if !node.isDirectory {
+                workspace.openFile(node.url)
+            }
+        }
+        .contextMenu { FileContextMenu(node: node) }
     }
 }
 

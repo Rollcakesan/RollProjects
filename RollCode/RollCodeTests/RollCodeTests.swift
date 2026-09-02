@@ -208,6 +208,55 @@ struct RollCodeTests {
         #expect(twoSpaces.selection.location == 4)
     }
 
+    @Test("WorkspaceSearch finds case-insensitive matches by line and replaces literal text")
+    func workspaceSearchFindsAndReplacesLiteralText() throws {
+        let root = URL(fileURLWithPath: "/tmp/project", isDirectory: true)
+        let first = WorkspaceSearchFile(
+            url: root.appendingPathComponent("Sources/App.swift"),
+            text: "let value = RollCode\n// rollcode and RollCode"
+        )
+        let second = WorkspaceSearchFile(
+            url: root.appendingPathComponent("README.md"),
+            text: "Nothing here"
+        )
+
+        let matches = WorkspaceSearch.matches(for: "rollcode", in: [first, second], relativeTo: root)
+        #expect(matches.map(\.line) == [1, 2])
+        #expect(matches.map(\.occurrences) == [1, 2])
+        #expect(matches.first?.relativePath == "Sources/App.swift")
+
+        let replacements = WorkspaceSearch.replacements(
+            of: "RollCode",
+            with: "$EDITOR\\name",
+            in: [first, second]
+        )
+        let replacement = try #require(replacements.first)
+        #expect(replacement.occurrences == 3)
+        #expect(replacement.text == "let value = $EDITOR\\name\n// $EDITOR\\name and $EDITOR\\name")
+    }
+
+    @Test("GitDiffService returns tracked and untracked changes")
+    func gitDiffServiceReturnsWorkingTreeChanges() throws {
+        try withTemporaryDirectory { root in
+            try runGit(["init", "--quiet"], in: root)
+            try runGit(["config", "user.email", "rollcode@example.com"], in: root)
+            try runGit(["config", "user.name", "RollCode Tests"], in: root)
+
+            let tracked = root.appendingPathComponent("tracked.txt")
+            try "before\n".write(to: tracked, atomically: true, encoding: .utf8)
+            try runGit(["add", "tracked.txt"], in: root)
+            try runGit(["commit", "--quiet", "-m", "Initial"], in: root)
+
+            try "after\n".write(to: tracked, atomically: true, encoding: .utf8)
+            try "new\n".write(to: root.appendingPathComponent("new.txt"), atomically: true, encoding: .utf8)
+
+            let changes = try GitDiffService.changes(in: root)
+            #expect(changes.map(\.path) == ["new.txt", "tracked.txt"])
+            #expect(changes.first(where: { $0.path == "tracked.txt" })?.diff.contains("+after") == true)
+            #expect(changes.first(where: { $0.path == "new.txt" })?.diff.contains("new file mode") == true)
+        }
+    }
+
     @Test("WorkspaceModel opens, modifies, and saves text files")
     @MainActor
     func workspaceOpensAndSavesTextFile() throws {
@@ -325,4 +374,19 @@ private func withTemporaryDirectory<T>(_ operation: (URL) throws -> T) throws ->
     try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
     defer { try? FileManager.default.removeItem(at: root) }
     return try operation(root)
+}
+
+private func runGit(_ arguments: [String], in directory: URL) throws {
+    let process = Process()
+    let output = Pipe()
+    process.executableURL = URL(fileURLWithPath: "/usr/bin/git")
+    process.arguments = ["-C", directory.path] + arguments
+    process.standardOutput = output
+    process.standardError = output
+    try process.run()
+    let data = output.fileHandleForReading.readDataToEndOfFile()
+    process.waitUntilExit()
+    guard process.terminationStatus == 0 else {
+        throw GitDiffError.commandFailed(String(decoding: data, as: UTF8.self))
+    }
 }

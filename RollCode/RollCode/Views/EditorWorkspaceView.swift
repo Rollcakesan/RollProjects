@@ -129,6 +129,7 @@ private struct EditorDocumentView: View {
                 language: document.language,
                 searchTerm: searchTerm,
                 searchRequest: searchRequest,
+                navigationRequest: workspace.editorNavigationRequest,
                 tabWidth: workspace.tabWidth
             )
         }

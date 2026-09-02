@@ -6,6 +6,7 @@ struct CodeEditorView: NSViewRepresentable {
     let language: CodeLanguage
     let searchTerm: String
     let searchRequest: EditorSearchRequest?
+    let navigationRequest: EditorNavigationRequest?
     let tabWidth: Int
 
     func makeCoordinator() -> Coordinator {
@@ -75,6 +76,7 @@ struct CodeEditorView: NSViewRepresentable {
         }
         context.coordinator.applyHighlighting(language: language, searchTerm: searchTerm)
         context.coordinator.handleSearchRequest(searchRequest, query: searchTerm)
+        context.coordinator.handleNavigationRequest(navigationRequest)
         context.coordinator.ruler?.needsDisplay = true
     }
 
@@ -86,6 +88,7 @@ struct CodeEditorView: NSViewRepresentable {
         private var isApplyingAttributes = false
         private var isPerformingSmartEdit = false
         private var lastSearchRequestID: UUID?
+        private var lastNavigationRequestID: UUID?
 
         init(parent: CodeEditorView) {
             self.parent = parent
@@ -154,6 +157,25 @@ struct CodeEditorView: NSViewRepresentable {
             guard match.location != NSNotFound else { return }
             textView.setSelectedRange(match)
             textView.scrollRangeToVisible(match)
+            textView.window?.makeFirstResponder(textView)
+        }
+
+        func handleNavigationRequest(_ request: EditorNavigationRequest?) {
+            guard let request,
+                  request.id != lastNavigationRequestID,
+                  let textView else { return }
+            lastNavigationRequestID = request.id
+
+            let text = textView.string as NSString
+            var line = 1
+            var location = 0
+            while line < request.line, location < text.length {
+                location = NSMaxRange(text.lineRange(for: NSRange(location: location, length: 0)))
+                line += 1
+            }
+            let range = text.lineRange(for: NSRange(location: min(location, text.length), length: 0))
+            textView.setSelectedRange(range)
+            textView.scrollRangeToVisible(range)
             textView.window?.makeFirstResponder(textView)
         }
 

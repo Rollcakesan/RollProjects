@@ -28,8 +28,7 @@ struct RollCodeApp: App {
                 }
                 .frame(minWidth: agent.isVisible ? 1080 : 860, minHeight: 560)
         }
-        .windowStyle(.hiddenTitleBar)
-        .windowToolbarStyle(.unifiedCompact(showsTitle: false))
+        .windowToolbarStyle(.unified(showsTitle: false))
         .commands {
             CommandGroup(replacing: .newItem) {
                 Button("Open Folder…") { workspace.chooseFolder() }
@@ -58,6 +57,10 @@ struct RollCodeApp: App {
             CommandMenu("Navigate") {
                 Button("Quick Open…") { workspace.presentQuickOpen() }
                     .keyboardShortcut("p", modifiers: [.command])
+                Button("Search in Project…") { workspace.presentWorkspaceSearch() }
+                    .keyboardShortcut("f", modifiers: [.command, .shift])
+                Button("Git Changes…") { workspace.presentGitChanges() }
+                    .keyboardShortcut("g", modifiers: [.command, .shift])
                 Divider()
                 Button("Close Editor") { workspace.closeActiveDocument() }
                     .keyboardShortcut("w", modifiers: [.command])

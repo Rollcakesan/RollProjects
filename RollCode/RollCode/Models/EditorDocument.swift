@@ -48,6 +48,11 @@ struct EditorSearchRequest: Equatable, Sendable {
     let direction: Direction
 }
 
+struct EditorNavigationRequest: Equatable, Sendable {
+    let id = UUID()
+    let line: Int
+}
+
 enum CodeLanguage: String, Sendable {
     case swift, javascript, typescript, python, html, css, json, shell, markdown
     case cFamily, go, rust, yaml, plainText

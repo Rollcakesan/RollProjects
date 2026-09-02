@@ -12,6 +12,10 @@ final class WorkspaceModel {
     var fileFilter = ""
     var alertMessage: String?
     var isQuickOpenPresented = false
+    var isWorkspaceSearchPresented = false
+    var isGitChangesPresented = false
+    var isFolderPickerPresented = false
+    var editorNavigationRequest: EditorNavigationRequest?
     var renamingURL: URL?
     var renamingName = ""
     private(set) var tabWidth: Int
@@ -51,14 +55,7 @@ final class WorkspaceModel {
     }
 
     func chooseFolder() {
-        let panel = NSOpenPanel()
-        panel.title = "Open a folder in RollCode"
-        panel.prompt = "Open"
-        panel.canChooseDirectories = true
-        panel.canChooseFiles = false
-        panel.allowsMultipleSelection = false
-        guard panel.runModal() == .OK, let url = panel.url else { return }
-        openWorkspace(url)
+        isFolderPickerPresented = true
     }
 
     func openWorkspace(_ url: URL) {
@@ -76,6 +73,22 @@ final class WorkspaceModel {
             return
         }
         isQuickOpenPresented = true
+    }
+
+    func presentWorkspaceSearch() {
+        guard rootURL != nil else {
+            chooseFolder()
+            return
+        }
+        isWorkspaceSearchPresented = true
+    }
+
+    func presentGitChanges() {
+        guard rootURL != nil else {
+            chooseFolder()
+            return
+        }
+        isGitChangesPresented = true
     }
 
     func setTabWidth(_ width: Int) {
@@ -334,6 +347,7 @@ final class WorkspaceModel {
         }
         refreshTree()
     }
+
 }
 
 enum WorkspaceError: LocalizedError, Sendable {

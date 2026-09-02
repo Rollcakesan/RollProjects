@@ -9,9 +9,6 @@ struct ContentView: View {
     var body: some View {
         @Bindable var workspace = workspace
         VStack(spacing: 0) {
-            WorkspaceToolbar()
-            Divider().overlay(RollCodeTheme.divider)
-
             HSplitView {
                 SidebarView()
                     .frame(minWidth: 180, idealWidth: 230, maxWidth: 360)
@@ -36,6 +33,9 @@ struct ContentView: View {
             StatusBarView()
         }
         .background(RollCodeTheme.editorBackground)
+        .toolbar {
+            WorkspaceToolbarContent()
+        }
         .alert("RollCode", isPresented: alertBinding) {
             Button("OK", role: .cancel) { workspace.alertMessage = nil }
         } message: {
@@ -50,6 +50,21 @@ struct ContentView: View {
         }
         .sheet(isPresented: $workspace.isQuickOpenPresented) {
             QuickOpenView(isPresented: $workspace.isQuickOpenPresented)
+        }
+        .sheet(isPresented: $workspace.isWorkspaceSearchPresented) {
+            WorkspaceSearchView(isPresented: $workspace.isWorkspaceSearchPresented)
+        }
+        .sheet(isPresented: $workspace.isGitChangesPresented) {
+            GitChangesView(isPresented: $workspace.isGitChangesPresented)
+        }
+        .fileImporter(
+            isPresented: $workspace.isFolderPickerPresented,
+            allowedContentTypes: [.folder],
+            allowsMultipleSelection: false
+        ) { result in
+            if case .success(let urls) = result, let url = urls.first {
+                workspace.openWorkspace(url)
+            }
         }
         .onAppear {
             if !terminal.isRunning {
