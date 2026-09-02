@@ -1,0 +1,33 @@
+steps:
+  - name: gcr.io/cloud-builders/docker
+    args: [build, --tag, '${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPOSITORY}/rollproject:$COMMIT_SHA', .]
+  - name: gcr.io/cloud-builders/docker
+    args: [push, '${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPOSITORY}/rollproject:$COMMIT_SHA']
+  - name: gcr.io/google.com/cloudsdktool/cloud-sdk:slim
+    entrypoint: gcloud
+    args:
+      - run
+      - deploy
+      - rollproject
+      - '--image=${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPOSITORY}/rollproject:$COMMIT_SHA'
+      - '--region=${_REGION}'
+      - --platform=managed
+      - --allow-unauthenticated
+      - --min-instances=0
+      - --max-instances=3
+      - --concurrency=60
+      - --cpu=1
+      - --memory=512Mi
+      - --timeout=30s
+      - '--set-env-vars=GOOGLE_CLIENT_ID=${_GOOGLE_CLIENT_ID},FIRESTORE_DATABASE=${_FIRESTORE_DATABASE}'
+      - '--set-secrets=ROLLPROJECT_SESSION_SECRET=${_SESSION_SECRET}:latest'
+      - '--service-account=${_SERVICE_ACCOUNT}'
+images: ['${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPOSITORY}/rollproject:$COMMIT_SHA']
+substitutions:
+  _REGION: asia-northeast1
+  _REPOSITORY: rollprojects
+  _GOOGLE_CLIENT_ID: 804469796792-f633hb8iidlvqg5lmn0b0t8v76ol4sri.apps.googleusercontent.com
+  _FIRESTORE_DATABASE: (default)
+  _SESSION_SECRET: rollproject-session-secret
+  _SERVICE_ACCOUNT: rollproject-runtime@rollprojects.iam.gserviceaccount.com
+options: { logging: CLOUD_LOGGING_ONLY }

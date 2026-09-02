@@ -1,0 +1,26 @@
+{
+  "name": "rollproject",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "build": "esbuild client/main.jsx --bundle --format=esm --target=es2022 --jsx=automatic --outfile=public/app.js --minify",
+    "predev": "npm run build",
+    "dev": "node --watch src/server.mjs",
+    "prestart": "npm run build",
+    "start": "node src/server.mjs",
+    "check": "npm run build && node --check src/server.mjs && node --check src/store.mjs && node --check src/validation.mjs && node --check src/google-auth.mjs && node --check src/session-auth.mjs",
+    "test": "node --test"
+  },
+  "dependencies": {
+    "@google-cloud/firestore": "^9.0.0",
+    "react": "^19.2.0",
+    "react-dom": "^19.2.0"
+  },
+  "devDependencies": {
+    "esbuild": "^0.25.0"
+  }
+}
