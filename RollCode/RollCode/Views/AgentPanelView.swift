@@ -168,38 +168,27 @@ struct AgentPanelView: View {
     }
 
     private var unavailableView: some View {
-        VStack(spacing: 10) {
-            Spacer()
-            Image(systemName: "exclamationmark.triangle")
-                .font(.system(size: 26, weight: .light))
-                .foregroundStyle(Color.orange)
-            Text("Codex CLI was not found")
-                .font(.system(size: 13, weight: .medium))
-            Text("Install Codex with Homebrew, then reopen RollCode.")
-                .font(.system(size: 11))
-                .foregroundStyle(RollCodeTheme.secondaryText)
-                .multilineTextAlignment(.center)
+        EmptyStateView(
+            systemImage: "exclamationmark.triangle",
+            title: "Codex CLI was not found",
+            message: "Install Codex with Homebrew, then reopen RollCode."
+        ) {
             Text("brew install --cask codex")
                 .font(.system(size: 10, design: .monospaced))
                 .textSelection(.enabled)
-            Spacer()
         }
         .padding(20)
     }
 
     private var noWorkspaceView: some View {
-        VStack(spacing: 10) {
-            Spacer()
-            Image(systemName: "folder")
-                .font(.system(size: 26, weight: .light))
-                .foregroundStyle(RollCodeTheme.secondaryText)
-            Text("Open a folder to start an agent")
-                .font(.system(size: 12))
-                .foregroundStyle(RollCodeTheme.secondaryText)
+        EmptyStateView(
+            systemImage: "folder",
+            title: "No folder open",
+            message: "Open a folder to start an agent."
+        ) {
             Button("Open Folder") { workspace.chooseFolder() }
                 .buttonStyle(.bordered)
                 .controlSize(.small)
-            Spacer()
         }
     }
 
@@ -228,7 +217,7 @@ private struct AgentMessageView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
-            Text(roleTitle)
+            Text(message.role.title)
                 .font(.system(size: 9, weight: .bold))
                 .foregroundStyle(roleColor)
             Text(message.text)
@@ -241,14 +230,6 @@ private struct AgentMessageView: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(backgroundColor)
         .clipShape(RoundedRectangle(cornerRadius: 6))
-    }
-
-    private var roleTitle: String {
-        switch message.role {
-        case .user: return "YOU"
-        case .assistant: return "CODEX"
-        case .system: return "ROLLCODE"
-        }
     }
 
     private var roleColor: Color {
@@ -272,7 +253,7 @@ private struct AgentActivityView: View {
         Button { isExpanded.toggle() } label: {
             VStack(alignment: .leading, spacing: 4) {
                 HStack(spacing: 6) {
-                    Image(systemName: icon)
+                    Image(systemName: activity.state.iconName)
                         .foregroundStyle(color)
                         .font(.system(size: 9))
                     Text(activity.title)
@@ -298,14 +279,6 @@ private struct AgentActivityView: View {
             .clipShape(RoundedRectangle(cornerRadius: 4))
         }
         .buttonStyle(.plain)
-    }
-
-    private var icon: String {
-        switch activity.state {
-        case .running: return "circle.dotted"
-        case .completed: return "checkmark.circle.fill"
-        case .failed: return "xmark.circle.fill"
-        }
     }
 
     private var color: Color {

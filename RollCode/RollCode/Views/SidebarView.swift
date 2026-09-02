@@ -42,20 +42,15 @@ struct SidebarView: View {
                         .padding(.horizontal, 5)
                     }
                 } else {
-                    VStack(spacing: 12) {
-                        Spacer()
-                        Image(systemName: "folder.badge.plus")
-                            .font(.system(size: 28, weight: .light))
-                            .foregroundStyle(RollCodeTheme.secondaryText)
-                        Text("Open a folder to begin")
-                            .font(.system(size: 12))
-                            .foregroundStyle(RollCodeTheme.secondaryText)
+                    EmptyStateView(
+                        systemImage: "folder.badge.plus",
+                        title: "No folder open",
+                        message: "Open a folder to begin."
+                    ) {
                         Button("Open Folder") { workspace.chooseFolder() }
                             .buttonStyle(.bordered)
                             .controlSize(.small)
-                        Spacer()
                     }
-                    .frame(maxWidth: .infinity)
                 }
             }
         }

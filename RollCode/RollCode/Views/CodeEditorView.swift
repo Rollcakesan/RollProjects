@@ -227,6 +227,9 @@ private enum SyntaxRules {
     private static let number = NSColor(red: 0.92, green: 0.68, blue: 0.43, alpha: 1)
     private static let type = NSColor(red: 0.45, green: 0.75, blue: 0.94, alpha: 1)
 
+    private static let slashComments = SyntaxRule(pattern: #"//.*$|/\*[\s\S]*?\*/"#, color: comment, options: [.anchorsMatchLines])
+    private static let hashComments = SyntaxRule(pattern: #"#.*$"#, color: comment, options: [.anchorsMatchLines])
+
     static func rules(for language: CodeLanguage) -> [SyntaxRule] {
         var common = [
             SyntaxRule(pattern: #"\b\d+(?:\.\d+)?\b"#, color: number),
@@ -238,22 +241,22 @@ private enum SyntaxRules {
             common += [
                 SyntaxRule(pattern: #"\b(import|struct|class|enum|protocol|extension|func|var|let|if|else|guard|switch|case|for|while|return|throw|throws|try|await|async|actor|private|public|internal|fileprivate|static|final|some|any|in|where|nil|true|false|self|Self)\b"#, color: keyword),
                 SyntaxRule(pattern: #"\b[A-Z][A-Za-z0-9_]*\b"#, color: type),
-                SyntaxRule(pattern: #"//.*$|/\*[\s\S]*?\*/"#, color: comment, options: [.anchorsMatchLines])
+                slashComments
             ]
         case .javascript, .typescript:
             common += [
                 SyntaxRule(pattern: #"\b(const|let|var|function|class|interface|type|extends|implements|if|else|switch|case|for|while|return|throw|try|catch|finally|async|await|import|export|from|new|this|null|undefined|true|false)\b"#, color: keyword),
-                SyntaxRule(pattern: #"//.*$|/\*[\s\S]*?\*/"#, color: comment, options: [.anchorsMatchLines])
+                slashComments
             ]
         case .python:
             common += [
                 SyntaxRule(pattern: #"\b(and|as|assert|async|await|break|class|continue|def|del|elif|else|except|False|finally|for|from|global|if|import|in|is|lambda|None|not|or|pass|raise|return|True|try|while|with|yield)\b"#, color: keyword),
-                SyntaxRule(pattern: #"#.*$"#, color: comment, options: [.anchorsMatchLines])
+                hashComments
             ]
         case .shell:
             common += [
                 SyntaxRule(pattern: #"\b(if|then|else|elif|fi|for|while|do|done|case|esac|function|in|export|local)\b"#, color: keyword),
-                SyntaxRule(pattern: #"#.*$"#, color: comment, options: [.anchorsMatchLines])
+                hashComments
             ]
         case .json:
             common += [
@@ -278,22 +281,22 @@ private enum SyntaxRules {
         case .cFamily:
             common += [
                 SyntaxRule(pattern: #"\b(auto|break|case|char|class|const|continue|default|delete|do|double|else|enum|explicit|extern|float|for|friend|if|inline|int|long|namespace|new|nullptr|operator|private|protected|public|return|short|signed|sizeof|static|struct|switch|template|this|throw|try|typedef|typename|union|unsigned|using|virtual|void|volatile|while)\b"#, color: keyword),
-                SyntaxRule(pattern: #"//.*$|/\*[\s\S]*?\*/"#, color: comment, options: [.anchorsMatchLines])
+                slashComments
             ]
         case .go:
             common += [
                 SyntaxRule(pattern: #"\b(break|case|chan|const|continue|default|defer|else|fallthrough|for|func|go|goto|if|import|interface|map|package|range|return|select|struct|switch|type|var|nil|true|false)\b"#, color: keyword),
-                SyntaxRule(pattern: #"//.*$|/\*[\s\S]*?\*/"#, color: comment, options: [.anchorsMatchLines])
+                slashComments
             ]
         case .rust:
             common += [
                 SyntaxRule(pattern: #"\b(as|async|await|break|const|continue|crate|dyn|else|enum|extern|false|fn|for|if|impl|in|let|loop|match|mod|move|mut|pub|ref|return|self|Self|static|struct|super|trait|true|type|unsafe|use|where|while)\b"#, color: keyword),
-                SyntaxRule(pattern: #"//.*$|/\*[\s\S]*?\*/"#, color: comment, options: [.anchorsMatchLines])
+                slashComments
             ]
         case .yaml:
             common += [
                 SyntaxRule(pattern: #"^[\s-]*[A-Za-z0-9_.-]+(?=:)"#, color: type, options: [.anchorsMatchLines]),
-                SyntaxRule(pattern: #"#.*$"#, color: comment, options: [.anchorsMatchLines]),
+                hashComments,
                 SyntaxRule(pattern: #"\b(true|false|null|yes|no)\b"#, color: keyword, options: [.caseInsensitive])
             ]
         case .plainText:

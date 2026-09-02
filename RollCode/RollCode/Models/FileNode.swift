@@ -77,4 +77,9 @@ extension URL {
         let relative = parent.relativePath(from: base).trimmingCharacters(in: CharacterSet(charactersIn: "/"))
         return relative.isEmpty ? "." : relative
     }
+
+    var modificationDate: Date? {
+        let attributes = try? FileManager.default.attributesOfItem(atPath: path)
+        return attributes?[.modificationDate] as? Date
+    }
 }

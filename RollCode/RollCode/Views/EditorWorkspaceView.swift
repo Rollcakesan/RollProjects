@@ -163,25 +163,18 @@ private struct EmptyEditorView: View {
     @Environment(WorkspaceModel.self) private var workspace
 
     var body: some View {
-        VStack(spacing: 14) {
-            Spacer()
-            Image(systemName: "chevron.left.forwardslash.chevron.right")
-                .font(.system(size: 44, weight: .ultraLight))
-                .foregroundStyle(RollCodeTheme.secondaryText.opacity(0.55))
-            Text("A quiet place to write code")
-                .font(.system(size: 16, weight: .medium))
-                .foregroundStyle(RollCodeTheme.primaryText)
-            Text("Open a file from the project tree or create a new one.")
-                .font(.system(size: 12))
-                .foregroundStyle(RollCodeTheme.secondaryText)
+        EmptyStateView(
+            systemImage: "chevron.left.forwardslash.chevron.right",
+            title: "A quiet place to write code",
+            message: "Open a file from the project tree or create a new one.",
+            imageSize: 40
+        ) {
             HStack(spacing: 8) {
                 Button("Open Folder") { workspace.chooseFolder() }
                 Button("New File") { workspace.createFile() }
             }
             .buttonStyle(.bordered)
             .controlSize(.small)
-            Spacer()
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 }

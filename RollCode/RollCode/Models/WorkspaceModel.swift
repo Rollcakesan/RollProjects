@@ -133,7 +133,7 @@ final class WorkspaceModel {
             guard !data.prefix(8_192).contains(0), let text = String(data: data, encoding: .utf8) else {
                 throw WorkspaceError.notUTF8Text
             }
-            let document = EditorDocument(url: url, text: text, diskModificationDate: modificationDate(for: url))
+            let document = EditorDocument(url: url, text: text, diskModificationDate: url.modificationDate)
             documents.append(document)
             activeDocumentID = document.id
         } catch {
@@ -178,7 +178,7 @@ final class WorkspaceModel {
         do {
             try document.text.write(to: destination, atomically: true, encoding: .utf8)
             document.url = destination
-            document.markSaved(modificationDate: modificationDate(for: destination))
+            document.markSaved(modificationDate: destination.modificationDate)
             refreshTree()
         } catch {
             alertMessage = "Could not save the file: \(error.localizedDescription)"
@@ -189,7 +189,7 @@ final class WorkspaceModel {
     func save(_ document: EditorDocument) -> Bool {
         do {
             try document.text.write(to: document.url, atomically: true, encoding: .utf8)
-            document.markSaved(modificationDate: modificationDate(for: document.url))
+            document.markSaved(modificationDate: document.url.modificationDate)
             return true
         } catch {
             alertMessage = "Could not save \(document.name): \(error.localizedDescription)"
@@ -246,7 +246,7 @@ final class WorkspaceModel {
                 continue
             }
 
-            let currentDate = modificationDate(for: document.url)
+            let currentDate = document.url.modificationDate
             guard currentDate != document.diskModificationDate,
                   let data = try? Data(contentsOf: document.url),
                   let diskText = String(data: data, encoding: .utf8) else { continue }
@@ -329,11 +329,6 @@ final class WorkspaceModel {
             }
         }
         refreshTree()
-    }
-
-    private func modificationDate(for url: URL) -> Date? {
-        let attributes = try? FileManager.default.attributesOfItem(atPath: url.path)
-        return attributes?[.modificationDate] as? Date
     }
 }
 

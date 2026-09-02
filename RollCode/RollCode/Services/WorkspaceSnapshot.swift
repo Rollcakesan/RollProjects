@@ -10,7 +10,6 @@ struct WorkspaceSnapshot: Equatable, Sendable {
 
     static func capture(at rootURL: URL) -> WorkspaceSnapshot {
         let keys: [URLResourceKey] = [.isDirectoryKey, .isRegularFileKey, .contentModificationDateKey, .fileSizeKey]
-        let excludedDirectories: Set<String> = [".git", ".build", "DerivedData", "node_modules"]
         guard let enumerator = FileManager.default.enumerator(atPath: rootURL.path) else {
             return WorkspaceSnapshot(files: [:])
         }
@@ -20,7 +19,7 @@ struct WorkspaceSnapshot: Equatable, Sendable {
             let url = rootURL.appendingPathComponent(relativePath)
             guard let values = try? url.resourceValues(forKeys: Set(keys)) else { continue }
             if values.isDirectory == true {
-                if excludedDirectories.contains(url.lastPathComponent) { enumerator.skipDescendants() }
+                if FileNode.ignoredDirectoryNames.contains(url.lastPathComponent) { enumerator.skipDescendants() }
                 continue
             }
             guard values.isRegularFile == true else { continue }

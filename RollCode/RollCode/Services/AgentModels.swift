@@ -5,6 +5,14 @@ struct AgentMessage: Identifiable, Equatable, Sendable {
         case user
         case assistant
         case system
+
+        var title: String {
+            switch self {
+            case .user: "YOU"
+            case .assistant: "CODEX"
+            case .system: "ROLLCODE"
+            }
+        }
     }
 
     let id = UUID()
@@ -17,6 +25,14 @@ struct AgentActivity: Identifiable, Equatable, Sendable {
         case running
         case completed
         case failed
+
+        var iconName: String {
+            switch self {
+            case .running: "circle.dotted"
+            case .completed: "checkmark.circle.fill"
+            case .failed: "xmark.circle.fill"
+            }
+        }
     }
 
     let id: String

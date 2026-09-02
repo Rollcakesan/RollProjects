@@ -77,3 +77,47 @@ enum RollCodeTheme {
     static let secondaryText = Color(white: 0.56)
     static let divider = Color.white.opacity(0.08)
 }
+
+struct EmptyStateView<Actions: View>: View {
+    let systemImage: String
+    let title: String
+    var message: String? = nil
+    var imageSize: CGFloat = 28
+    @ViewBuilder var actions: Actions
+
+    init(
+        systemImage: String,
+        title: String,
+        message: String? = nil,
+        imageSize: CGFloat = 28,
+        @ViewBuilder actions: () -> Actions = { EmptyView() }
+    ) {
+        self.systemImage = systemImage
+        self.title = title
+        self.message = message
+        self.imageSize = imageSize
+        self.actions = actions()
+    }
+
+    var body: some View {
+        VStack(spacing: 10) {
+            Spacer()
+            Image(systemName: systemImage)
+                .font(.system(size: imageSize, weight: .light))
+                .foregroundStyle(RollCodeTheme.secondaryText.opacity(0.75))
+            Text(title)
+                .font(.system(size: 13, weight: .medium))
+                .foregroundStyle(RollCodeTheme.primaryText)
+            if let message {
+                Text(message)
+                    .font(.system(size: 11))
+                    .foregroundStyle(RollCodeTheme.secondaryText)
+                    .multilineTextAlignment(.center)
+            }
+            actions
+                .padding(.top, 2)
+            Spacer()
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+}
