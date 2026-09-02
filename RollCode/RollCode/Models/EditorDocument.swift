@@ -1,0 +1,60 @@
+import Foundation
+
+final class EditorDocument: ObservableObject, Identifiable {
+    let id = UUID()
+    @Published var url: URL
+    @Published var text: String
+    @Published private(set) var savedText: String
+
+    init(url: URL, text: String) {
+        self.url = url
+        self.text = text
+        self.savedText = text
+    }
+
+    var name: String { url.lastPathComponent }
+    var isDirty: Bool { text != savedText }
+    var language: CodeLanguage { CodeLanguage(url: url) }
+
+    func markSaved() {
+        savedText = text
+    }
+}
+
+enum CodeLanguage: String {
+    case swift, javascript, typescript, python, html, css, json, shell, markdown
+    case cFamily, go, rust, yaml, plainText
+
+    init(url: URL) {
+        switch url.pathExtension.lowercased() {
+        case "swift": self = .swift
+        case "js", "jsx", "mjs", "cjs": self = .javascript
+        case "ts", "tsx": self = .typescript
+        case "py": self = .python
+        case "html", "htm": self = .html
+        case "css", "scss", "sass": self = .css
+        case "json": self = .json
+        case "sh", "zsh", "bash": self = .shell
+        case "md", "markdown": self = .markdown
+        case "c", "h", "cc", "cpp", "cxx", "hpp", "m", "mm": self = .cFamily
+        case "go": self = .go
+        case "rs": self = .rust
+        case "yaml", "yml": self = .yaml
+        default: self = .plainText
+        }
+    }
+
+    var displayName: String {
+        switch self {
+        case .javascript: return "JavaScript"
+        case .typescript: return "TypeScript"
+        case .html: return "HTML"
+        case .css: return "CSS"
+        case .json: return "JSON"
+        case .cFamily: return "C / C++"
+        case .yaml: return "YAML"
+        case .plainText: return "Plain Text"
+        default: return rawValue.prefix(1).uppercased() + rawValue.dropFirst()
+        }
+    }
+}

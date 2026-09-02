@@ -1,0 +1,56 @@
+import Foundation
+
+struct FileNode: Identifiable, Hashable {
+    let url: URL
+    let isDirectory: Bool
+    var children: [FileNode]?
+
+    var id: URL { url }
+    var name: String { url.lastPathComponent }
+
+    static let ignoredDirectoryNames: Set<String> = [
+        ".git", ".build", ".swiftpm", "DerivedData", "node_modules", "Pods"
+    ]
+
+    static func buildTree(at url: URL, fileManager: FileManager = .default) -> FileNode {
+        let keys: Set<URLResourceKey> = [.isDirectoryKey, .isSymbolicLinkKey, .isHiddenKey]
+        let childURLs = (try? fileManager.contentsOfDirectory(
+            at: url,
+            includingPropertiesForKeys: Array(keys),
+            options: [.skipsHiddenFiles]
+        )) ?? []
+
+        let nodes = childURLs.compactMap { childURL -> FileNode? in
+            guard let values = try? childURL.resourceValues(forKeys: keys) else { return nil }
+            let isDirectory = values.isDirectory == true
+            if isDirectory && ignoredDirectoryNames.contains(childURL.lastPathComponent) { return nil }
+            if values.isSymbolicLink == true && isDirectory { return nil }
+
+            return FileNode(
+                url: childURL,
+                isDirectory: isDirectory,
+                children: isDirectory ? buildTree(at: childURL, fileManager: fileManager).children : nil
+            )
+        }
+        .sorted {
+            if $0.isDirectory != $1.isDirectory { return $0.isDirectory }
+            return $0.name.localizedStandardCompare($1.name) == .orderedAscending
+        }
+
+        return FileNode(url: url, isDirectory: true, children: nodes)
+    }
+
+    func matchingFiles(_ query: String) -> [FileNode] {
+        let normalized = query.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !normalized.isEmpty else { return [] }
+
+        var matches: [FileNode] = []
+        if !isDirectory && name.localizedCaseInsensitiveContains(normalized) {
+            matches.append(self)
+        }
+        for child in children ?? [] {
+            matches.append(contentsOf: child.matchingFiles(normalized))
+        }
+        return matches
+    }
+}

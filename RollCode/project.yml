@@ -1,0 +1,55 @@
+name: RollCode
+options:
+  bundleIdPrefix: com.rollprojects
+  deploymentTarget:
+    macOS: "14.0"
+  createIntermediateGroups: true
+settings:
+  base:
+    SWIFT_VERSION: "5.0"
+    MACOSX_DEPLOYMENT_TARGET: "14.0"
+    CODE_SIGN_STYLE: Automatic
+    CURRENT_PROJECT_VERSION: 1
+    MARKETING_VERSION: 0.1.0
+targets:
+  RollCode:
+    type: application
+    platform: macOS
+    sources:
+      - path: RollCode
+    info:
+      path: RollCode/Resources/Info.plist
+      properties:
+        CFBundleDisplayName: RollCode
+        CFBundleName: RollCode
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
+        LSApplicationCategoryType: public.app-category.developer-tools
+        NSHighResolutionCapable: true
+        NSSupportsAutomaticGraphicsSwitching: true
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.rollprojects.RollCode
+        PRODUCT_NAME: RollCode
+        ENABLE_APP_SANDBOX: NO
+        GENERATE_INFOPLIST_FILE: NO
+  RollCodeTests:
+    type: bundle.unit-test
+    platform: macOS
+    sources:
+      - path: RollCodeTests
+    dependencies:
+      - target: RollCode
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.rollprojects.RollCodeTests
+        GENERATE_INFOPLIST_FILE: YES
+schemes:
+  RollCode:
+    build:
+      targets:
+        RollCode: all
+        RollCodeTests: [test]
+    test:
+      targets:
+        - RollCodeTests
