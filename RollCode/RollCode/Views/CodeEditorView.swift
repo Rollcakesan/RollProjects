@@ -78,6 +78,7 @@ struct CodeEditorView: NSViewRepresentable {
         context.coordinator.ruler?.needsDisplay = true
     }
 
+    @MainActor
     final class Coordinator: NSObject, NSTextViewDelegate {
         var parent: CodeEditorView
         weak var textView: NSTextView?
@@ -193,6 +194,7 @@ struct CodeEditorView: NSViewRepresentable {
     }
 }
 
+@MainActor
 private enum EditorPalette {
     static let background = NSColor(red: 0.115, green: 0.12, blue: 0.14, alpha: 1)
     static let foreground = NSColor(white: 0.86, alpha: 1)
@@ -210,12 +212,14 @@ private enum EditorPalette {
     }
 }
 
+@MainActor
 private struct SyntaxRule {
     let pattern: String
     let color: NSColor
     var options: NSRegularExpression.Options = []
 }
 
+@MainActor
 private enum SyntaxRules {
     private static let keyword = NSColor(red: 0.78, green: 0.48, blue: 0.92, alpha: 1)
     private static let string = NSColor(red: 0.72, green: 0.86, blue: 0.56, alpha: 1)
@@ -299,6 +303,7 @@ private enum SyntaxRules {
     }
 }
 
+@MainActor
 final class LineNumberRulerView: NSRulerView {
     private weak var textView: NSTextView?
 

@@ -1,9 +1,10 @@
 import SwiftUI
 
 struct SidebarView: View {
-    @EnvironmentObject private var workspace: WorkspaceModel
+    @Environment(WorkspaceModel.self) private var workspace
 
     var body: some View {
+        @Bindable var workspace = workspace
         VStack(spacing: 0) {
             HStack {
                 Text("PROJECT")
@@ -63,7 +64,7 @@ struct SidebarView: View {
 }
 
 private struct FileTreeItem: View {
-    @EnvironmentObject private var workspace: WorkspaceModel
+    @Environment(WorkspaceModel.self) private var workspace
     let node: FileNode
     let depth: Int
     @State private var isExpanded = false
@@ -134,7 +135,7 @@ private struct FileRowLabel: View {
 }
 
 private struct FilteredFileRow: View {
-    @EnvironmentObject private var workspace: WorkspaceModel
+    @Environment(WorkspaceModel.self) private var workspace
     let node: FileNode
     let rootURL: URL
 
@@ -160,7 +161,7 @@ private struct FilteredFileRow: View {
 }
 
 private struct FileContextMenu: View {
-    @EnvironmentObject private var workspace: WorkspaceModel
+    @Environment(WorkspaceModel.self) private var workspace
     let node: FileNode
 
     var body: some View {

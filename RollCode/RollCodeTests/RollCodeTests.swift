@@ -1,64 +1,73 @@
-import XCTest
+import Foundation
+import Testing
 @testable import RollCode
 
-final class RollCodeTests: XCTestCase {
-    func testCodexEventParserReadsThreadMessagesCommandsAndChanges() throws {
-        let thread = try XCTUnwrap(CodexEventParser.parse(
+@Suite("RollCode Test Suite")
+struct RollCodeTests {
+    @Test("CodexEventParser reads thread started, messages, command execution, and file changes")
+    func codexEventParserReadsThreadMessagesCommandsAndChanges() throws {
+        let thread = try #require(CodexEventParser.parse(
             #"{"type":"thread.started","thread_id":"thread-123"}"#
         ))
-        XCTAssertEqual(thread, .threadStarted("thread-123"))
+        #expect(thread == .threadStarted("thread-123"))
 
-        let message = try XCTUnwrap(CodexEventParser.parse(
+        let message = try #require(CodexEventParser.parse(
             #"{"type":"item.completed","item":{"id":"item-1","type":"agent_message","text":"Done"}}"#
         ))
-        XCTAssertEqual(message, .message("Done"))
+        #expect(message == .message("Done"))
 
-        let command = try XCTUnwrap(CodexEventParser.parse(
+        let command = try #require(CodexEventParser.parse(
             #"{"type":"item.completed","item":{"id":"item-2","type":"command_execution","command":"swift test","aggregated_output":"ok","exit_code":0,"status":"completed"}}"#
         ))
         guard case .activity(let commandActivity, let commandFiles) = command else {
-            return XCTFail("Expected an activity")
+            Issue.record("Expected a command activity")
+            return
         }
-        XCTAssertEqual(commandActivity.title, "swift test")
-        XCTAssertEqual(commandActivity.detail, "ok")
-        XCTAssertEqual(commandActivity.state, .completed)
-        XCTAssertEqual(commandFiles, [])
+        #expect(commandActivity.title == "swift test")
+        #expect(commandActivity.detail == "ok")
+        #expect(commandActivity.state == .completed)
+        #expect(commandFiles == [])
 
-        let change = try XCTUnwrap(CodexEventParser.parse(
+        let change = try #require(CodexEventParser.parse(
             #"{"type":"item.completed","item":{"id":"item-3","type":"file_change","changes":[{"path":"/tmp/App.swift","kind":"update"}],"status":"completed"}}"#
         ))
         guard case .activity(let changeActivity, let changedFiles) = change else {
-            return XCTFail("Expected a file change activity")
+            Issue.record("Expected a file change activity")
+            return
         }
-        XCTAssertEqual(changedFiles, ["/tmp/App.swift"])
-        XCTAssertEqual(changeActivity.state, .completed)
+        #expect(changedFiles == ["/tmp/App.swift"])
+        #expect(changeActivity.state == .completed)
     }
 
-    func testCodexEventParserReadsUsageAndFailures() throws {
-        let completed = try XCTUnwrap(CodexEventParser.parse(
+    @Test("CodexEventParser reads usage tokens and failure events")
+    func codexEventParserReadsUsageAndFailures() throws {
+        let completed = try #require(CodexEventParser.parse(
             #"{"type":"turn.completed","usage":{"input_tokens":20,"cached_input_tokens":10,"output_tokens":5}}"#
         ))
-        XCTAssertEqual(completed, .usage("20 input · 10 cached · 5 output"))
+        #expect(completed == .usage("20 input · 10 cached · 5 output"))
 
-        let failed = try XCTUnwrap(CodexEventParser.parse(
+        let failed = try #require(CodexEventParser.parse(
             #"{"type":"turn.failed","error":{"message":"Authentication required"}}"#
         ))
-        XCTAssertEqual(failed, .error("Authentication required"))
+        #expect(failed == .error("Authentication required"))
     }
 
-    func testCodexEventParserDecodesStructuredToolResults() throws {
-        let event = try XCTUnwrap(CodexEventParser.parse(
+    @Test("CodexEventParser decodes structured JSON tool call results")
+    func codexEventParserDecodesStructuredToolResults() throws {
+        let event = try #require(CodexEventParser.parse(
             #"{"type":"item.completed","item":{"id":"tool-1","type":"mcp_tool_call","server":"files","tool":"read","result":{"ok":true,"count":2}}}"#
         ))
         guard case .activity(let activity, _) = event else {
-            return XCTFail("Expected a tool activity")
+            Issue.record("Expected a tool activity")
+            return
         }
-        XCTAssertEqual(activity.title, "files · read")
-        XCTAssertTrue(activity.detail.contains("\"ok\":true"))
-        XCTAssertTrue(activity.detail.contains("\"count\":2"))
+        #expect(activity.title == "files · read")
+        #expect(activity.detail.contains("\"ok\":true"))
+        #expect(activity.detail.contains("\"count\":2"))
     }
 
-    func testWorkspaceSnapshotDetectsAddedChangedAndDeletedFiles() throws {
+    @Test("WorkspaceSnapshot detects added, changed, and deleted files")
+    func workspaceSnapshotDetectsAddedChangedAndDeletedFiles() throws {
         let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
         defer { try? FileManager.default.removeItem(at: root) }
@@ -73,11 +82,12 @@ final class RollCodeTests: XCTestCase {
         try "new".write(to: root.appendingPathComponent("added.txt"), atomically: true, encoding: .utf8)
         let after = WorkspaceSnapshot.capture(at: root)
 
-        XCTAssertEqual(before.changedFiles(comparedTo: after), ["added.txt", "changed.txt", "deleted.txt"])
+        #expect(before.changedFiles(comparedTo: after) == ["added.txt", "changed.txt", "deleted.txt"])
     }
 
+    @Test("AgentSession streams Codex JSON Lines and tracks state changes")
     @MainActor
-    func testAgentSessionStreamsCodexJSONLines() async throws {
+    func agentSessionStreamsCodexJSONLines() async throws {
         let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
         defer { try? FileManager.default.removeItem(at: root) }
@@ -98,26 +108,33 @@ final class RollCodeTests: XCTestCase {
             try await Task.sleep(nanoseconds: 50_000_000)
         }
 
-        XCTAssertFalse(agent.isRunning)
-        XCTAssertEqual(agent.threadID, "fake-thread")
-        XCTAssertTrue(agent.entries.contains { entry in
+        #expect(!agent.isRunning)
+        #expect(agent.threadID == "fake-thread")
+        #expect(agent.entries.contains { entry in
             guard case .message(let message) = entry else { return false }
             return message.role == .assistant && message.text == "Finished"
         })
-        XCTAssertTrue(agent.entries.contains(.changes(["Sources/App.swift"])))
-        XCTAssertTrue(agent.entries.contains(.usage("3 input · 1 cached · 2 output")))
+        #expect(agent.entries.contains(.changes(["Sources/App.swift"])))
+        #expect(agent.entries.contains(.usage("3 input · 1 cached · 2 output")))
     }
 
-    func testCodeLanguageDetection() {
-        XCTAssertEqual(CodeLanguage(url: URL(fileURLWithPath: "/tmp/App.swift")), .swift)
-        XCTAssertEqual(CodeLanguage(url: URL(fileURLWithPath: "/tmp/view.tsx")), .typescript)
-        XCTAssertEqual(CodeLanguage(url: URL(fileURLWithPath: "/tmp/README.md")), .markdown)
-        XCTAssertEqual(CodeLanguage(url: URL(fileURLWithPath: "/tmp/main.rs")), .rust)
-        XCTAssertEqual(CodeLanguage(url: URL(fileURLWithPath: "/tmp/config.yml")), .yaml)
-        XCTAssertEqual(CodeLanguage(url: URL(fileURLWithPath: "/tmp/LICENSE")), .plainText)
+    @Test(
+        "Code language detection from file extension",
+        arguments: [
+            ("/tmp/App.swift", CodeLanguage.swift),
+            ("/tmp/view.tsx", CodeLanguage.typescript),
+            ("/tmp/README.md", CodeLanguage.markdown),
+            ("/tmp/main.rs", CodeLanguage.rust),
+            ("/tmp/config.yml", CodeLanguage.yaml),
+            ("/tmp/LICENSE", CodeLanguage.plainText),
+        ]
+    )
+    func codeLanguageDetection(path: String, expected: CodeLanguage) {
+        #expect(CodeLanguage(url: URL(fileURLWithPath: path)) == expected)
     }
 
-    func testTreeSortsDirectoriesBeforeFilesAndSkipsHeavyFolders() throws {
+    @Test("FileNode.buildTree sorts directories before files and skips ignored folders")
+    func treeSortsDirectoriesBeforeFilesAndSkipsHeavyFolders() throws {
         let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
         defer { try? FileManager.default.removeItem(at: root) }
@@ -127,10 +144,11 @@ final class RollCodeTests: XCTestCase {
         try "let value = 1".write(to: root.appendingPathComponent("main.swift"), atomically: true, encoding: .utf8)
 
         let tree = FileNode.buildTree(at: root)
-        XCTAssertEqual(tree.children?.map(\.name), ["Sources", "main.swift"])
+        #expect(tree.children?.map(\.name) == ["Sources", "main.swift"])
     }
 
-    func testTreeFindsNestedFilesCaseInsensitively() throws {
+    @Test("FileNode.matchingFiles finds nested files case-insensitively")
+    func treeFindsNestedFilesCaseInsensitively() throws {
         let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         let sources = root.appendingPathComponent("Sources")
         try FileManager.default.createDirectory(at: sources, withIntermediateDirectories: true)
@@ -138,61 +156,65 @@ final class RollCodeTests: XCTestCase {
         try "".write(to: sources.appendingPathComponent("WorkspaceModel.swift"), atomically: true, encoding: .utf8)
 
         let matches = FileNode.buildTree(at: root).matchingFiles("workspace")
-        XCTAssertEqual(matches.map(\.name), ["WorkspaceModel.swift"])
+        #expect(matches.map(\.name) == ["WorkspaceModel.swift"])
     }
 
-    func testQuickOpenMatcherSupportsFuzzyPathsAndRanksTighterMatchesHigher() {
+    @Test("QuickOpenMatcher ranks tighter fuzzy matches higher")
+    func quickOpenMatcherSupportsFuzzyPathsAndRanksTighterMatchesHigher() {
         let tight = QuickOpenMatcher.score(query: "wsm", candidate: "WorkspaceModel.swift")
         let loose = QuickOpenMatcher.score(query: "wsm", candidate: "Views/WorkspaceMenu.swift")
 
-        XCTAssertNotNil(tight)
-        XCTAssertNotNil(loose)
-        XCTAssertGreaterThan(tight ?? 0, loose ?? 0)
-        XCTAssertNil(QuickOpenMatcher.score(query: "xyz", candidate: "WorkspaceModel.swift"))
+        #expect(tight != nil)
+        #expect(loose != nil)
+        #expect((tight ?? 0) > (loose ?? 0))
+        #expect(QuickOpenMatcher.score(query: "xyz", candidate: "WorkspaceModel.swift") == nil)
     }
 
-    func testSmartEditingPairsAndWrapsCharacters() throws {
-        let emptyPair = try XCTUnwrap(EditorSmartEditing.edit(for: "(", in: "", range: NSRange(location: 0, length: 0)))
-        XCTAssertEqual(emptyPair.replacement, "()")
-        XCTAssertEqual(emptyPair.selection, NSRange(location: 1, length: 0))
+    @Test("EditorSmartEditing auto-closes pairs and wraps selected ranges")
+    func smartEditingPairsAndWrapsCharacters() throws {
+        let emptyPair = try #require(EditorSmartEditing.edit(for: "(", in: "", range: NSRange(location: 0, length: 0)))
+        #expect(emptyPair.replacement == "()")
+        #expect(emptyPair.selection == NSRange(location: 1, length: 0))
 
-        let wrapped = try XCTUnwrap(EditorSmartEditing.edit(for: "{", in: "value", range: NSRange(location: 0, length: 5)))
-        XCTAssertEqual(wrapped.replacement, "{value}")
-        XCTAssertEqual(wrapped.selection, NSRange(location: 1, length: 5))
+        let wrapped = try #require(EditorSmartEditing.edit(for: "{", in: "value", range: NSRange(location: 0, length: 5)))
+        #expect(wrapped.replacement == "{value}")
+        #expect(wrapped.selection == NSRange(location: 1, length: 5))
 
-        let skipClosing = try XCTUnwrap(EditorSmartEditing.edit(for: ")", in: "()", range: NSRange(location: 1, length: 0)))
-        XCTAssertEqual(skipClosing.replacement, "")
-        XCTAssertEqual(skipClosing.selection.location, 2)
+        let skipClosing = try #require(EditorSmartEditing.edit(for: ")", in: "()", range: NSRange(location: 1, length: 0)))
+        #expect(skipClosing.replacement == "")
+        #expect(skipClosing.selection.location == 2)
     }
 
-    func testSmartEditingIndentsNewLinesAndExpandsEmptyBlocks() throws {
-        let indented = try XCTUnwrap(EditorSmartEditing.edit(
+    @Test("EditorSmartEditing automatically indents new lines and expands empty blocks")
+    func smartEditingIndentsNewLinesAndExpandsEmptyBlocks() throws {
+        let indented = try #require(EditorSmartEditing.edit(
             for: "\n",
             in: "    let value = {",
             range: NSRange(location: 17, length: 0)
         ))
-        XCTAssertEqual(indented.replacement, "\n        ")
+        #expect(indented.replacement == "\n        ")
 
-        let block = try XCTUnwrap(EditorSmartEditing.edit(
+        let block = try #require(EditorSmartEditing.edit(
             for: "\n",
             in: "{}",
             range: NSRange(location: 1, length: 0)
         ))
-        XCTAssertEqual(block.replacement, "\n    \n")
-        XCTAssertEqual(block.selection.location, 6)
+        #expect(block.replacement == "\n    \n")
+        #expect(block.selection.location == 6)
 
-        let twoSpaces = try XCTUnwrap(EditorSmartEditing.edit(
+        let twoSpaces = try #require(EditorSmartEditing.edit(
             for: "\n",
             in: "{}",
             range: NSRange(location: 1, length: 0),
             tabWidth: 2
         ))
-        XCTAssertEqual(twoSpaces.replacement, "\n  \n")
-        XCTAssertEqual(twoSpaces.selection.location, 4)
+        #expect(twoSpaces.replacement == "\n  \n")
+        #expect(twoSpaces.selection.location == 4)
     }
 
+    @Test("WorkspaceModel opens, modifies, and saves text files")
     @MainActor
-    func testWorkspaceOpensAndSavesTextFile() throws {
+    func workspaceOpensAndSavesTextFile() throws {
         let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
         defer { try? FileManager.default.removeItem(at: root) }
@@ -201,15 +223,16 @@ final class RollCodeTests: XCTestCase {
 
         let workspace = WorkspaceModel(restoresLastWorkspace: false)
         workspace.openFile(file)
-        XCTAssertEqual(workspace.activeDocument?.text, "before")
+        #expect(workspace.activeDocument?.text == "before")
         workspace.activeDocument?.text = "after"
-        XCTAssertTrue(workspace.activeDocument?.isDirty == true)
-        XCTAssertTrue(workspace.saveAllDocuments())
-        XCTAssertEqual(try String(contentsOf: file, encoding: .utf8), "after")
+        #expect(workspace.activeDocument?.isDirty == true)
+        #expect(workspace.saveAllDocuments())
+        #expect(try String(contentsOf: file, encoding: .utf8) == "after")
     }
 
+    @Test("WorkspaceModel reloads clean files changed externally on disk")
     @MainActor
-    func testWorkspaceReloadsCleanFileChangedOnDisk() throws {
+    func workspaceReloadsCleanFileChangedOnDisk() throws {
         let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
         defer { try? FileManager.default.removeItem(at: root) }
@@ -225,12 +248,13 @@ final class RollCodeTests: XCTestCase {
         )
         workspace.checkForExternalChanges()
 
-        XCTAssertEqual(workspace.activeDocument?.text, "after")
-        XCTAssertFalse(workspace.activeDocument?.isDirty == true)
+        #expect(workspace.activeDocument?.text == "after")
+        #expect(workspace.activeDocument?.isDirty == false)
     }
 
+    @Test("WorkspaceModel renames open file and updates document URL with Typed Throws")
     @MainActor
-    func testWorkspaceRenamesOpenFileAndUpdatesDocumentURL() throws {
+    func workspaceRenamesOpenFileAndUpdatesDocumentURL() throws {
         let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
         defer { try? FileManager.default.removeItem(at: root) }
@@ -242,28 +266,30 @@ final class RollCodeTests: XCTestCase {
         workspace.openFile(source)
         try workspace.renameItem(at: source, to: "new.swift")
 
-        XCTAssertFalse(FileManager.default.fileExists(atPath: source.path))
-        XCTAssertTrue(FileManager.default.fileExists(atPath: destination.path))
-        XCTAssertEqual(workspace.activeDocument?.url, destination)
+        #expect(!FileManager.default.fileExists(atPath: source.path))
+        #expect(FileManager.default.fileExists(atPath: destination.path))
+        #expect(workspace.activeDocument?.url == destination)
     }
 
+    @Test("TerminalSession executes command and delivers output in workspace")
     @MainActor
-    func testTerminalExecutesCommandInWorkspace() async throws {
+    func terminalExecutesCommandInWorkspace() async throws {
         let directory = FileManager.default.temporaryDirectory
         let terminal = TerminalSession()
         terminal.start(in: directory)
         defer { terminal.stop() }
-        XCTAssertTrue(terminal.isRunning)
+        #expect(terminal.isRunning)
 
         terminal.send("printf '%s\\n' \"$((40 + 2))\"")
-        for _ in 0..<30 where !terminal.output.contains("\n42\n") {
+        for _ in 0..<30 where !terminal.output.contains("42") {
             try await Task.sleep(nanoseconds: 50_000_000)
         }
-        XCTAssertTrue(terminal.output.contains("\n42\n"))
+        #expect(terminal.output.contains("42"))
     }
 
+    @Test("TerminalSession interrupts running foreground command with Ctrl+C")
     @MainActor
-    func testTerminalInterruptsForegroundCommand() async throws {
+    func terminalInterruptsForegroundCommand() async throws {
         let terminal = TerminalSession()
         terminal.start(in: FileManager.default.temporaryDirectory)
         defer { terminal.stop() }
@@ -273,28 +299,30 @@ final class RollCodeTests: XCTestCase {
         terminal.interrupt()
         terminal.send("printf '%s\\n' \"$((60 + 3))\"")
 
-        for _ in 0..<40 where !terminal.output.contains("\n63\n") {
+        for _ in 0..<40 where !terminal.output.contains("63") {
             try await Task.sleep(nanoseconds: 50_000_000)
         }
-        XCTAssertTrue(terminal.output.contains("\n63\n"))
+        #expect(terminal.output.contains("63"))
     }
 
+    @Test("TerminalSession command history moves backward and forward")
     @MainActor
-    func testTerminalCommandHistoryMovesBackwardAndForward() {
+    func terminalCommandHistoryMovesBackwardAndForward() {
         let terminal = TerminalSession()
         terminal.send("first")
         terminal.send("second")
 
-        XCTAssertEqual(terminal.previousCommand(), "second")
-        XCTAssertEqual(terminal.previousCommand(), "first")
-        XCTAssertEqual(terminal.nextCommand(), "second")
-        XCTAssertEqual(terminal.nextCommand(), "")
+        #expect(terminal.previousCommand() == "second")
+        #expect(terminal.previousCommand() == "first")
+        #expect(terminal.nextCommand() == "second")
+        #expect(terminal.nextCommand() == "")
     }
 
+    @Test("WorkspaceModel persists and restores last opened folder")
     @MainActor
-    func testWorkspacePersistsAndRestoresLastFolder() throws {
+    func workspacePersistsAndRestoresLastFolder() throws {
         let suiteName = "RollCodeTests.\(UUID().uuidString)"
-        let defaults = try XCTUnwrap(UserDefaults(suiteName: suiteName))
+        let defaults = try #require(UserDefaults(suiteName: suiteName))
         defer { defaults.removePersistentDomain(forName: suiteName) }
         let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
@@ -304,6 +332,6 @@ final class RollCodeTests: XCTestCase {
         firstWorkspace.openWorkspace(root)
         let restoredWorkspace = WorkspaceModel(defaults: defaults)
 
-        XCTAssertEqual(restoredWorkspace.rootURL, root.standardizedFileURL)
+        #expect(restoredWorkspace.rootURL == root.standardizedFileURL)
     }
 }

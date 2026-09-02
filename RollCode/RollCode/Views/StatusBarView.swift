@@ -1,7 +1,7 @@
 import SwiftUI
 
 struct StatusBarView: View {
-    @EnvironmentObject private var workspace: WorkspaceModel
+    @Environment(WorkspaceModel.self) private var workspace
 
     var body: some View {
         HStack(spacing: 14) {
@@ -25,7 +25,7 @@ struct StatusBarView: View {
 }
 
 private struct ActiveDocumentStatus: View {
-    @ObservedObject var document: EditorDocument
+    let document: EditorDocument
 
     var body: some View {
         Group {

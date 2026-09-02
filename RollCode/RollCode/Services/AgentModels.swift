@@ -1,7 +1,7 @@
 import Foundation
 
-struct AgentMessage: Identifiable, Equatable {
-    enum Role {
+struct AgentMessage: Identifiable, Equatable, Sendable {
+    enum Role: Sendable {
         case user
         case assistant
         case system
@@ -12,8 +12,8 @@ struct AgentMessage: Identifiable, Equatable {
     let text: String
 }
 
-struct AgentActivity: Identifiable, Equatable {
-    enum State {
+struct AgentActivity: Identifiable, Equatable, Sendable {
+    enum State: Sendable {
         case running
         case completed
         case failed
@@ -25,8 +25,8 @@ struct AgentActivity: Identifiable, Equatable {
     let state: State
 }
 
-enum AgentEntry: Identifiable, Equatable {
-    enum ID: Hashable {
+enum AgentEntry: Identifiable, Equatable, Sendable {
+    enum ID: Hashable, Sendable {
         case message(UUID)
         case activity(String)
         case changes
@@ -48,7 +48,7 @@ enum AgentEntry: Identifiable, Equatable {
     }
 }
 
-enum CodexEvent: Equatable {
+enum CodexEvent: Equatable, Sendable {
     case threadStarted(String)
     case message(String)
     case activity(AgentActivity, changedFiles: [String])

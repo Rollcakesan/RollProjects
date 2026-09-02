@@ -1,9 +1,9 @@
 import SwiftUI
 
 struct WorkspaceToolbar: View {
-    @EnvironmentObject private var workspace: WorkspaceModel
-    @EnvironmentObject private var terminal: TerminalSession
-    @EnvironmentObject private var agent: AgentSession
+    @Environment(WorkspaceModel.self) private var workspace
+    @Environment(TerminalSession.self) private var terminal
+    @Environment(AgentSession.self) private var agent
 
     var body: some View {
         HStack(spacing: 10) {

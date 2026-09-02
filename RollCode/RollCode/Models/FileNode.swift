@@ -1,6 +1,6 @@
 import Foundation
 
-struct FileNode: Identifiable, Hashable {
+struct FileNode: Identifiable, Hashable, Sendable {
     let url: URL
     let isDirectory: Bool
     var children: [FileNode]?

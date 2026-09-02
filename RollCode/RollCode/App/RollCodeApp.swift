@@ -3,17 +3,17 @@ import SwiftUI
 
 @main
 struct RollCodeApp: App {
-    @StateObject private var workspace = WorkspaceModel()
-    @StateObject private var terminal = TerminalSession()
-    @StateObject private var agent = AgentSession()
+    @State private var workspace = WorkspaceModel()
+    @State private var terminal = TerminalSession()
+    @State private var agent = AgentSession()
     @NSApplicationDelegateAdaptor private var appDelegate: RollCodeAppDelegate
 
     var body: some Scene {
         WindowGroup {
             ContentView()
-                .environmentObject(workspace)
-                .environmentObject(terminal)
-                .environmentObject(agent)
+                .environment(workspace)
+                .environment(terminal)
+                .environment(agent)
                 .preferredColorScheme(.dark)
                 .onAppear {
                     appDelegate.workspace = workspace
@@ -79,6 +79,7 @@ struct RollCodeApp: App {
         }
     }
 }
+@MainActor
 final class RollCodeAppDelegate: NSObject, NSApplicationDelegate {
     weak var workspace: WorkspaceModel?
 

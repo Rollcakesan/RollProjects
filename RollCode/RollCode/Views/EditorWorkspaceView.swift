@@ -2,7 +2,7 @@ import AppKit
 import SwiftUI
 
 struct EditorWorkspaceView: View {
-    @EnvironmentObject private var workspace: WorkspaceModel
+    @Environment(WorkspaceModel.self) private var workspace
 
     var body: some View {
         VStack(spacing: 0) {
@@ -21,7 +21,7 @@ struct EditorWorkspaceView: View {
 }
 
 private struct EditorTabBar: View {
-    @EnvironmentObject private var workspace: WorkspaceModel
+    @Environment(WorkspaceModel.self) private var workspace
 
     var body: some View {
         ScrollView(.horizontal, showsIndicators: false) {
@@ -42,7 +42,7 @@ private struct EditorTabBar: View {
 }
 
 private struct EditorTab: View {
-    @ObservedObject var document: EditorDocument
+    let document: EditorDocument
     let isActive: Bool
     let select: () -> Void
     let close: () -> Void
@@ -87,8 +87,8 @@ private struct EditorTab: View {
 }
 
 private struct EditorDocumentView: View {
-    @EnvironmentObject private var workspace: WorkspaceModel
-    @ObservedObject var document: EditorDocument
+    @Environment(WorkspaceModel.self) private var workspace
+    @Bindable var document: EditorDocument
     @State private var searchTerm = ""
     @State private var showsSearch = false
     @State private var searchRequest: EditorSearchRequest?
@@ -160,7 +160,7 @@ private struct EditorDocumentView: View {
 }
 
 private struct EmptyEditorView: View {
-    @EnvironmentObject private var workspace: WorkspaceModel
+    @Environment(WorkspaceModel.self) private var workspace
 
     var body: some View {
         VStack(spacing: 14) {

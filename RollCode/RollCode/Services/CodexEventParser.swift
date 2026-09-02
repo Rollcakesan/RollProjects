@@ -1,7 +1,7 @@
 import Foundation
 
-private struct RawCodexEvent: Decodable {
-    struct Usage: Decodable {
+private struct RawCodexEvent: Decodable, Sendable {
+    struct Usage: Decodable, Sendable {
         let inputTokens: Int
         let cachedInputTokens: Int
         let outputTokens: Int
@@ -13,12 +13,12 @@ private struct RawCodexEvent: Decodable {
         }
     }
 
-    struct Change: Decodable {
+    struct Change: Decodable, Sendable {
         let path: String
         let kind: String?
     }
 
-    struct Item: Decodable {
+    struct Item: Decodable, Sendable {
         let id: String?
         let type: String
         let status: String?
@@ -38,7 +38,7 @@ private struct RawCodexEvent: Decodable {
         }
     }
 
-    enum Failure: Decodable {
+    enum Failure: Decodable, Sendable {
         case message(String)
 
         init(from decoder: Decoder) throws {
@@ -66,7 +66,7 @@ private struct RawCodexEvent: Decodable {
     }
 }
 
-private enum JSONValue: Codable {
+private enum JSONValue: Codable, Sendable {
     case string(String)
     case number(Double)
     case bool(Bool)

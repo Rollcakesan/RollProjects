@@ -1,10 +1,13 @@
 import Foundation
+import Observation
 
-final class EditorDocument: ObservableObject, Identifiable {
-    let id = UUID()
-    @Published var url: URL
-    @Published var text: String
-    @Published private(set) var savedText: String
+@Observable
+@MainActor
+final class EditorDocument: Identifiable {
+    @ObservationIgnored let id = UUID()
+    var url: URL
+    var text: String
+    private(set) var savedText: String
     private(set) var diskModificationDate: Date?
 
     init(url: URL, text: String, diskModificationDate: Date? = nil) {
@@ -35,8 +38,8 @@ final class EditorDocument: ObservableObject, Identifiable {
     }
 }
 
-struct EditorSearchRequest: Equatable {
-    enum Direction {
+struct EditorSearchRequest: Equatable, Sendable {
+    enum Direction: Sendable {
         case previous
         case next
     }
@@ -45,7 +48,7 @@ struct EditorSearchRequest: Equatable {
     let direction: Direction
 }
 
-enum CodeLanguage: String {
+enum CodeLanguage: String, Sendable {
     case swift, javascript, typescript, python, html, css, json, shell, markdown
     case cFamily, go, rust, yaml, plainText
 

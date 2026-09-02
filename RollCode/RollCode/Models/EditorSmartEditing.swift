@@ -1,6 +1,6 @@
 import Foundation
 
-struct EditorSmartEdit: Equatable {
+struct EditorSmartEdit: Equatable, Sendable {
     let replacement: String
     let selection: NSRange
 }

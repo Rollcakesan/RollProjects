@@ -1,21 +1,23 @@
 import AppKit
 import Foundation
+import Observation
 
+@Observable
 @MainActor
-final class WorkspaceModel: ObservableObject {
-    @Published private(set) var rootURL: URL?
-    @Published private(set) var rootNode: FileNode?
-    @Published var documents: [EditorDocument] = []
-    @Published var activeDocumentID: UUID?
-    @Published var fileFilter = ""
-    @Published var alertMessage: String?
-    @Published var isQuickOpenPresented = false
-    @Published private(set) var tabWidth: Int
-    @Published private(set) var isLoadingTree = false
+final class WorkspaceModel {
+    private(set) var rootURL: URL?
+    private(set) var rootNode: FileNode?
+    var documents: [EditorDocument] = []
+    var activeDocumentID: UUID?
+    var fileFilter = ""
+    var alertMessage: String?
+    var isQuickOpenPresented = false
+    private(set) var tabWidth: Int
+    private(set) var isLoadingTree = false
 
-    var onWorkspaceChanged: ((URL) -> Void)?
-    private let defaults: UserDefaults
-    private var isCheckingExternalChanges = false
+    var onWorkspaceChanged: (@MainActor @Sendable (URL) -> Void)?
+    @ObservationIgnored private let defaults: UserDefaults
+    @ObservationIgnored private var isCheckingExternalChanges = false
     private static let lastWorkspacePathKey = "RollCode.lastWorkspacePath"
     private static let tabWidthKey = "RollCode.editorTabWidth"
 
@@ -296,23 +298,28 @@ final class WorkspaceModel: ObservableObject {
         }
     }
 
-    func renameItem(at source: URL, to newName: String) throws {
+    func renameItem(at source: URL, to newName: String) throws(WorkspaceError) {
         let trimmedName = newName.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmedName.isEmpty,
               trimmedName != ".",
               trimmedName != "..",
               !trimmedName.contains("/") else {
-            throw WorkspaceError.invalidFileName
+            throw .invalidFileName
         }
 
         let destination = source.deletingLastPathComponent().appendingPathComponent(trimmedName)
         guard destination != source else { return }
         guard !FileManager.default.fileExists(atPath: destination.path) else {
-            throw WorkspaceError.fileAlreadyExists
+            throw .fileAlreadyExists
         }
 
         let sourcePrefix = source.path.hasSuffix("/") ? source.path : source.path + "/"
-        try FileManager.default.moveItem(at: source, to: destination)
+        do {
+            try FileManager.default.moveItem(at: source, to: destination)
+        } catch {
+            throw .moveFailed(error.localizedDescription)
+        }
+
         for document in documents {
             if document.url == source {
                 document.url = destination
@@ -330,11 +337,12 @@ final class WorkspaceModel: ObservableObject {
     }
 }
 
-private enum WorkspaceError: LocalizedError {
+enum WorkspaceError: LocalizedError, Sendable {
     case fileTooLarge
     case notUTF8Text
     case fileAlreadyExists
     case invalidFileName
+    case moveFailed(String)
 
     var errorDescription: String? {
         switch self {
@@ -342,6 +350,7 @@ private enum WorkspaceError: LocalizedError {
         case .notUTF8Text: return "The file is binary or is not UTF-8 text."
         case .fileAlreadyExists: return "A file with that name already exists."
         case .invalidFileName: return "Enter a valid file or folder name."
+        case .moveFailed(let detail): return "Could not move file: \(detail)"
         }
     }
 }

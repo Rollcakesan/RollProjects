@@ -1,8 +1,8 @@
 import SwiftUI
 
 struct AgentPanelView: View {
-    @EnvironmentObject private var agent: AgentSession
-    @EnvironmentObject private var workspace: WorkspaceModel
+    @Environment(AgentSession.self) private var agent
+    @Environment(WorkspaceModel.self) private var workspace
     @State private var prompt = ""
     @FocusState private var promptFocused: Bool
 

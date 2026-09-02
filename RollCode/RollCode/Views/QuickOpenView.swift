@@ -1,7 +1,7 @@
 import SwiftUI
 
 struct QuickOpenView: View {
-    @EnvironmentObject private var workspace: WorkspaceModel
+    @Environment(WorkspaceModel.self) private var workspace
     @Binding var isPresented: Bool
     @State private var query = ""
     @State private var selectedURL: URL?

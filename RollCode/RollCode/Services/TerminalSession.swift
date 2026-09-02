@@ -1,17 +1,20 @@
 import Darwin
 import Foundation
+import Observation
 
+@Observable
 @MainActor
-final class TerminalSession: ObservableObject {
-    @Published var output = ""
-    @Published var isVisible = true
-    @Published private(set) var isRunning = false
+final class TerminalSession {
+    var output = ""
+    var isVisible = true
+    private(set) var isRunning = false
 
-    private var childPID: pid_t?
-    private var masterHandle: FileHandle?
+    @ObservationIgnored private var childPID: pid_t?
+    @ObservationIgnored private var masterHandle: FileHandle?
+    @ObservationIgnored private var outputContinuation: AsyncStream<String>.Continuation?
     private(set) var workingDirectory: URL?
-    private var commandHistory: [String] = []
-    private var historyIndex: Int?
+    @ObservationIgnored private var commandHistory: [String] = []
+    @ObservationIgnored private var historyIndex: Int?
 
     func start(in directory: URL) {
         stop()
@@ -24,22 +27,35 @@ final class TerminalSession: ObservableObject {
             masterHandle = process.handle
             isRunning = true
 
-            process.handle.readabilityHandler = { [weak self] handle in
-                let data = handle.availableData
-                guard !data.isEmpty else { return }
-                let chunk = String(decoding: data, as: UTF8.self)
-                Task { @MainActor [weak self] in
+            let handle = process.handle
+            let outputStream = AsyncStream<String> { continuation in
+                outputContinuation = continuation
+                handle.readabilityHandler = { fileHandle in
+                    let data = fileHandle.availableData
+                    guard !data.isEmpty else {
+                        continuation.finish()
+                        return
+                    }
+                    continuation.yield(String(decoding: data, as: UTF8.self))
+                }
+                continuation.onTermination = { @Sendable _ in
+                    handle.readabilityHandler = nil
+                }
+            }
+
+            Task { @MainActor [weak self] in
+                for await chunk in outputStream {
                     self?.appendOutput(TerminalOutputCleaner.clean(chunk))
                 }
             }
 
             let pid = process.pid
-            DispatchQueue.global(qos: .utility).async { [weak self] in
+            Task.detached(priority: .utility) { [weak self] in
                 var status: Int32 = 0
                 _ = waitpid(pid, &status, 0)
-                Task { @MainActor [weak self] in
+                await MainActor.run { [weak self] in
                     guard self?.childPID == pid else { return }
-                    self?.masterHandle?.readabilityHandler = nil
+                    self?.finishOutputStream()
                     self?.masterHandle = nil
                     self?.childPID = nil
                     self?.isRunning = false
@@ -95,7 +111,7 @@ final class TerminalSession: ObservableObject {
     }
 
     func stop() {
-        masterHandle?.readabilityHandler = nil
+        finishOutputStream()
         if let childPID {
             _ = kill(-childPID, SIGHUP)
             _ = kill(childPID, SIGHUP)
@@ -140,6 +156,7 @@ final class TerminalSession: ObservableObject {
     }
 
     deinit {
+        outputContinuation?.finish()
         masterHandle?.readabilityHandler = nil
         if let childPID {
             _ = kill(-childPID, SIGHUP)
@@ -147,10 +164,16 @@ final class TerminalSession: ObservableObject {
         }
         try? masterHandle?.close()
     }
+
+    private func finishOutputStream() {
+        outputContinuation?.finish()
+        outputContinuation = nil
+        masterHandle?.readabilityHandler = nil
+    }
 }
 
 private enum PTYProcess {
-    struct Result {
+    struct Result: Sendable {
         let pid: pid_t
         let handle: FileHandle
     }
@@ -212,20 +235,13 @@ private enum PTYError: LocalizedError {
     }
 }
 
+@MainActor
 private enum TerminalOutputCleaner {
-    private static let controlSequence = try? NSRegularExpression(
-        pattern: #"\u{001B}(?:\[[0-?]*[ -/]*[@-~]|\][^\u{0007}]*(?:\u{0007}|\u{001B}\\))"#
-    )
+    private static let controlSequence = #/\u{001B}(?:\[[0-?]*[ -/]*[@-~]|\][^\u{0007}]*(?:\u{0007}|\u{001B}\\))/#
 
     static func clean(_ text: String) -> String {
-        let range = NSRange(text.startIndex..<text.endIndex, in: text)
-        let withoutANSI = controlSequence?.stringByReplacingMatches(
-            in: text,
-            range: range,
-            withTemplate: ""
-        ) ?? text
-        return withoutANSI
-            .replacingOccurrences(of: "\r\n", with: "\n")
-            .replacingOccurrences(of: "\r", with: "")
+        text.replacing(controlSequence, with: "")
+            .replacing("\r\n", with: "\n")
+            .replacing("\r", with: "")
     }
 }

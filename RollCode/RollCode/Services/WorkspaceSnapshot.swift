@@ -1,7 +1,7 @@
 import Foundation
 
-struct WorkspaceSnapshot: Equatable {
-    struct Fingerprint: Equatable {
+struct WorkspaceSnapshot: Equatable, Sendable {
+    struct Fingerprint: Equatable, Sendable {
         let modificationDate: Date?
         let size: Int?
     }

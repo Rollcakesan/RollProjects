@@ -1,7 +1,7 @@
 import SwiftUI
 
 struct TerminalView: View {
-    @EnvironmentObject private var terminal: TerminalSession
+    @Environment(TerminalSession.self) private var terminal
     @State private var command = ""
     @FocusState private var inputFocused: Bool
 

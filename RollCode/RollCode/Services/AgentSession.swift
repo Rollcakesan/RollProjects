@@ -1,7 +1,9 @@
 import Foundation
+import Observation
 
+@Observable
 @MainActor
-final class AgentSession: ObservableObject {
+final class AgentSession {
     private enum RunState {
         case idle
         case running(Process)
@@ -15,17 +17,17 @@ final class AgentSession: ObservableObject {
         }
     }
 
-    @Published var isVisible = true
-    @Published private(set) var entries: [AgentEntry] = []
-    @Published private(set) var threadID: String?
-    @Published private var runState = RunState.idle
+    var isVisible = true
+    private(set) var entries: [AgentEntry] = []
+    private(set) var threadID: String?
+    private var runState = RunState.idle
 
-    let executableURL: URL?
-    var onRunCompleted: (() -> Void)?
+    @ObservationIgnored let executableURL: URL?
+    var onRunCompleted: (@MainActor @Sendable () -> Void)?
 
-    private var errorBuffer = ""
-    private var workspaceURL: URL?
-    private var baselineSnapshot: WorkspaceSnapshot?
+    @ObservationIgnored private var errorBuffer = ""
+    @ObservationIgnored private var workspaceURL: URL?
+    @ObservationIgnored private var baselineSnapshot: WorkspaceSnapshot?
 
     init(executableURL: URL? = CodexExecutableLocator.locate()) {
         self.executableURL = executableURL
