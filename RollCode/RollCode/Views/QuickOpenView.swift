@@ -43,29 +43,23 @@ struct QuickOpenView: View {
                 .foregroundStyle(RollCodeTheme.secondaryText)
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
-                ScrollViewReader { proxy in
-                    ScrollView {
-                        LazyVStack(spacing: 2) {
-                            ForEach(matches) { node in
-                                QuickOpenRow(
-                                    node: node,
-                                    path: workspace.relativePath(for: node.url),
-                                    isSelected: selectedURL == node.url
-                                )
-                                .id(node.url)
-                                .onTapGesture {
-                                    selectedURL = node.url
-                                    openSelectedFile()
-                                }
-                            }
-                        }
-                        .padding(6)
-                    }
-                    .onChange(of: selectedURL) { _, url in
-                        guard let url else { return }
-                        proxy.scrollTo(url, anchor: .center)
+                List(matches, selection: $selectedURL) { node in
+                    QuickOpenRow(
+                        node: node,
+                        path: workspace.relativePath(for: node.url)
+                    )
+                    .tag(node.url)
+                    .listRowInsets(EdgeInsets(top: 3, leading: 8, bottom: 3, trailing: 8))
+                    .listRowBackground(selectedURL == node.url ? RollCodeTheme.selection : Color.clear)
+                    .listRowSeparator(.hidden)
+                    .contentShape(Rectangle())
+                    .onTapGesture {
+                        selectedURL = node.url
+                        openSelectedFile()
                     }
                 }
+                .listStyle(.plain)
+                .scrollContentBackground(.hidden)
             }
         }
         .frame(width: 620, height: 410)
@@ -93,9 +87,7 @@ struct QuickOpenView: View {
 
     private func moveSelection(by offset: Int) {
         guard !matches.isEmpty else { return }
-        let currentIndex = selectedURL.flatMap { selected in
-            matches.firstIndex(where: { $0.url == selected })
-        } ?? 0
+        let currentIndex = matches.firstIndex { $0.url == selectedURL } ?? 0
         let nextIndex = min(max(currentIndex + offset, 0), matches.count - 1)
         selectedURL = matches[nextIndex].url
     }
@@ -110,13 +102,12 @@ struct QuickOpenView: View {
 private struct QuickOpenRow: View {
     let node: FileNode
     let path: String
-    let isSelected: Bool
 
     var body: some View {
         HStack(spacing: 10) {
             Image(systemName: node.iconName)
                 .font(.system(size: 12))
-                .foregroundStyle(isSelected ? RollCodeTheme.accent : RollCodeTheme.secondaryText)
+                .foregroundStyle(RollCodeTheme.accent)
                 .frame(width: 18)
             VStack(alignment: .leading, spacing: 3) {
                 Text(node.name)
@@ -132,10 +123,7 @@ private struct QuickOpenRow: View {
                 .font(.system(size: 9, design: .monospaced))
                 .foregroundStyle(RollCodeTheme.secondaryText)
         }
-        .padding(.horizontal, 10)
-        .frame(height: 43)
-        .background(isSelected ? RollCodeTheme.selection : Color.clear)
-        .clipShape(RoundedRectangle(cornerRadius: 5))
+        .frame(height: 36)
         .contentShape(Rectangle())
     }
 }

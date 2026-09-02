@@ -44,15 +44,15 @@ struct GitChangesView: View {
                 )
             } else {
                 HSplitView {
-                    ScrollView {
-                        LazyVStack(spacing: 2) {
-                            ForEach(changes) { change in
-                                GitChangeRow(change: change, isSelected: selectedPath == change.path)
-                                    .onTapGesture { selectedPath = change.path }
-                            }
-                        }
-                        .padding(6)
+                    List(changes, selection: $selectedPath) { change in
+                        GitChangeRow(change: change)
+                            .tag(change.path)
+                            .listRowInsets(EdgeInsets(top: 2, leading: 6, bottom: 2, trailing: 6))
+                            .listRowBackground(selectedPath == change.path ? RollCodeTheme.selection : Color.clear)
+                            .listRowSeparator(.hidden)
                     }
+                    .listStyle(.plain)
+                    .scrollContentBackground(.hidden)
                     .frame(minWidth: 210, idealWidth: 250, maxWidth: 320)
                     .background(RollCodeTheme.sidebarBackground)
 
@@ -89,7 +89,6 @@ struct GitChangesView: View {
 
 private struct GitChangeRow: View {
     let change: GitChange
-    let isSelected: Bool
 
     var body: some View {
         HStack(spacing: 8) {
@@ -103,10 +102,7 @@ private struct GitChangeRow: View {
                 .lineLimit(1)
             Spacer(minLength: 0)
         }
-        .padding(.horizontal, 8)
-        .frame(height: 30)
-        .background(isSelected ? RollCodeTheme.selection : Color.clear)
-        .clipShape(RoundedRectangle(cornerRadius: 4))
+        .frame(height: 26)
         .contentShape(Rectangle())
     }
 
