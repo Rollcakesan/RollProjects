@@ -204,8 +204,7 @@ struct CodeEditorView: NSViewRepresentable {
             ], range: fullRange)
 
             for rule in SyntaxRules.rules(for: language) {
-                guard let expression = try? NSRegularExpression(pattern: rule.pattern, options: rule.options) else { continue }
-                for match in expression.matches(in: textStorage.string, range: fullRange) {
+                for match in rule.regex.matches(in: textStorage.string, range: fullRange) {
                     textStorage.addAttribute(.foregroundColor, value: rule.color, range: match.range)
                 }
             }
@@ -250,9 +249,13 @@ private enum EditorPalette {
 
 @MainActor
 private struct SyntaxRule {
-    let pattern: String
+    let regex: NSRegularExpression
     let color: NSColor
-    var options: NSRegularExpression.Options = []
+
+    init(pattern: String, color: NSColor, options: NSRegularExpression.Options = []) {
+        self.regex = (try? NSRegularExpression(pattern: pattern, options: options)) ?? (try! NSRegularExpression(pattern: "$^"))
+        self.color = color
+    }
 }
 
 @MainActor
@@ -266,79 +269,69 @@ private enum SyntaxRules {
     private static let slashComments = SyntaxRule(pattern: #"//.*$|/\*[\s\S]*?\*/"#, color: comment, options: [.anchorsMatchLines])
     private static let hashComments = SyntaxRule(pattern: #"#.*$"#, color: comment, options: [.anchorsMatchLines])
 
-    static func rules(for language: CodeLanguage) -> [SyntaxRule] {
-        var common = [
+    private static let rulesByLanguage: [CodeLanguage: [SyntaxRule]] = {
+        let common = [
             SyntaxRule(pattern: #"\b\d+(?:\.\d+)?\b"#, color: number),
             SyntaxRule(pattern: #"\"(?:\\.|[^\"\\])*\"|'(?:\\.|[^'\\])*'"#, color: string),
         ]
+        var dict: [CodeLanguage: [SyntaxRule]] = [:]
+        dict[.swift] = common + [
+            SyntaxRule(pattern: #"\b(import|struct|class|enum|protocol|extension|func|var|let|if|else|guard|switch|case|for|while|return|throw|throws|try|await|async|actor|private|public|internal|fileprivate|static|final|some|any|in|where|nil|true|false|self|Self)\b"#, color: keyword),
+            SyntaxRule(pattern: #"\b[A-Z][A-Za-z0-9_]*\b"#, color: type),
+            slashComments
+        ]
+        dict[.javascript] = common + [
+            SyntaxRule(pattern: #"\b(const|let|var|function|class|interface|type|extends|implements|if|else|switch|case|for|while|return|throw|try|catch|finally|async|await|import|export|from|new|this|null|undefined|true|false)\b"#, color: keyword),
+            slashComments
+        ]
+        dict[.typescript] = dict[.javascript]
+        dict[.python] = common + [
+            SyntaxRule(pattern: #"\b(and|as|assert|async|await|break|class|continue|def|del|elif|else|except|False|finally|for|from|global|if|import|in|is|lambda|None|not|or|pass|raise|return|True|try|while|with|yield)\b"#, color: keyword),
+            hashComments
+        ]
+        dict[.shell] = common + [
+            SyntaxRule(pattern: #"\b(if|then|else|elif|fi|for|while|do|done|case|esac|function|in|export|local)\b"#, color: keyword),
+            hashComments
+        ]
+        dict[.json] = common + [
+            SyntaxRule(pattern: #"\"(?:\\.|[^\"\\])*\"\s*(?=:)"#, color: type),
+            SyntaxRule(pattern: #"\b(true|false|null)\b"#, color: keyword)
+        ]
+        dict[.html] = common + [
+            SyntaxRule(pattern: #"</?[A-Za-z][^>]*>"#, color: type),
+            SyntaxRule(pattern: #"<!--[\s\S]*?-->"#, color: comment)
+        ]
+        dict[.css] = common + [
+            SyntaxRule(pattern: #"[#.]?[A-Za-z_-][A-Za-z0-9_-]*(?=\s*\{)"#, color: type),
+            SyntaxRule(pattern: #"/\*[\s\S]*?\*/"#, color: comment)
+        ]
+        dict[.markdown] = common + [
+            SyntaxRule(pattern: #"^#{1,6}\s+.*$"#, color: type, options: [.anchorsMatchLines]),
+            SyntaxRule(pattern: #"`[^`]+`|\*\*[^*]+\*\*"#, color: keyword)
+        ]
+        dict[.cFamily] = common + [
+            SyntaxRule(pattern: #"\b(auto|break|case|char|class|const|continue|default|delete|do|double|else|enum|explicit|extern|float|for|friend|if|inline|int|long|namespace|new|nullptr|operator|private|protected|public|return|short|signed|sizeof|static|struct|switch|template|this|throw|try|typedef|typename|union|unsigned|using|virtual|void|volatile|while)\b"#, color: keyword),
+            slashComments
+        ]
+        dict[.go] = common + [
+            SyntaxRule(pattern: #"\b(break|case|chan|const|continue|default|defer|else|fallthrough|for|func|go|goto|if|import|interface|map|package|range|return|select|struct|switch|type|var|nil|true|false)\b"#, color: keyword),
+            slashComments
+        ]
+        dict[.rust] = common + [
+            SyntaxRule(pattern: #"\b(as|async|await|break|const|continue|crate|dyn|else|enum|extern|false|fn|for|if|impl|in|let|loop|match|mod|move|mut|pub|ref|return|self|Self|static|struct|super|trait|true|type|unsafe|use|where|while)\b"#, color: keyword),
+            slashComments
+        ]
+        dict[.yaml] = common + [
+            SyntaxRule(pattern: #"^[\s-]*[A-Za-z0-9_.-]+(?=:)"#, color: type, options: [.anchorsMatchLines]),
+            hashComments,
+            SyntaxRule(pattern: #"\b(true|false|yes|no|null)\b"#, color: keyword)
+        ]
+        dict[.plainText] = common
+        return dict
+    }()
 
-        switch language {
-        case .swift:
-            common += [
-                SyntaxRule(pattern: #"\b(import|struct|class|enum|protocol|extension|func|var|let|if|else|guard|switch|case|for|while|return|throw|throws|try|await|async|actor|private|public|internal|fileprivate|static|final|some|any|in|where|nil|true|false|self|Self)\b"#, color: keyword),
-                SyntaxRule(pattern: #"\b[A-Z][A-Za-z0-9_]*\b"#, color: type),
-                slashComments
-            ]
-        case .javascript, .typescript:
-            common += [
-                SyntaxRule(pattern: #"\b(const|let|var|function|class|interface|type|extends|implements|if|else|switch|case|for|while|return|throw|try|catch|finally|async|await|import|export|from|new|this|null|undefined|true|false)\b"#, color: keyword),
-                slashComments
-            ]
-        case .python:
-            common += [
-                SyntaxRule(pattern: #"\b(and|as|assert|async|await|break|class|continue|def|del|elif|else|except|False|finally|for|from|global|if|import|in|is|lambda|None|not|or|pass|raise|return|True|try|while|with|yield)\b"#, color: keyword),
-                hashComments
-            ]
-        case .shell:
-            common += [
-                SyntaxRule(pattern: #"\b(if|then|else|elif|fi|for|while|do|done|case|esac|function|in|export|local)\b"#, color: keyword),
-                hashComments
-            ]
-        case .json:
-            common += [
-                SyntaxRule(pattern: #"\"(?:\\.|[^\"\\])*\"\s*(?=:)"#, color: type),
-                SyntaxRule(pattern: #"\b(true|false|null)\b"#, color: keyword)
-            ]
-        case .html:
-            common += [
-                SyntaxRule(pattern: #"</?[A-Za-z][^>]*>"#, color: type),
-                SyntaxRule(pattern: #"<!--[\s\S]*?-->"#, color: comment)
-            ]
-        case .css:
-            common += [
-                SyntaxRule(pattern: #"[#.]?[A-Za-z_-][A-Za-z0-9_-]*(?=\s*\{)"#, color: type),
-                SyntaxRule(pattern: #"/\*[\s\S]*?\*/"#, color: comment)
-            ]
-        case .markdown:
-            common += [
-                SyntaxRule(pattern: #"^#{1,6}\s+.*$"#, color: type, options: [.anchorsMatchLines]),
-                SyntaxRule(pattern: #"`[^`]+`|\*\*[^*]+\*\*"#, color: keyword)
-            ]
-        case .cFamily:
-            common += [
-                SyntaxRule(pattern: #"\b(auto|break|case|char|class|const|continue|default|delete|do|double|else|enum|explicit|extern|float|for|friend|if|inline|int|long|namespace|new|nullptr|operator|private|protected|public|return|short|signed|sizeof|static|struct|switch|template|this|throw|try|typedef|typename|union|unsigned|using|virtual|void|volatile|while)\b"#, color: keyword),
-                slashComments
-            ]
-        case .go:
-            common += [
-                SyntaxRule(pattern: #"\b(break|case|chan|const|continue|default|defer|else|fallthrough|for|func|go|goto|if|import|interface|map|package|range|return|select|struct|switch|type|var|nil|true|false)\b"#, color: keyword),
-                slashComments
-            ]
-        case .rust:
-            common += [
-                SyntaxRule(pattern: #"\b(as|async|await|break|const|continue|crate|dyn|else|enum|extern|false|fn|for|if|impl|in|let|loop|match|mod|move|mut|pub|ref|return|self|Self|static|struct|super|trait|true|type|unsafe|use|where|while)\b"#, color: keyword),
-                slashComments
-            ]
-        case .yaml:
-            common += [
-                SyntaxRule(pattern: #"^[\s-]*[A-Za-z0-9_.-]+(?=:)"#, color: type, options: [.anchorsMatchLines]),
-                hashComments,
-                SyntaxRule(pattern: #"\b(true|false|null|yes|no)\b"#, color: keyword, options: [.caseInsensitive])
-            ]
-        case .plainText:
-            break
-        }
-        return common
+    static func rules(for language: CodeLanguage) -> [SyntaxRule] {
+        rulesByLanguage[language] ?? rulesByLanguage[.plainText] ?? []
     }
 }
 

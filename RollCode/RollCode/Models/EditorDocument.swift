@@ -6,22 +6,30 @@ import Observation
 final class EditorDocument: Identifiable {
     @ObservationIgnored let id = UUID()
     var url: URL
-    var text: String
+    var text: String {
+        didSet {
+            if text != oldValue {
+                cachedLineCount = text.count(where: \.isNewline) + 1
+            }
+        }
+    }
     private(set) var savedText: String
     private(set) var diskModificationDate: Date?
     var isPreviewMode = false
+    private var cachedLineCount: Int
 
     init(url: URL, text: String, diskModificationDate: Date? = nil) {
         self.url = url
         self.text = text
         self.savedText = text
         self.diskModificationDate = diskModificationDate
+        self.cachedLineCount = text.count(where: \.isNewline) + 1
     }
 
     var name: String { url.lastPathComponent }
     var isDirty: Bool { text != savedText }
     var language: CodeLanguage { CodeLanguage(url: url) }
-    var lineCount: Int { text.count(where: \.isNewline) + 1 }
+    var lineCount: Int { cachedLineCount }
 
     func markSaved(modificationDate: Date? = nil) {
         savedText = text

@@ -81,9 +81,12 @@ struct ContentView: View {
         .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
             workspace.checkForExternalChanges()
         }
-        .onReceive(Timer.publish(every: 2, on: .main, in: .common).autoconnect()) { _ in
-            guard NSApp.isActive else { return }
-            workspace.checkForExternalChanges()
+        .task {
+            while !Task.isCancelled {
+                try? await Task.sleep(for: .seconds(2))
+                guard NSApp.isActive else { continue }
+                workspace.checkForExternalChanges()
+            }
         }
     }
 
