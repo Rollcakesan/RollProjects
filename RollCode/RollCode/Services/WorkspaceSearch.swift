@@ -28,12 +28,12 @@ enum WorkspaceSearch {
         relativeTo rootURL: URL,
         limit: Int = 2_000
     ) -> [WorkspaceSearchMatch] {
-        guard !query.isEmpty, limit > 0 else { return [] }
+        guard !query.isEmpty, limit > 0, let regex = regex(for: query) else { return [] }
 
         var results: [WorkspaceSearchMatch] = []
         for file in files {
             for (index, line) in file.text.components(separatedBy: .newlines).enumerated() {
-                let occurrences = occurrenceCount(of: query, in: line)
+                let occurrences = line.matches(of: regex).count
                 guard occurrences > 0 else { continue }
                 results.append(WorkspaceSearchMatch(
                     url: file.url,
@@ -53,31 +53,16 @@ enum WorkspaceSearch {
         with replacement: String,
         in files: [WorkspaceSearchFile]
     ) -> [WorkspaceReplacement] {
-        guard !query.isEmpty else { return [] }
+        guard !query.isEmpty, let regex = regex(for: query) else { return [] }
         return files.compactMap { file in
-            let (text, count) = replacing(query, with: replacement, in: file.text)
+            let count = file.text.matches(of: regex).count
             guard count > 0 else { return nil }
-            return WorkspaceReplacement(url: file.url, text: text, occurrences: count)
+            let replaced = file.text.replacing(regex, with: replacement)
+            return WorkspaceReplacement(url: file.url, text: replaced, occurrences: count)
         }
     }
 
-    private static func occurrenceCount(of query: String, in text: String) -> Int {
-        let expression = regularExpression(for: query)
-        return expression.numberOfMatches(in: text, range: NSRange(text.startIndex..., in: text))
-    }
-
-    private static func replacing(_ query: String, with replacement: String, in text: String) -> (String, Int) {
-        let expression = regularExpression(for: query)
-        let range = NSRange(text.startIndex..., in: text)
-        let count = expression.numberOfMatches(in: text, range: range)
-        let escapedReplacement = NSRegularExpression.escapedTemplate(for: replacement)
-        return (expression.stringByReplacingMatches(in: text, range: range, withTemplate: escapedReplacement), count)
-    }
-
-    private static func regularExpression(for query: String) -> NSRegularExpression {
-        try! NSRegularExpression(
-            pattern: NSRegularExpression.escapedPattern(for: query),
-            options: [.caseInsensitive]
-        )
+    private static func regex(for query: String) -> Regex<AnyRegexOutput>? {
+        try? Regex(NSRegularExpression.escapedPattern(for: query)).ignoresCase()
     }
 }

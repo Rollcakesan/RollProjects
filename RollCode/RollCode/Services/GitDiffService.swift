@@ -29,7 +29,11 @@ enum GitDiffService {
         return try entries.map { entry in
             let diff: String
             if entry.status == "??" {
-                diff = untrackedDiff(for: entry.path, in: rootURL)
+                diff = try runGit(
+                    ["diff", "--no-index", "--no-ext-diff", "--color=never", "--", "/dev/null", entry.path],
+                    in: rootURL,
+                    allowedExitCodes: [0, 1]
+                )
             } else {
                 diff = try runGit(
                     ["diff", "HEAD", "--no-ext-diff", "--color=never", "--", entry.path],
@@ -60,30 +64,11 @@ enum GitDiffService {
         return entries
     }
 
-    private static func untrackedDiff(for path: String, in rootURL: URL) -> String {
-        let url = rootURL.appendingPathComponent(path)
-        guard let data = try? Data(contentsOf: url),
-              data.count <= 1_000_000,
-              !data.prefix(8_192).contains(0),
-              let text = String(data: data, encoding: .utf8) else {
-            return "Binary or large untracked file"
-        }
-
-        guard !text.isEmpty else { return "Empty untracked file" }
-        var lines = text.split(separator: "\n", omittingEmptySubsequences: false).map(String.init)
-        if lines.last?.isEmpty == true { lines.removeLast() }
-        let content = lines.map { "+" + $0 }.joined(separator: "\n")
-        return """
-        diff --git a/\(path) b/\(path)
-        new file mode 100644
-        --- /dev/null
-        +++ b/\(path)
-        @@ -0,0 +1,\(lines.count) @@
-        \(content)
-        """
-    }
-
-    private static func runGit(_ arguments: [String], in rootURL: URL) throws -> String {
+    private static func runGit(
+        _ arguments: [String],
+        in rootURL: URL,
+        allowedExitCodes: Set<Int32> = [0]
+    ) throws -> String {
         let process = Process()
         let output = Pipe()
         process.executableURL = URL(fileURLWithPath: "/usr/bin/git")
@@ -94,7 +79,7 @@ enum GitDiffService {
         try process.run()
         let outputData = output.fileHandleForReading.readDataToEndOfFile()
         process.waitUntilExit()
-        guard process.terminationStatus == 0 else {
+        guard allowedExitCodes.contains(process.terminationStatus) else {
             let message = String(decoding: outputData, as: UTF8.self).trimmed
             throw GitDiffError.commandFailed(message.isEmpty ? "Git command failed." : message)
         }
