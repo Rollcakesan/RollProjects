@@ -115,8 +115,8 @@ struct SettingsView: View {
                         .foregroundStyle(isGeminiLoggedIn ? Color.green : RollCodeTheme.secondaryText)
                 }
 
-                Text("Log in with your Google account via browser. Works directly with Gemini CLI.")
-                    .font(.system(size: 11))
+                Text("Direct Google login requires a Google Cloud Code Assist license (Enterprise/Workspace). For personal accounts, using Google AI Studio (Free) is recommended.")
+                    .font(.system(size: 10))
                     .foregroundStyle(RollCodeTheme.secondaryText)
 
                 HStack(spacing: 10) {
@@ -146,19 +146,28 @@ struct SettingsView: View {
                 }
             }
 
-            Section("Alternative: Gemini API Key") {
-                Text("If you prefer using an API key from Google AI Studio:")
+            Section("Google AI Studio (Recommended for Personal Accounts)") {
+                Text("Google provides free Gemini access for personal Google accounts via AI Studio:")
                     .font(.system(size: 11))
                     .foregroundStyle(RollCodeTheme.secondaryText)
 
-                SecureField("Gemini API Key (AI Studio)", text: $geminiKeyInput)
+                Button {
+                    if let url = URL(string: "https://aistudio.google.com/app/apikey") {
+                        NSWorkspace.shared.open(url)
+                    }
+                } label: {
+                    Label("Get Free API Key (Google AI Studio)", systemImage: "arrow.up.right.square")
+                }
+                .buttonStyle(.borderedProminent)
+
+                SecureField("Paste Gemini API Key here", text: $geminiKeyInput)
                     .textFieldStyle(.roundedBorder)
 
                 TextField("Google Cloud Project ID (Optional)", text: $geminiProjectInput)
                     .textFieldStyle(.roundedBorder)
 
                 HStack {
-                    Button("Save Settings") {
+                    Button("Save API Key") {
                         agent.geminiAuth.storedAPIKey = geminiKeyInput
                         agent.geminiAuth.storedProjectID = geminiProjectInput
                         showingKeySaved = true
