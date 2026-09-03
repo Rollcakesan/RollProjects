@@ -14,11 +14,9 @@ struct ContentView: View {
     var body: some View {
         @Bindable var workspace = workspace
         VStack(spacing: 0) {
-            HStack(spacing: 0) {
+            HSplitView {
                 SidebarView()
-                    .frame(width: sidebarWidth)
-
-                SplitDivider(size: $sidebarWidth, range: 160...420)
+                    .frame(minWidth: 160, idealWidth: sidebarWidth, maxWidth: 420)
 
                 VSplitView {
                     EditorWorkspaceView()
@@ -32,10 +30,8 @@ struct ContentView: View {
                 .frame(minWidth: 400)
 
                 if agent.isVisible {
-                    SplitDivider(size: $agentPanelWidth, range: 300...950, isTrailing: true)
-
                     AgentPanelView()
-                        .frame(width: agentPanelWidth)
+                        .frame(minWidth: 300, idealWidth: agentPanelWidth, maxWidth: 950)
                 }
             }
 
@@ -248,44 +244,6 @@ private struct TextDocumentFile: FileDocument {
 
     func fileWrapper(configuration: WriteConfiguration) throws -> FileWrapper {
         FileWrapper(regularFileWithContents: Data(text.utf8))
-    }
-}
-
-private struct SplitDivider: View {
-    @Binding var size: Double
-    let range: ClosedRange<Double>
-    var isTrailing: Bool = false
-
-    @State private var startSize: Double = 0
-
-    var body: some View {
-        Rectangle()
-            .fill(RollCodeTheme.divider)
-            .frame(width: 1)
-            .padding(.horizontal, 3)
-            .background(Color.clear)
-            .contentShape(Rectangle())
-            .onHover { hovering in
-                if hovering {
-                    NSCursor.resizeLeftRight.push()
-                } else {
-                    NSCursor.pop()
-                }
-            }
-            .gesture(
-                DragGesture(minimumDistance: 1)
-                    .onChanged { value in
-                        if startSize == 0 {
-                            startSize = size
-                        }
-                        let delta = value.translation.width
-                        let newSize = isTrailing ? (startSize - delta) : (startSize + delta)
-                        size = min(max(newSize, range.lowerBound), range.upperBound)
-                    }
-                    .onEnded { _ in
-                        startSize = 0
-                    }
-            )
     }
 }
 
