@@ -682,6 +682,40 @@ struct RollCodeTests {
         #expect(session.activeThreadTitle == "Past Discussion")
         #expect(session.entries.count == 1)
     }
+
+    @Test("AgentSession toggles between latest Codex and Gemini threads independently")
+    @MainActor
+    func agentSessionTogglesBetweenProviders() throws {
+        let session = AgentSession(executableURL: nil, geminiExecutableURL: nil)
+        #expect(session.selectedProvider == .codex)
+
+        session.entries = [.message(AgentMessage(role: .user, text: "Codex prompt"))]
+        #expect(session.entries.count == 1)
+
+        session.selectProvider(.gemini)
+        #expect(session.selectedProvider == .gemini)
+        #expect(session.entries.isEmpty)
+
+        session.entries = [.message(AgentMessage(role: .user, text: "Gemini prompt"))]
+        #expect(session.entries.count == 1)
+
+        session.selectProvider(.codex)
+        #expect(session.selectedProvider == .codex)
+        #expect(session.entries.count == 1)
+        if case .message(let msg) = session.entries.first {
+            #expect(msg.text == "Codex prompt")
+        } else {
+            Issue.record("Expected Codex message")
+        }
+
+        session.selectProvider(.gemini)
+        #expect(session.entries.count == 1)
+        if case .message(let msg) = session.entries.first {
+            #expect(msg.text == "Gemini prompt")
+        } else {
+            Issue.record("Expected Gemini message")
+        }
+    }
 }
 
 @MainActor

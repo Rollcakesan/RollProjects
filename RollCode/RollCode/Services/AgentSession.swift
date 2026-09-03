@@ -18,8 +18,17 @@ final class AgentSession {
     }
 
     var isVisible = true
+    var selectedProvider: AgentProvider = .codex {
+        didSet {
+            guard selectedProvider != oldValue else { return }
+            handleProviderChanged(from: oldValue, to: selectedProvider)
+        }
+    }
+
     private(set) var threads: [AgentThread] = []
-    private(set) var activeThread = AgentThread()
+    private(set) var activeThread = AgentThread(provider: .codex)
+    private var codexLatestThread = AgentThread(provider: .codex)
+    private var geminiLatestThread = AgentThread(provider: .gemini)
     private(set) var pastCodexSessions: [CodexSessionSummary] = []
     private var runState = RunState.idle
 
@@ -43,6 +52,7 @@ final class AgentSession {
 
     let auth: CodexAuthService
     @ObservationIgnored let executableURL: URL?
+    @ObservationIgnored let geminiExecutableURL: URL?
     var onRunCompleted: (@MainActor @Sendable () -> Void)?
 
     @ObservationIgnored private var errorBuffer = ""
@@ -50,18 +60,41 @@ final class AgentSession {
 
     init(
         executableURL: URL? = CodexExecutableLocator.locate(),
+        geminiExecutableURL: URL? = GeminiExecutableLocator.locate(),
         auth: CodexAuthService = CodexAuthService()
     ) {
         self.executableURL = executableURL
+        self.geminiExecutableURL = geminiExecutableURL
         self.auth = auth
     }
 
-    var isAvailable: Bool { executableURL != nil }
+    var isAvailable: Bool { currentExecutableURL != nil }
+    var currentExecutableURL: URL? {
+        selectedProvider == .codex ? executableURL : geminiExecutableURL
+    }
     var isRunning: Bool { runState.process != nil }
+
+    func selectProvider(_ provider: AgentProvider) {
+        guard selectedProvider != provider else { return }
+        selectedProvider = provider
+    }
+
+    private func handleProviderChanged(from old: AgentProvider, to new: AgentProvider) {
+        if isRunning {
+            stop(resetThread: false)
+        }
+        if old == .codex {
+            codexLatestThread = activeThread
+        } else {
+            geminiLatestThread = activeThread
+        }
+        activeThread = (new == .codex) ? codexLatestThread : geminiLatestThread
+        errorBuffer = ""
+    }
 
     func send(_ prompt: String, in workspaceURL: URL, activeFileURL: URL? = nil) {
         let prompt = prompt.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !prompt.isEmpty, !isRunning, let executableURL else { return }
+        guard !prompt.isEmpty, !isRunning, let executableURL = currentExecutableURL else { return }
 
         if activeThread.title == "New Thread" || activeThread.entries.isEmpty {
             activeThread.title = String(prompt.prefix(40))
@@ -81,25 +114,35 @@ final class AgentSession {
         let standardInput = Pipe()
         process.executableURL = executableURL
         process.currentDirectoryURL = workspaceURL
-        process.arguments = argumentsForCurrentThread()
+
+        let contextualPrompt = makeContextualPrompt(prompt, activeFileURL: activeFileURL)
+
+        if selectedProvider == .codex {
+            process.arguments = argumentsForCurrentThread()
+            var environment = ProcessInfo.processInfo.environment
+            environment["CODEX_INTERNAL_ORIGINATOR_OVERRIDE"] = "rollcode"
+            process.environment = environment
+        } else {
+            process.arguments = ["-p", contextualPrompt, "-y"]
+            process.environment = ProcessInfo.processInfo.environment
+        }
+
         process.standardOutput = standardOutput
         process.standardError = standardError
         process.standardInput = standardInput
-        var environment = ProcessInfo.processInfo.environment
-        environment["CODEX_INTERNAL_ORIGINATOR_OVERRIDE"] = "rollcode"
-        process.environment = environment
 
         do {
             try process.run()
             runState = .running(process)
             monitor(process, standardOutput: standardOutput, standardError: standardError)
 
-            let contextualPrompt = makeContextualPrompt(prompt, activeFileURL: activeFileURL)
-            try standardInput.fileHandleForWriting.write(contentsOf: Data(contextualPrompt.utf8))
-            try standardInput.fileHandleForWriting.close()
+            if selectedProvider == .codex {
+                try standardInput.fileHandleForWriting.write(contentsOf: Data(contextualPrompt.utf8))
+                try standardInput.fileHandleForWriting.close()
+            }
         } catch {
             runState = .idle
-            entries.append(.message(AgentMessage(role: .system, text: "Could not start Codex: \(error.localizedDescription)")))
+            entries.append(.message(AgentMessage(role: .system, text: "Could not start \(selectedProvider.rawValue): \(error.localizedDescription)")))
         }
     }
 
@@ -229,10 +272,15 @@ final class AgentSession {
     }
 
     private func monitor(_ process: Process, standardOutput: Pipe, standardError: Pipe) {
+        let isGemini = selectedProvider == .gemini
         let outputTask = Task { [weak self] in
             do {
                 for try await line in standardOutput.fileHandleForReading.bytes.lines where !line.isEmpty {
-                    self?.consume(CodexEventParser.parse(line))
+                    if isGemini {
+                        self?.appendGeminiOutput(line)
+                    } else {
+                        self?.consume(CodexEventParser.parse(line))
+                    }
                 }
             } catch {}
         }
@@ -294,6 +342,15 @@ final class AgentSession {
         }
     }
 
+    private func appendGeminiOutput(_ text: String) {
+        if let last = entries.last, case .message(let message) = last, message.role == .assistant {
+            let updated = message.text + "\n" + text
+            entries[entries.count - 1] = .message(AgentMessage(role: .assistant, text: updated))
+        } else {
+            entries.append(.message(AgentMessage(role: .assistant, text: text)))
+        }
+    }
+
     private func relativePath(_ path: String) -> String {
         guard path.hasPrefix("/") else { return path }
         return URL(fileURLWithPath: path).relativePath(from: workspaceURL)
@@ -333,11 +390,11 @@ final class AgentSession {
             let detail = errorBuffer.trimmingCharacters(in: .whitespacesAndNewlines)
             let lower = detail.lowercased()
             let message: String
-            if lower.contains("unauthorized") || lower.contains("login") || lower.contains("authentication") {
+            if selectedProvider == .codex && (lower.contains("unauthorized") || lower.contains("login") || lower.contains("authentication")) {
                 auth.refresh()
                 message = "Codex authentication required. Please click 'Log In' or run 'codex login' in the terminal.\n(\(detail))"
             } else {
-                message = detail.isEmpty ? "Codex exited with code \(exitCode)." : detail
+                message = detail.isEmpty ? "\(selectedProvider.rawValue) exited with code \(exitCode)." : detail
             }
             entries.append(.message(AgentMessage(role: .system, text: message)))
         }
@@ -357,6 +414,26 @@ enum CodexExecutableLocator {
         ]
         if let path = environment["PATH"] {
             candidates += path.split(separator: ":").map { "\($0)/codex" }
+        }
+
+        for path in candidates {
+            let standardized = URL(fileURLWithPath: path).standardizedFileURL
+            if FileManager.default.isExecutableFile(atPath: standardized.path) {
+                return standardized
+            }
+        }
+        return nil
+    }
+}
+
+enum GeminiExecutableLocator {
+    static func locate(environment: [String: String] = ProcessInfo.processInfo.environment) -> URL? {
+        var candidates = [
+            "/opt/homebrew/bin/gemini",
+            "/usr/local/bin/gemini"
+        ]
+        if let path = environment["PATH"] {
+            candidates += path.split(separator: ":").map { "\($0)/gemini" }
         }
 
         for path in candidates {

@@ -67,8 +67,10 @@ struct AgentPanelView: View {
                 }
             }
 
-            // Thread Switcher Bar
-            HStack(spacing: 6) {
+            // Thread Switcher & Provider Bar
+            HStack(spacing: 8) {
+                providerToggle
+                Divider().frame(height: 12).overlay(RollCodeTheme.divider)
                 threadSwitcherMenu
                 Spacer()
             }
@@ -76,6 +78,35 @@ struct AgentPanelView: View {
             .padding(.vertical, 4)
             .background(RollCodeTheme.elevatedBackground.opacity(0.4))
         }
+    }
+
+    private var providerToggle: some View {
+        HStack(spacing: 2) {
+            ForEach(AgentProvider.allCases) { provider in
+                Button {
+                    withAnimation(.easeInOut(duration: 0.12)) {
+                        agent.selectProvider(provider)
+                    }
+                } label: {
+                    HStack(spacing: 3) {
+                        Image(systemName: provider.iconName)
+                            .font(.system(size: 8))
+                        Text(provider.rawValue)
+                            .font(.system(size: 10, weight: agent.selectedProvider == provider ? .bold : .medium))
+                    }
+                    .padding(.horizontal, 6)
+                    .padding(.vertical, 2.5)
+                    .background(agent.selectedProvider == provider ? RollCodeTheme.accent.opacity(0.2) : Color.clear)
+                    .foregroundStyle(agent.selectedProvider == provider ? RollCodeTheme.accent : RollCodeTheme.secondaryText)
+                    .clipShape(RoundedRectangle(cornerRadius: 3.5))
+                }
+                .buttonStyle(.plain)
+                .help("Switch to \(provider.rawValue)'s latest thread")
+            }
+        }
+        .padding(1.5)
+        .background(RollCodeTheme.windowBackground)
+        .clipShape(RoundedRectangle(cornerRadius: 4.5))
     }
 
     private var threadSwitcherMenu: some View {
@@ -150,50 +181,73 @@ struct AgentPanelView: View {
 
     @ViewBuilder
     private var authBadge: some View {
-        switch agent.auth.status {
-        case .loggedIn(_, let email, _):
-            HStack(spacing: 4) {
-                Circle()
-                    .fill(Color.green)
-                    .frame(width: 6, height: 6)
-                Text(email ?? "ChatGPT")
-                    .font(.system(size: 9))
-                    .foregroundStyle(RollCodeTheme.secondaryText)
-                    .lineLimit(1)
-            }
-            .help("Logged in to Codex via ChatGPT")
-        case .apiKey:
-            HStack(spacing: 4) {
-                Circle()
-                    .fill(Color.blue)
-                    .frame(width: 6, height: 6)
-                Text("API Key")
-                    .font(.system(size: 9))
-                    .foregroundStyle(RollCodeTheme.secondaryText)
-            }
-            .help("Authenticated via OPENAI_API_KEY")
-        case .unauthenticated:
-            Button {
-                agent.auth.requestLogin(in: terminal)
-            } label: {
-                HStack(spacing: 3) {
-                    Image(systemName: "person.crop.circle.badge.plus")
-                    Text("Log In")
+        if agent.selectedProvider == .gemini {
+            if agent.geminiExecutableURL != nil {
+                HStack(spacing: 4) {
+                    Circle()
+                        .fill(Color.purple)
+                        .frame(width: 6, height: 6)
+                    Text("Gemini CLI")
+                        .font(.system(size: 9))
+                        .foregroundStyle(RollCodeTheme.secondaryText)
                 }
-                .font(.system(size: 9, weight: .medium))
+                .help("Gemini CLI is ready")
+            } else {
+                HStack(spacing: 4) {
+                    Circle()
+                        .fill(Color.gray)
+                        .frame(width: 6, height: 6)
+                    Text("Gemini CLI Missing")
+                        .font(.system(size: 9))
+                        .foregroundStyle(RollCodeTheme.secondaryText)
+                }
             }
-            .buttonStyle(.bordered)
-            .controlSize(.mini)
-            .help("Log in with ChatGPT account via 'codex login'")
-        case .cliNotInstalled:
-            EmptyView()
+        } else {
+            switch agent.auth.status {
+            case .loggedIn(_, let email, _):
+                HStack(spacing: 4) {
+                    Circle()
+                        .fill(Color.green)
+                        .frame(width: 6, height: 6)
+                    Text(email ?? "ChatGPT")
+                        .font(.system(size: 9))
+                        .foregroundStyle(RollCodeTheme.secondaryText)
+                        .lineLimit(1)
+                }
+                .help("Logged in to Codex via ChatGPT")
+            case .apiKey:
+                HStack(spacing: 4) {
+                    Circle()
+                        .fill(Color.blue)
+                        .frame(width: 6, height: 6)
+                    Text("API Key")
+                        .font(.system(size: 9))
+                        .foregroundStyle(RollCodeTheme.secondaryText)
+                }
+                .help("Authenticated via OPENAI_API_KEY")
+            case .unauthenticated:
+                Button {
+                    agent.auth.requestLogin(in: terminal)
+                } label: {
+                    HStack(spacing: 3) {
+                        Image(systemName: "person.crop.circle.badge.plus")
+                        Text("Log In")
+                    }
+                    .font(.system(size: 9, weight: .medium))
+                }
+                .buttonStyle(.bordered)
+                .controlSize(.mini)
+                .help("Log in with ChatGPT account via 'codex login'")
+            case .cliNotInstalled:
+                EmptyView()
+            }
         }
     }
 
     private var conversation: some View {
         ScrollView {
             LazyVStack(alignment: .leading, spacing: 10) {
-                if agent.auth.status == .unauthenticated {
+                if agent.selectedProvider == .codex && agent.auth.status == .unauthenticated {
                     HStack(spacing: 8) {
                         Image(systemName: "person.badge.key.fill")
                             .foregroundStyle(RollCodeTheme.accent)
@@ -222,7 +276,7 @@ struct AgentPanelView: View {
                         Text("What should I change?")
                             .font(.system(size: 15, weight: .medium))
                             .foregroundStyle(RollCodeTheme.primaryText)
-                        Text("Codex can inspect the workspace, edit files, and run tests. Changes are applied automatically.")
+                        Text("\(agent.selectedProvider.rawValue) can inspect the workspace, edit files, and run tests. Changes are applied automatically.")
                             .font(.system(size: 11))
                             .foregroundStyle(RollCodeTheme.secondaryText)
                             .fixedSize(horizontal: false, vertical: true)
@@ -237,7 +291,7 @@ struct AgentPanelView: View {
                 if agent.isRunning {
                     HStack(spacing: 6) {
                         ProgressView().controlSize(.small)
-                        Text("Codex is working…")
+                        Text("\(agent.selectedProvider.rawValue) is working…")
                             .font(.system(size: 10))
                             .foregroundStyle(RollCodeTheme.secondaryText)
                     }
@@ -343,10 +397,12 @@ struct AgentPanelView: View {
     private var unavailableView: some View {
         EmptyStateView(
             systemImage: "exclamationmark.triangle",
-            title: "Codex CLI was not found",
-            message: "Install Codex with Homebrew, then reopen RollCode."
+            title: "\(agent.selectedProvider.rawValue) CLI was not found",
+            message: agent.selectedProvider == .codex
+                ? "Install Codex or ChatGPT.app, then reopen RollCode."
+                : "Install Gemini CLI with Homebrew or npm, then reopen RollCode."
         ) {
-            Text("brew install --cask codex")
+            Text(agent.selectedProvider == .codex ? "brew install --cask codex" : "npm install -g @google/gemini-cli")
                 .font(.system(size: 10, design: .monospaced))
                 .textSelection(.enabled)
         }

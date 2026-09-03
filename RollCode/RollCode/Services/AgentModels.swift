@@ -72,8 +72,23 @@ enum CodexEvent: Equatable, Sendable {
     case error(String)
 }
 
+enum AgentProvider: String, CaseIterable, Identifiable, Sendable {
+    case codex = "Codex"
+    case gemini = "Gemini"
+
+    var id: String { rawValue }
+
+    var iconName: String {
+        switch self {
+        case .codex: "sparkles"
+        case .gemini: "bolt.fill"
+        }
+    }
+}
+
 struct AgentThread: Identifiable, Equatable, Sendable {
     let id: UUID
+    var provider: AgentProvider
     var codexThreadID: String?
     var title: String
     var updatedAt: Date
@@ -81,12 +96,14 @@ struct AgentThread: Identifiable, Equatable, Sendable {
 
     init(
         id: UUID = UUID(),
+        provider: AgentProvider = .codex,
         codexThreadID: String? = nil,
         title: String = "New Thread",
         updatedAt: Date = Date(),
         entries: [AgentEntry] = []
     ) {
         self.id = id
+        self.provider = provider
         self.codexThreadID = codexThreadID
         self.title = title
         self.updatedAt = updatedAt
