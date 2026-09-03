@@ -98,10 +98,10 @@ final class SuggestionOverlayController {
         let nsText = textView.string as NSString
         guard prefixRange.location + prefixRange.length <= nsText.length else { return }
 
-        if textView.shouldChangeText(in: prefixRange, replacementString: word) {
-            textView.replaceCharacters(in: prefixRange, with: word)
-            textView.didChangeText()
-        }
+        let undoManager = textView.undoManager
+        undoManager?.beginUndoGrouping()
+        textView.insertText(word, replacementRange: prefixRange)
+        undoManager?.endUndoGrouping()
         hide()
     }
 

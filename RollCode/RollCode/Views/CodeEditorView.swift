@@ -83,7 +83,7 @@ struct CodeEditorView: NSViewRepresentable {
         textView.defaultParagraphStyle = paragraphStyle
         textView.typingAttributes[.paragraphStyle] = paragraphStyle
 
-        if textView.string != text {
+        if !context.coordinator.isInternalTextChange && textView.string != text {
             let selection = textView.selectedRange()
             textView.string = text
             textView.setSelectedRange(NSRange(location: min(selection.location, text.utf16.count), length: 0))
@@ -100,6 +100,7 @@ struct CodeEditorView: NSViewRepresentable {
         var parent: CodeEditorView
         weak var textView: NSTextView?
         weak var ruler: LineNumberRulerView?
+        var isInternalTextChange = false
         private var isApplyingAttributes = false
         private var isPerformingSmartEdit = false
         private var lastSearchRequestID: UUID?
@@ -113,7 +114,9 @@ struct CodeEditorView: NSViewRepresentable {
 
         func textDidChange(_ notification: Notification) {
             guard !isApplyingAttributes, let textView else { return }
+            isInternalTextChange = true
             parent.text = textView.string
+            isInternalTextChange = false
             applyHighlighting(language: parent.language, searchTerm: parent.searchTerm)
             ruler?.needsDisplay = true
 
@@ -219,10 +222,15 @@ struct CodeEditorView: NSViewRepresentable {
                   ) else { return true }
 
             isPerformingSmartEdit = true
+            let undoManager = textView.undoManager
+            undoManager?.beginUndoGrouping()
             textView.insertText(edit.replacement, replacementRange: affectedCharRange)
             textView.setSelectedRange(edit.selection)
+            undoManager?.endUndoGrouping()
             isPerformingSmartEdit = false
+            isInternalTextChange = true
             parent.text = textView.string
+            isInternalTextChange = false
             applyHighlighting(language: parent.language, searchTerm: parent.searchTerm)
             ruler?.needsDisplay = true
             return false
