@@ -725,6 +725,31 @@ struct RollCodeTests {
         let event = CodexEventParser.parse(line)
         #expect(event == nil)
     }
+
+    @Test("WorkspaceModel manages restoreLastWorkspace preference and restores workspace on launch")
+    @MainActor
+    func workspaceRestoresLastWorkspacePreference() throws {
+        try withTemporaryDirectory { root in
+            let defaults = UserDefaults(suiteName: "TestWorkspaceDefaults_\(UUID().uuidString)")!
+            let workspace = WorkspaceModel(defaults: defaults, restoresLastWorkspace: true)
+            #expect(workspace.restoresLastWorkspace == true)
+
+            workspace.openWorkspace(root)
+            #expect(workspace.lastWorkspacePath == root.standardizedFileURL.path)
+
+            workspace.setRestoresLastWorkspace(false)
+            #expect(workspace.restoresLastWorkspace == false)
+
+            // When disabled, a new instance should not reopen
+            let reopenedDisabled = WorkspaceModel(defaults: defaults, restoresLastWorkspace: true)
+            #expect(reopenedDisabled.rootURL == nil)
+
+            // When re-enabled, a new instance should reopen the last project
+            reopenedDisabled.setRestoresLastWorkspace(true)
+            let reopenedEnabled = WorkspaceModel(defaults: defaults, restoresLastWorkspace: true)
+            #expect(reopenedEnabled.rootURL?.path == root.standardizedFileURL.path)
+        }
+    }
 }
 
 @MainActor

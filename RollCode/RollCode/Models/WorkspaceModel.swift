@@ -28,14 +28,20 @@ final class WorkspaceModel {
     private var savingDocumentID: UUID?
     private(set) var fontSize: CGFloat
     private(set) var tabWidth: Int
+    private(set) var restoresLastWorkspace: Bool
     private(set) var isLoadingTree = false
 
     var onWorkspaceChanged: (@MainActor @Sendable (URL) -> Void)?
     @ObservationIgnored private let defaults: UserDefaults
     @ObservationIgnored private var isCheckingExternalChanges = false
     private static let lastWorkspacePathKey = "RollCode.lastWorkspacePath"
+    private static let restoreLastWorkspaceKey = "RollCode.restoreLastWorkspace"
     private static let tabWidthKey = "RollCode.editorTabWidth"
     private static let fontSizeKey = "RollCode.editorFontSize"
+
+    var lastWorkspacePath: String? {
+        defaults.string(forKey: Self.lastWorkspacePathKey)
+    }
 
     init(defaults: UserDefaults = .standard, restoresLastWorkspace: Bool = true) {
         self.defaults = defaults
@@ -43,7 +49,10 @@ final class WorkspaceModel {
         self.tabWidth = [2, 4, 8].contains(savedTabWidth) ? savedTabWidth : 4
         let savedFontSize = defaults.double(forKey: Self.fontSizeKey)
         self.fontSize = savedFontSize >= 9 && savedFontSize <= 32 ? CGFloat(savedFontSize) : 12.5
-        guard restoresLastWorkspace,
+        let userPrefersRestore = defaults.object(forKey: Self.restoreLastWorkspaceKey) as? Bool ?? true
+        self.restoresLastWorkspace = userPrefersRestore
+
+        guard restoresLastWorkspace && userPrefersRestore,
               let path = defaults.string(forKey: Self.lastWorkspacePathKey) else { return }
 
         var isDirectory: ObjCBool = false
@@ -52,6 +61,15 @@ final class WorkspaceModel {
             return
         }
         openWorkspace(URL(fileURLWithPath: path, isDirectory: true))
+    }
+
+    func setRestoresLastWorkspace(_ enabled: Bool) {
+        restoresLastWorkspace = enabled
+        defaults.set(enabled, forKey: Self.restoreLastWorkspaceKey)
+    }
+
+    func clearLastWorkspace() {
+        defaults.removeObject(forKey: Self.lastWorkspacePathKey)
     }
 
     var activeDocument: EditorDocument? {

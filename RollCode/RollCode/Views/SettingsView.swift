@@ -60,6 +60,32 @@ struct SettingsView: View {
                 }
             }
 
+            Section("Startup & Workspace") {
+                Toggle("Reopen last project on startup", isOn: Binding(
+                    get: { workspace.restoresLastWorkspace },
+                    set: { workspace.setRestoresLastWorkspace($0) }
+                ))
+
+                HStack {
+                    Text("Last Project")
+                    Spacer()
+                    if let path = workspace.lastWorkspacePath {
+                        Text(URL(fileURLWithPath: path).lastPathComponent)
+                            .foregroundStyle(RollCodeTheme.secondaryText)
+                    } else {
+                        Text("None")
+                            .foregroundStyle(RollCodeTheme.secondaryText)
+                    }
+                }
+
+                if workspace.lastWorkspacePath != nil {
+                    Button("Clear Project History") {
+                        workspace.clearLastWorkspace()
+                    }
+                    .controlSize(.small)
+                }
+            }
+
             Section("Default AI Provider") {
                 Picker("Provider", selection: Binding(
                     get: { agent.selectedProvider },
