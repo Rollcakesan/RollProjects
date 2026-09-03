@@ -16,6 +16,8 @@ final class EditorDocument: Identifiable {
     private(set) var savedText: String
     private(set) var diskModificationDate: Date?
     var isPreviewMode = false
+    var diagnostics: [SyntaxDiagnostic] = []
+    var isCheckingSyntax: Bool = false
     private var cachedLineCount: Int
 
     init(url: URL, text: String, diskModificationDate: Date? = nil) {

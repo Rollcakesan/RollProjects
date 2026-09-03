@@ -32,6 +32,15 @@ struct WorkspaceToolbarContent: ToolbarContent {
         }
 
         ToolbarItemGroup(placement: .primaryAction) {
+            Button {
+                workspace.saveActiveDocument()
+            } label: {
+                Image(systemName: workspace.activeDocument?.isDirty == true ? "square.and.arrow.down.fill" : "square.and.arrow.down")
+                    .foregroundStyle(workspace.activeDocument?.isDirty == true ? RollCodeTheme.accent : RollCodeTheme.primaryText)
+            }
+            .disabled(workspace.activeDocument == nil)
+            .help("Save Active File (⌘S)")
+
             Button { agent.isVisible.toggle() } label: {
                 Image(systemName: "sparkles")
             }

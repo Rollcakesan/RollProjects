@@ -795,6 +795,26 @@ struct RollCodeTests {
         #expect(terminal.tabs.count == 1)
         #expect(terminal.activeTabID == secondTab.id)
     }
+
+    @Test("SyntaxCheckService detects JSON syntax errors")
+    func syntaxCheckDetectsJSONErrors() async {
+        let validJSON = "{\"name\": \"RollCode\", \"version\": 1}"
+        let validResult = await SyntaxCheckService.check(
+            url: URL(fileURLWithPath: "/tmp/test.json"),
+            text: validJSON,
+            language: .json
+        )
+        #expect(validResult.isEmpty)
+
+        let invalidJSON = "{\"name\": \"RollCode\", invalid}"
+        let invalidResult = await SyntaxCheckService.check(
+            url: URL(fileURLWithPath: "/tmp/test.json"),
+            text: invalidJSON,
+            language: .json
+        )
+        #expect(!invalidResult.isEmpty)
+        #expect(invalidResult[0].severity == .error)
+    }
 }
 
 @MainActor

@@ -10,6 +10,32 @@ struct StatusBarView: View {
             } else {
                 Text("No folder open")
             }
+
+            if let document = workspace.activeDocument {
+                if document.isCheckingSyntax {
+                    HStack(spacing: 4) {
+                        ProgressView().controlSize(.mini)
+                        Text("Checking syntax…")
+                            .font(.system(size: 9))
+                    }
+                } else if !document.diagnostics.isEmpty {
+                    let first = document.diagnostics[0]
+                    Button {
+                        workspace.navigateTo(line: first.line)
+                    } label: {
+                        HStack(spacing: 4) {
+                            Image(systemName: "xmark.circle.fill")
+                                .foregroundStyle(Color.red)
+                            Text("Line \(first.line): \(first.message)")
+                                .lineLimit(1)
+                                .foregroundStyle(Color.red.opacity(0.9))
+                        }
+                    }
+                    .buttonStyle(.plain)
+                    .help(document.diagnostics.map { "Line \($0.line): \($0.message)" }.joined(separator: "\n"))
+                }
+            }
+
             Spacer()
             if let document = workspace.activeDocument {
                 ActiveDocumentStatus(document: document)

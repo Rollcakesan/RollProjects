@@ -84,6 +84,10 @@ final class WorkspaceModel {
         rootNode?.flattenedFiles ?? []
     }
 
+    func navigateTo(line: Int) {
+        editorNavigationRequest = EditorNavigationRequest(line: line)
+    }
+
     func chooseFolder() {
         isFolderPickerPresented = true
     }
@@ -243,6 +247,19 @@ final class WorkspaceModel {
         do {
             try document.text.write(to: document.url, atomically: true, encoding: .utf8)
             document.markSaved(modificationDate: document.url.modificationDate)
+
+            // Non-blocking syntax check on save
+            let docURL = document.url
+            let docText = document.text
+            let docLang = document.language
+            Task { @MainActor [weak document] in
+                guard let document else { return }
+                document.isCheckingSyntax = true
+                let diagnostics = await SyntaxCheckService.check(url: docURL, text: docText, language: docLang)
+                document.diagnostics = diagnostics
+                document.isCheckingSyntax = false
+            }
+
             return true
         } catch {
             alertMessage = "Could not save \(document.name): \(error.localizedDescription)"
