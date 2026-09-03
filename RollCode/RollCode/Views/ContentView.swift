@@ -36,7 +36,6 @@ struct ContentView: View {
 
                     AgentPanelView()
                         .frame(width: agentPanelWidth)
-                        .transition(.move(edge: .trailing).combined(with: .opacity))
                 }
             }
 
