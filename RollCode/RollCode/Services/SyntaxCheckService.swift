@@ -26,14 +26,29 @@ enum SyntaxCheckService {
         switch language {
         case .json:
             return checkJSON(text: text)
-        case .python:
-            return await checkPython(fileURL: url)
-        case .javascript:
-            return await checkJavaScript(fileURL: url)
-        case .swift:
-            return await checkSwift(fileURL: url)
+        case .python, .javascript, .swift:
+            guard let temporaryURL = temporaryFileURL(for: url, containing: text) else { return [] }
+            defer { try? FileManager.default.removeItem(at: temporaryURL) }
+            switch language {
+            case .python: return await checkPython(fileURL: temporaryURL)
+            case .javascript: return await checkJavaScript(fileURL: temporaryURL)
+            case .swift: return await checkSwift(fileURL: temporaryURL)
+            default: return []
+            }
         default:
             return []
+        }
+    }
+
+    private static func temporaryFileURL(for sourceURL: URL, containing text: String) -> URL? {
+        let fileExtension = sourceURL.pathExtension
+        let filename = "RollCodeSyntax-\(UUID().uuidString)" + (fileExtension.isEmpty ? "" : ".\(fileExtension)")
+        let temporaryURL = FileManager.default.temporaryDirectory.appendingPathComponent(filename)
+        do {
+            try text.write(to: temporaryURL, atomically: true, encoding: .utf8)
+            return temporaryURL
+        } catch {
+            return nil
         }
     }
 
@@ -63,7 +78,7 @@ enum SyntaxCheckService {
             let process = Process()
             let errorPipe = Pipe()
             process.executableURL = URL(fileURLWithPath: pythonPath)
-            process.arguments = ["-m", "py_compile", fileURL.path]
+            process.arguments = ["-B", "-m", "py_compile", fileURL.path]
             process.standardError = errorPipe
             process.standardOutput = Pipe()
 

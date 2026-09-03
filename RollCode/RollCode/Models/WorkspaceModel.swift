@@ -272,6 +272,42 @@ final class WorkspaceModel {
         _ = save(activeDocument)
     }
 
+    func formatAndCheckActiveDocument() {
+        guard let activeDocument, !activeDocument.isCheckingSyntax else { return }
+        Task { [weak self, weak activeDocument] in
+            guard let self, let activeDocument else { return }
+            await self.formatAndCheck(activeDocument)
+        }
+    }
+
+    private func formatAndCheck(_ document: EditorDocument) async {
+        guard documents.contains(where: { $0.id == document.id }) else { return }
+        document.isCheckingSyntax = true
+        defer {
+            if documents.contains(where: { $0.id == document.id }) {
+                document.isCheckingSyntax = false
+            }
+        }
+
+        let formattedText = await LSPManager.shared.formatDocument(
+            for: document.language,
+            url: document.url,
+            text: document.text,
+            tabWidth: tabWidth,
+            workspaceURL: rootURL
+        )
+        guard documents.contains(where: { $0.id == document.id }) else { return }
+        if let formattedText {
+            document.text = formattedText
+        }
+
+        document.diagnostics = await SyntaxCheckService.check(
+            url: document.url,
+            text: document.text,
+            language: document.language
+        )
+    }
+
     func saveActiveDocumentAs() {
         guard let activeDocument else { return }
         savingDocumentID = activeDocument.id

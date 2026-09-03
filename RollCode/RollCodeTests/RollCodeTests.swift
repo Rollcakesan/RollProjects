@@ -984,6 +984,31 @@ struct RollCodeTests {
         #expect(arrayItems.map(\.insertText) == ["map(transform)"])
     }
 
+    @Test("LSPClient applies document formatting edits in reverse order")
+    func lspClientAppliesFormattingEdits() {
+        let text = "let x=1\n"
+        let response: [String: Any] = [
+            "result": [
+                [
+                    "range": [
+                        "start": ["line": 0, "character": 5],
+                        "end": ["line": 0, "character": 5]
+                    ],
+                    "newText": " "
+                ],
+                [
+                    "range": [
+                        "start": ["line": 0, "character": 6],
+                        "end": ["line": 0, "character": 6]
+                    ],
+                    "newText": " "
+                ]
+            ]
+        ]
+
+        #expect(LSPClient.formattedText(from: response, text: text) == "let x = 1\n")
+    }
+
     @Test("LSPClient converts UTF-16 editor positions to negotiated LSP encodings")
     func lspClientConvertsPositionEncodings() {
         let text = "😀abc"

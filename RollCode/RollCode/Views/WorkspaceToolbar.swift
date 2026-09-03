@@ -41,6 +41,14 @@ struct WorkspaceToolbarContent: ToolbarContent {
             .disabled(workspace.activeDocument == nil)
             .help("Save Active File (⌘S)")
 
+            Button {
+                workspace.formatAndCheckActiveDocument()
+            } label: {
+                Image(systemName: "paintbrush")
+            }
+            .disabled(workspace.activeDocument == nil || workspace.activeDocument?.isCheckingSyntax == true)
+            .help("Format & Check Active File (⇧⌥F)")
+
             Button { agent.isVisible.toggle() } label: {
                 Image(systemName: "sparkles")
             }

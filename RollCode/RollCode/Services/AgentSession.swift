@@ -1,9 +1,11 @@
 import Foundation
+import os
 import Observation
 
 @Observable
 @MainActor
 final class AgentSession {
+    private let logger = Logger(subsystem: "com.rollprojects.RollCode", category: "agent")
     private enum RunState {
         case idle
         case running(Process)
@@ -98,7 +100,10 @@ final class AgentSession {
 
     func send(_ prompt: String, in workspaceURL: URL, activeFileURL: URL? = nil) {
         let prompt = prompt.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !prompt.isEmpty, !isRunning, let executableURL = currentExecutableURL else { return }
+        guard !prompt.isEmpty, !isRunning, let executableURL = currentExecutableURL else {
+            logger.debug("Ignoring agent request because it is empty, already running, or unavailable")
+            return
+        }
 
         if activeThread.title == "New Thread" || activeThread.entries.isEmpty {
             activeThread.title = String(prompt.prefix(40))
@@ -139,6 +144,7 @@ final class AgentSession {
         do {
             try process.run()
             runState = .running(process)
+            logger.debug("Started \(self.selectedProvider.rawValue, privacy: .public) agent process")
             monitor(process, standardOutput: standardOutput, standardError: standardError)
 
             if selectedProvider == .codex {
@@ -149,6 +155,7 @@ final class AgentSession {
             }
         } catch {
             runState = .idle
+            logger.error("Could not start \(self.selectedProvider.rawValue, privacy: .public) agent: \(error.localizedDescription, privacy: .private)")
             entries.append(.message(AgentMessage(role: .system, text: "Could not start \(selectedProvider.rawValue): \(error.localizedDescription)")))
         }
     }
@@ -491,6 +498,8 @@ final class AgentSession {
             return
         }
         runState = .idle
+
+        logger.debug("\(self.selectedProvider.rawValue, privacy: .public) agent finished with exit code \(exitCode, privacy: .public)")
 
         mergeChangedFiles(changedPaths)
 

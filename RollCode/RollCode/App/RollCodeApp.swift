@@ -86,6 +86,10 @@ struct RollCodeApp: App {
                     .disabled(workspace.activeDocument == nil)
             }
             CommandMenu("Editor") {
+                Button("Format & Check") { workspace.formatAndCheckActiveDocument() }
+                    .keyboardShortcut("f", modifiers: [.option, .shift])
+                    .disabled(workspace.activeDocument == nil || workspace.activeDocument?.isCheckingSyntax == true)
+                Divider()
                 Picker(
                     "Tab Width",
                     selection: Binding(

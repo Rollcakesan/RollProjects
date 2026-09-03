@@ -1,4 +1,7 @@
 import Foundation
+import os
+
+private let lspLogger = Logger(subsystem: "com.rollprojects.RollCode", category: "lsp")
 
 @MainActor
 final class LSPClient {
@@ -22,6 +25,7 @@ final class LSPClient {
     private var shutdownRequestID: Int?
     private var initContinuations: [CheckedContinuation<Bool, Never>] = []
     private var pendingCompletions: [Int: PendingCompletion] = [:]
+    private var pendingFormatting: [Int: PendingFormatting] = [:]
     private var openDocumentVersions: [URL: Int] = [:]
     private var positionEncoding = "utf-16"
     private let readQueue = DispatchQueue(label: "com.rollcode.lsp.reader")
@@ -29,6 +33,11 @@ final class LSPClient {
     private struct PendingCompletion {
         let text: String
         let continuation: CheckedContinuation<[CodeCompletionSuggestion], Never>
+    }
+
+    private struct PendingFormatting {
+        let text: String
+        let continuation: CheckedContinuation<String?, Never>
     }
 
     var isRunning: Bool {
@@ -42,6 +51,7 @@ final class LSPClient {
     }
 
     private func startServer() -> Bool {
+        lspLogger.debug("Starting language server \(self.server.identifier, privacy: .public)")
         let process = Process()
         process.executableURL = URL(fileURLWithPath: server.executablePath)
         process.arguments = server.arguments
@@ -58,6 +68,7 @@ final class LSPClient {
         do {
             try process.run()
         } catch {
+            lspLogger.error("Could not start language server \(self.server.identifier, privacy: .public): \(error.localizedDescription, privacy: .private)")
             state = .stopped
             return false
         }
@@ -109,7 +120,8 @@ final class LSPClient {
                             "snippetSupport": false,
                             "documentationFormat": ["plaintext", "markdown"]
                         ]
-                    ]
+                    ],
+                    "formatting": ["dynamicRegistration": false]
                 ]
             ]
         ]
@@ -142,7 +154,14 @@ final class LSPClient {
         line: Int,
         character: Int
     ) async -> [CodeCompletionSuggestion] {
-        guard isRunning, await ensureInitialized() else { return [] }
+        guard isRunning else {
+            lspLogger.debug("Ignoring completion request because the server is not running")
+            return []
+        }
+        guard await ensureInitialized() else {
+            lspLogger.error("Language server initialization failed before completion request")
+            return []
+        }
         syncDocument(url: url, text: text, languageId: languageId)
 
         let requestID = nextRequestID()
@@ -170,6 +189,30 @@ final class LSPClient {
         }
     }
 
+    func requestFormatting(
+        url: URL,
+        text: String,
+        languageId: String,
+        tabWidth: Int
+    ) async -> String? {
+        guard isRunning, await ensureInitialized() else { return nil }
+        syncDocument(url: url, text: text, languageId: languageId)
+
+        let requestID = nextRequestID()
+        let params: [String: Any] = [
+            "textDocument": ["uri": url.standardizedFileURL.absoluteString],
+            "options": ["tabSize": tabWidth, "insertSpaces": true]
+        ]
+        return await withCheckedContinuation { continuation in
+            pendingFormatting[requestID] = PendingFormatting(text: text, continuation: continuation)
+            send(method: "textDocument/formatting", id: requestID, params: params)
+            Task { @MainActor [weak self] in
+                try? await Task.sleep(for: .milliseconds(2500))
+                self?.cancelFormatting(requestID, notifyServer: true)
+            }
+        }
+    }
+
     func closeDocument(_ url: URL) {
         let url = url.standardizedFileURL
         guard openDocumentVersions.removeValue(forKey: url) != nil else { return }
@@ -192,6 +235,7 @@ final class LSPClient {
         openDocumentVersions.removeAll()
         resumeInitialization(with: false)
         resumePendingCompletions()
+        resumePendingFormatting()
 
         let requestID = nextRequestID()
         shutdownRequestID = requestID
@@ -263,6 +307,7 @@ final class LSPClient {
         do {
             try stdin.write(contentsOf: header + data)
         } catch {
+            lspLogger.error("Language server write failed: \(error.localizedDescription, privacy: .private)")
             serverDidExit()
         }
     }
@@ -302,16 +347,24 @@ final class LSPClient {
             finishStopping()
             return
         }
-        guard let pending = pendingCompletions.removeValue(forKey: id) else { return }
-        let suggestions = message["error"] == nil
-            ? Self.completionSuggestions(from: message, text: pending.text, positionEncoding: positionEncoding)
-            : []
-        pending.continuation.resume(returning: suggestions)
+        if let pending = pendingCompletions.removeValue(forKey: id) {
+            let suggestions = message["error"] == nil
+                ? Self.completionSuggestions(from: message, text: pending.text, positionEncoding: positionEncoding)
+                : []
+            pending.continuation.resume(returning: suggestions)
+            return
+        }
+        guard let pending = pendingFormatting.removeValue(forKey: id) else { return }
+        let formattedText = message["error"] == nil
+            ? Self.formattedText(from: message, text: pending.text, positionEncoding: positionEncoding)
+            : nil
+        pending.continuation.resume(returning: formattedText)
     }
 
     private func handleInitializeResponse(_ message: [String: Any]) {
         initializeRequestID = nil
         guard message["error"] == nil else {
+            lspLogger.error("Language server returned an initialize error")
             failInitialization()
             return
         }
@@ -321,6 +374,7 @@ final class LSPClient {
             positionEncoding = encoding.lowercased()
         }
         state = .ready
+        lspLogger.debug("Language server \(self.server.identifier, privacy: .public) is ready")
         sendNotification(method: "initialized", params: [:])
         resumeInitialization(with: true)
     }
@@ -339,10 +393,12 @@ final class LSPClient {
     }
 
     private func failInitialization() {
+        lspLogger.error("Language server initialization timed out or failed")
         initializeRequestID = nil
         state = .stopped
         resumeInitialization(with: false)
         resumePendingCompletions()
+        resumePendingFormatting()
         terminateProcess()
     }
 
@@ -366,8 +422,23 @@ final class LSPClient {
         continuations.forEach { $0.resume(returning: []) }
     }
 
+    private func cancelFormatting(_ id: Int, notifyServer: Bool) {
+        guard let pending = pendingFormatting.removeValue(forKey: id) else { return }
+        if notifyServer {
+            sendNotification(method: "$/cancelRequest", params: ["id": id])
+        }
+        pending.continuation.resume(returning: nil)
+    }
+
+    private func resumePendingFormatting() {
+        let continuations = pendingFormatting.values.map(\.continuation)
+        pendingFormatting.removeAll()
+        continuations.forEach { $0.resume(returning: nil) }
+    }
+
     private func finishStopping() {
         guard state == .stopping else { return }
+        lspLogger.debug("Stopping language server \(self.server.identifier, privacy: .public)")
         shutdownRequestID = nil
         sendNotification(method: "exit")
         state = .stopped
@@ -376,9 +447,11 @@ final class LSPClient {
 
     private func serverDidExit() {
         guard state != .stopped else { return }
+        lspLogger.debug("Language server \(self.server.identifier, privacy: .public) exited")
         state = .stopped
         resumeInitialization(with: false)
         resumePendingCompletions()
+        resumePendingFormatting()
         clearProcessResources()
     }
 
@@ -451,6 +524,27 @@ final class LSPClient {
                 replacementRange: replacementRange
             )
         }
+    }
+
+    nonisolated static func formattedText(
+        from message: [String: Any],
+        text: String,
+        positionEncoding: String = "utf-16"
+    ) -> String? {
+        guard let edits = message["result"] as? [[String: Any]] else { return nil }
+        let replacements = edits.compactMap { edit -> (NSRange, String)? in
+            guard let range = edit["range"] as? [String: Any],
+                  let nsRange = nsRange(from: range, in: text, positionEncoding: positionEncoding),
+                  let newText = edit["newText"] as? String else { return nil }
+            return (nsRange, newText)
+        }
+        guard replacements.count == edits.count else { return nil }
+
+        let mutableText = NSMutableString(string: text)
+        for (range, replacement) in replacements.sorted(by: { $0.0.location > $1.0.location }) {
+            mutableText.replaceCharacters(in: range, with: replacement)
+        }
+        return mutableText as String
     }
 
     nonisolated static func characterOffset(
@@ -601,6 +695,24 @@ final class LSPManager {
             languageId: resolvedServer.languageId,
             line: line,
             character: character
+        )
+    }
+
+    func formatDocument(
+        for language: CodeLanguage,
+        url: URL,
+        text: String,
+        tabWidth: Int,
+        workspaceURL: URL? = nil
+    ) async -> String? {
+        let rootURL = (workspaceURL ?? url.deletingLastPathComponent()).standardizedFileURL
+        guard let resolvedServer = LanguageServerConfig.resolve(for: language, documentURL: url),
+              let client = client(for: resolvedServer, rootURL: rootURL) else { return nil }
+        return await client.requestFormatting(
+            url: url,
+            text: text,
+            languageId: resolvedServer.languageId,
+            tabWidth: tabWidth
         )
     }
 
