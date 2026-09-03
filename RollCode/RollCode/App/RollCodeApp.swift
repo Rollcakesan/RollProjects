@@ -58,7 +58,9 @@ struct RollCodeApp: App {
                 }
                 .keyboardShortcut("j", modifiers: [.command])
                 Button(agent.isVisible ? "Hide Agent" : "Show Agent") {
-                    agent.isVisible.toggle()
+                    withAnimation(.easeInOut(duration: 0.18)) {
+                        agent.isVisible.toggle()
+                    }
                 }
                 .keyboardShortcut("a", modifiers: [.command, .shift])
             }

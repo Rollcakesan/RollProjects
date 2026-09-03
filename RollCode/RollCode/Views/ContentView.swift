@@ -8,12 +8,17 @@ struct ContentView: View {
     @Environment(AgentSession.self) private var agent
     @Environment(\.scenePhase) private var scenePhase
 
+    @AppStorage("sidebarWidth") private var sidebarWidth: Double = 230
+    @AppStorage("agentPanelWidth") private var agentPanelWidth: Double = 400
+
     var body: some View {
         @Bindable var workspace = workspace
         VStack(spacing: 0) {
-            HSplitView {
+            HStack(spacing: 0) {
                 SidebarView()
-                    .frame(minWidth: 180, idealWidth: 230, maxWidth: 360)
+                    .frame(width: sidebarWidth)
+
+                SplitDivider(size: $sidebarWidth, range: 160...420)
 
                 VSplitView {
                     EditorWorkspaceView()
@@ -24,11 +29,14 @@ struct ContentView: View {
                             .frame(minHeight: 120, idealHeight: 210, maxHeight: 420)
                     }
                 }
-                .frame(minWidth: 520)
+                .frame(minWidth: 400)
 
                 if agent.isVisible {
+                    SplitDivider(size: $agentPanelWidth, range: 300...950, isTrailing: true)
+
                     AgentPanelView()
-                        .frame(minWidth: 360, idealWidth: 380, maxWidth: 900)
+                        .frame(width: agentPanelWidth)
+                        .transition(.move(edge: .trailing).combined(with: .opacity))
                 }
             }
 
@@ -292,5 +300,43 @@ private struct TextDocumentFile: FileDocument {
 
     func fileWrapper(configuration: WriteConfiguration) throws -> FileWrapper {
         FileWrapper(regularFileWithContents: Data(text.utf8))
+    }
+}
+
+private struct SplitDivider: View {
+    @Binding var size: Double
+    let range: ClosedRange<Double>
+    var isTrailing: Bool = false
+
+    @State private var startSize: Double = 0
+
+    var body: some View {
+        Rectangle()
+            .fill(RollCodeTheme.divider)
+            .frame(width: 1)
+            .padding(.horizontal, 3)
+            .background(Color.clear)
+            .contentShape(Rectangle())
+            .onHover { hovering in
+                if hovering {
+                    NSCursor.resizeLeftRight.push()
+                } else {
+                    NSCursor.pop()
+                }
+            }
+            .gesture(
+                DragGesture(minimumDistance: 1)
+                    .onChanged { value in
+                        if startSize == 0 {
+                            startSize = size
+                        }
+                        let delta = value.translation.width
+                        let newSize = isTrailing ? (startSize - delta) : (startSize + delta)
+                        size = min(max(newSize, range.lowerBound), range.upperBound)
+                    }
+                    .onEnded { _ in
+                        startSize = 0
+                    }
+            )
     }
 }

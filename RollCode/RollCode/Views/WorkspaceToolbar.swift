@@ -32,7 +32,11 @@ struct WorkspaceToolbarContent: ToolbarContent {
         }
 
         ToolbarItemGroup(placement: .primaryAction) {
-            Button { agent.isVisible.toggle() } label: {
+            Button {
+                withAnimation(.easeInOut(duration: 0.18)) {
+                    agent.isVisible.toggle()
+                }
+            } label: {
                 Image(systemName: "sparkles")
             }
             .help("Toggle Agent (⇧⌘A)")
