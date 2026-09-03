@@ -140,6 +140,8 @@ final class AgentSession {
             if selectedProvider == .codex {
                 try standardInput.fileHandleForWriting.write(contentsOf: Data(contextualPrompt.utf8))
                 try standardInput.fileHandleForWriting.close()
+            } else {
+                try? standardInput.fileHandleForWriting.close()
             }
         } catch {
             runState = .idle
@@ -422,6 +424,8 @@ final class AgentSession {
             if selectedProvider == .codex && (lower.contains("unauthorized") || lower.contains("login") || lower.contains("authentication")) {
                 auth.refresh()
                 message = "Codex authentication required. Please click 'Log In' or run 'codex login' in the terminal.\n(\(detail))"
+            } else if selectedProvider == .gemini && (lower.contains("google_cloud_project") || lower.contains("license") || lower.contains("valid license") || lower.contains("login")) {
+                message = "Gemini CLI authentication or project setup required:\n\(detail)\n\nTip: You can set GEMINI_API_KEY or configure a Google Cloud Project (GOOGLE_CLOUD_PROJECT)."
             } else {
                 message = detail.isEmpty ? "\(selectedProvider.rawValue) exited with code \(exitCode)." : detail
             }
