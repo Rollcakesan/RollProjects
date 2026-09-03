@@ -19,7 +19,10 @@ struct RollCodeApp: App {
                     appDelegate.workspace = workspace
                     workspace.onWorkspaceChanged = { url in
                         terminal.start(in: url)
-                        agent.newThread()
+                        agent.loadThreads(for: url)
+                    }
+                    if let rootURL = workspace.rootURL {
+                        agent.loadThreads(for: rootURL)
                     }
                     agent.onRunCompleted = {
                         workspace.refreshTree()

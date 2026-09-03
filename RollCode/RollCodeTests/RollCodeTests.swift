@@ -750,6 +750,30 @@ struct RollCodeTests {
             #expect(reopenedEnabled.rootURL?.path == root.standardizedFileURL.path)
         }
     }
+
+    @Test("AgentSession persists and restores conversation threads for a workspace")
+    @MainActor
+    func agentSessionPersistsThreadsAcrossSessions() throws {
+        try withTemporaryDirectory { root in
+            let session1 = AgentSession(executableURL: nil, geminiExecutableURL: nil)
+            session1.loadThreads(for: root)
+            #expect(session1.entries.isEmpty)
+
+            session1.entries.append(.message(AgentMessage(role: .user, text: "Hello AI")))
+            session1.entries.append(.message(AgentMessage(role: .assistant, text: "Hello User")))
+            session1.saveCurrentThreads()
+
+            let session2 = AgentSession(executableURL: nil, geminiExecutableURL: nil)
+            session2.loadThreads(for: root)
+            #expect(session2.entries.count == 2)
+            if case .message(let userMsg) = session2.entries.first {
+                #expect(userMsg.text == "Hello AI")
+            }
+            if case .message(let botMsg) = session2.entries.last {
+                #expect(botMsg.text == "Hello User")
+            }
+        }
+    }
 }
 
 @MainActor

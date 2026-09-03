@@ -1,7 +1,7 @@
 import Foundation
 
-struct AgentMessage: Identifiable, Equatable, Sendable {
-    enum Role: Sendable {
+struct AgentMessage: Identifiable, Equatable, Sendable, Codable {
+    enum Role: String, Sendable, Codable {
         case user
         case assistant
         case system
@@ -40,8 +40,8 @@ struct AgentMessage: Identifiable, Equatable, Sendable {
     }
 }
 
-struct AgentActivity: Identifiable, Equatable, Sendable {
-    enum State: Sendable {
+struct AgentActivity: Identifiable, Equatable, Sendable, Codable {
+    enum State: String, Sendable, Codable {
         case running
         case completed
         case failed
@@ -61,7 +61,7 @@ struct AgentActivity: Identifiable, Equatable, Sendable {
     let state: State
 }
 
-enum AgentEntry: Identifiable, Equatable, Sendable {
+enum AgentEntry: Identifiable, Equatable, Sendable, Codable {
     enum ID: Hashable, Sendable {
         case message(UUID)
         case activity(String)
@@ -82,6 +82,51 @@ enum AgentEntry: Identifiable, Equatable, Sendable {
         case .usage: .usage
         }
     }
+
+    private enum CodingKeys: String, CodingKey {
+        case type, message, activity, changes, usage
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        let type = try container.decode(String.self, forKey: .type)
+        switch type {
+        case "message":
+            let msg = try container.decode(AgentMessage.self, forKey: .message)
+            self = .message(msg)
+        case "activity":
+            let act = try container.decode(AgentActivity.self, forKey: .activity)
+            self = .activity(act)
+        case "changes":
+            let files = try container.decode([String].self, forKey: .changes)
+            self = .changes(files)
+        case "usage":
+            let txt = try container.decode(String.self, forKey: .usage)
+            self = .usage(txt)
+        default:
+            throw DecodingError.dataCorrupted(
+                DecodingError.Context(codingPath: decoder.codingPath, debugDescription: "Unknown AgentEntry type: \(type)")
+            )
+        }
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        switch self {
+        case .message(let msg):
+            try container.encode("message", forKey: .type)
+            try container.encode(msg, forKey: .message)
+        case .activity(let act):
+            try container.encode("activity", forKey: .type)
+            try container.encode(act, forKey: .activity)
+        case .changes(let files):
+            try container.encode("changes", forKey: .type)
+            try container.encode(files, forKey: .changes)
+        case .usage(let txt):
+            try container.encode("usage", forKey: .type)
+            try container.encode(txt, forKey: .usage)
+        }
+    }
 }
 
 enum CodexEvent: Equatable, Sendable {
@@ -92,7 +137,7 @@ enum CodexEvent: Equatable, Sendable {
     case error(String)
 }
 
-enum AgentProvider: String, CaseIterable, Identifiable, Sendable {
+enum AgentProvider: String, CaseIterable, Identifiable, Sendable, Codable {
     case codex = "Codex"
     case gemini = "Gemini"
 
@@ -106,7 +151,7 @@ enum AgentProvider: String, CaseIterable, Identifiable, Sendable {
     }
 }
 
-struct AgentThread: Identifiable, Equatable, Sendable {
+struct AgentThread: Identifiable, Equatable, Sendable, Codable {
     let id: UUID
     var provider: AgentProvider
     var codexThreadID: String?
@@ -141,4 +186,3 @@ struct CodexSessionSummary: Identifiable, Equatable, Sendable {
         return trimmed.isEmpty ? "Untitled Session" : trimmed
     }
 }
-

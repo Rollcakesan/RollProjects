@@ -112,6 +112,7 @@ final class AgentSession {
         errorBuffer = ""
         self.workspaceURL = workspaceURL.standardizedFileURL
         self.initialChangedPaths = Set((try? GitDiffService.changedPaths(in: workspaceURL)) ?? [])
+        saveCurrentThreads()
 
         let process = Process()
         let standardOutput = Pipe()
@@ -182,7 +183,9 @@ final class AgentSession {
         }
         archiveCurrentThreadIfNeeded()
         activeThread = thread
+        selectedProvider = thread.provider
         errorBuffer = ""
+        saveCurrentThreads()
     }
 
     func deleteThread(id: UUID) {
@@ -190,11 +193,13 @@ final class AgentSession {
         if activeThread.id == id {
             if let first = threads.first {
                 activeThread = first
+                selectedProvider = first.provider
             } else {
-                activeThread = AgentThread()
+                activeThread = AgentThread(provider: selectedProvider)
             }
             errorBuffer = ""
         }
+        saveCurrentThreads()
     }
 
     func resumePastCodexSession(_ session: CodexSessionSummary) {
@@ -202,6 +207,7 @@ final class AgentSession {
             stop(resetThread: false)
         }
         archiveCurrentThreadIfNeeded()
+        selectedProvider = .codex
         activeThread = AgentThread(
             codexThreadID: session.id,
             title: session.displayTitle,
@@ -209,6 +215,7 @@ final class AgentSession {
             entries: [.message(AgentMessage(role: .system, text: "Resumed Codex session: \(session.displayTitle)"))]
         )
         errorBuffer = ""
+        saveCurrentThreads()
     }
 
     func loadPastCodexSessions() {
@@ -238,10 +245,68 @@ final class AgentSession {
         pastCodexSessions = sessions
     }
 
+    private var storageDirectoryURL: URL {
+        let appSupport = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
+        let rollCodeDir = appSupport.appendingPathComponent("RollCode/threads", isDirectory: true)
+        try? FileManager.default.createDirectory(at: rollCodeDir, withIntermediateDirectories: true)
+        return rollCodeDir
+    }
+
+    private func storageFileURL(for workspaceURL: URL) -> URL {
+        let pathData = workspaceURL.standardizedFileURL.path.data(using: .utf8) ?? Data()
+        let pathHash = pathData.base64EncodedString()
+            .replacingOccurrences(of: "/", with: "_")
+            .replacingOccurrences(of: "+", with: "-")
+            .replacingOccurrences(of: "=", with: "")
+        return storageDirectoryURL.appendingPathComponent("\(pathHash).json")
+    }
+
+    func loadThreads(for workspaceURL: URL) {
+        if self.workspaceURL != nil && self.workspaceURL != workspaceURL.standardizedFileURL {
+            saveCurrentThreads()
+        }
+
+        self.workspaceURL = workspaceURL.standardizedFileURL
+        let fileURL = storageFileURL(for: workspaceURL)
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .iso8601
+        guard FileManager.default.fileExists(atPath: fileURL.path),
+              let data = try? Data(contentsOf: fileURL),
+              let loadedThreads = try? decoder.decode([AgentThread].self, from: data),
+              !loadedThreads.isEmpty else {
+            resetThreadState()
+            return
+        }
+
+        self.threads = loadedThreads
+        if let first = loadedThreads.first {
+            self.activeThread = first
+            self.selectedProvider = first.provider
+            if first.provider == .codex {
+                self.codexLatestThread = first
+            } else {
+                self.geminiLatestThread = first
+            }
+        }
+        errorBuffer = ""
+    }
+
+    func saveCurrentThreads() {
+        guard let workspaceURL else { return }
+        archiveCurrentThreadIfNeeded()
+        let fileURL = storageFileURL(for: workspaceURL)
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.prettyPrinted]
+        encoder.dateEncodingStrategy = .iso8601
+        guard let data = try? encoder.encode(threads) else { return }
+        try? data.write(to: fileURL, options: .atomic)
+    }
+
     private func resetThreadState() {
         archiveCurrentThreadIfNeeded()
-        activeThread = AgentThread()
+        activeThread = AgentThread(provider: selectedProvider)
         errorBuffer = ""
+        saveCurrentThreads()
     }
 
     private func archiveCurrentThreadIfNeeded() {
@@ -446,6 +511,7 @@ final class AgentSession {
             entries.append(.message(AgentMessage(role: .system, text: message)))
         }
         onRunCompleted?()
+        saveCurrentThreads()
         if resetThread {
             resetThreadState()
         }
