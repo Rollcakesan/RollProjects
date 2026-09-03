@@ -233,6 +233,7 @@ private struct EditorDocumentView: View {
                     gitAddedLines: document.gitAddedLines,
                     gitModifiedLines: document.gitModifiedLines,
                     documentURL: document.url,
+                    workspaceURL: workspace.rootURL,
                     tabWidth: workspace.tabWidth,
                     fontSize: workspace.fontSize
                 )

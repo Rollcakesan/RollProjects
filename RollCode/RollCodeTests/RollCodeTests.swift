@@ -915,17 +915,96 @@ struct RollCodeTests {
         #expect(!added.contains(10))
     }
 
-    @Test("SourceKitLSPService extracts JSON-RPC messages correctly")
-    func sourceKitLSPExtractsJSONRPCMessages() throws {
+    @Test("LSPClient extracts JSON-RPC messages correctly")
+    func lspClientExtractsJSONRPCMessages() throws {
         let jsonString = "{\"jsonrpc\":\"2.0\",\"id\":42,\"result\":{\"items\":[{\"label\":\"title\"}]}}"
         let jsonBytes = jsonString.data(using: .utf8)!
         let headerString = "Content-Length: \(jsonBytes.count)\r\n\r\n"
         var buffer = headerString.data(using: .utf8)! + jsonBytes
 
-        let message = SourceKitLSPService.extractMessage(from: &buffer)
+        let message = LSPClient.extractMessage(from: &buffer)
         #expect(message != nil)
         #expect((message?["id"] as? NSNumber)?.intValue == 42)
         #expect(buffer.isEmpty)
+    }
+
+    @Test("LanguageServerConfig resolves available language servers")
+    func languageServerConfigResolves() throws {
+        let swiftServer = LanguageServerConfig.resolve(for: .swift)
+        #expect(swiftServer != nil)
+        #expect(swiftServer?.languageId == "swift")
+
+        let markdownServer = LanguageServerConfig.resolve(for: .markdown)
+        #expect(markdownServer == nil)
+
+        #expect(LanguageServerConfig.languageIdentifier(
+            for: .cFamily,
+            documentURL: URL(fileURLWithPath: "/tmp/main.cpp")
+        ) == "cpp")
+        #expect(LanguageServerConfig.languageIdentifier(
+            for: .cFamily,
+            documentURL: URL(fileURLWithPath: "/tmp/main.mm")
+        ) == "objective-cpp")
+    }
+
+    @Test("LSPClient decodes both completion response shapes and insertion edits")
+    func lspClientDecodesCompletions() throws {
+        let text = "thing.ti"
+        let listResponse: [String: Any] = [
+            "result": [
+                "items": [[
+                    "label": "title: String",
+                    "filterText": "title",
+                    "detail": "String",
+                    "textEdit": [
+                        "newText": "title",
+                        "range": [
+                            "start": ["line": 0, "character": 6],
+                            "end": ["line": 0, "character": 8]
+                        ]
+                    ]
+                ]]
+            ]
+        ]
+        let listItems = LSPClient.completionSuggestions(from: listResponse, text: text)
+        #expect(listItems.count == 1)
+        #expect(listItems[0].label == "title: String")
+        #expect(listItems[0].insertText == "title")
+        #expect(listItems[0].filterText == "title")
+        #expect(listItems[0].replacementRange == NSRange(location: 6, length: 2))
+
+        let arrayResponse: [String: Any] = [
+            "result": [[
+                "label": "map",
+                "insertText": "map(${1:transform})$0",
+                "insertTextFormat": 2
+            ]]
+        ]
+        let arrayItems = LSPClient.completionSuggestions(from: arrayResponse, text: text)
+        #expect(arrayItems.map(\.insertText) == ["map(transform)"])
+    }
+
+    @Test("LSPClient converts UTF-16 editor positions to negotiated LSP encodings")
+    func lspClientConvertsPositionEncodings() {
+        let text = "😀abc"
+        #expect(LSPClient.characterOffset(
+            in: text,
+            line: 0,
+            utf16Character: 2,
+            positionEncoding: "utf-16"
+        ) == 2)
+        #expect(LSPClient.characterOffset(
+            in: text,
+            line: 0,
+            utf16Character: 2,
+            positionEncoding: "utf-8"
+        ) == 4)
+        #expect(LSPClient.characterOffset(
+            in: text,
+            line: 0,
+            utf16Character: 2,
+            positionEncoding: "utf-32"
+        ) == 1)
     }
 
     @Test("CodeCompletionService supports async completions blending")
@@ -943,7 +1022,7 @@ struct RollCodeTests {
             in: text,
             language: .swift
         )
-        #expect(matches.contains("title"))
+        #expect(matches.contains(where: { $0.insertText == "title" }))
     }
 }
 

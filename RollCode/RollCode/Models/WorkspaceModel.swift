@@ -98,6 +98,7 @@ final class WorkspaceModel {
 
     func openWorkspace(_ url: URL) {
         let standardizedURL = url.standardizedFileURL
+        LSPManager.shared.activateWorkspace(standardizedURL)
         rootURL = standardizedURL
         fileFilter = ""
         defaults.set(standardizedURL.path, forKey: Self.lastWorkspacePathKey)
@@ -284,6 +285,7 @@ final class WorkspaceModel {
     func completeSaveActiveDocumentAs(destination: URL) {
         guard let document = documentBeingSavedAs else { return }
         savingDocumentID = nil
+        LSPManager.shared.closeDocument(document.url)
         document.url = destination
         document.markSaved(modificationDate: destination.modificationDate)
         refreshTree()
@@ -351,6 +353,7 @@ final class WorkspaceModel {
 
     func forceCloseDocument(_ document: EditorDocument) {
         guard let index = documents.firstIndex(where: { $0.id == document.id }) else { return }
+        LSPManager.shared.closeDocument(document.url)
         documents.remove(at: index)
         if activeDocumentID == document.id {
             activeDocumentID = documents.indices.contains(index) ? documents[index].id : documents.last?.id
@@ -530,11 +533,15 @@ final class WorkspaceModel {
         }
 
         let sourcePrefix = source.path.hasSuffix("/") ? source.path : source.path + "/"
+        let renamedDocumentURLs = documents.compactMap { document -> URL? in
+            document.url == source || document.url.path.hasPrefix(sourcePrefix) ? document.url : nil
+        }
         do {
             try FileManager.default.moveItem(at: source, to: destination)
         } catch {
             throw .moveFailed(error.localizedDescription)
         }
+        renamedDocumentURLs.forEach { LSPManager.shared.closeDocument($0) }
 
         for document in documents {
             if document.url == source {

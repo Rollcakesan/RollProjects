@@ -11,6 +11,7 @@ struct CodeEditorView: NSViewRepresentable {
     var gitAddedLines: Set<Int> = []
     var gitModifiedLines: Set<Int> = []
     var documentURL: URL? = nil
+    var workspaceURL: URL? = nil
     let tabWidth: Int
     let fontSize: CGFloat
 
@@ -357,6 +358,7 @@ struct CodeEditorView: NSViewRepresentable {
                     in: textView.string,
                     language: self.parent.language,
                     fileURL: self.parent.documentURL,
+                    workspaceURL: self.parent.workspaceURL,
                     line: lineNumber,
                     character: columnNumber
                 )

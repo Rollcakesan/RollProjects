@@ -111,6 +111,10 @@ struct RollCodeApp: App {
 final class RollCodeAppDelegate: NSObject, NSApplicationDelegate {
     weak var workspace: WorkspaceModel?
 
+    func applicationWillTerminate(_ notification: Notification) {
+        LSPManager.shared.stopAllServers()
+    }
+
     func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
         guard let workspace, workspace.hasUnsavedDocuments else { return .terminateNow }
 

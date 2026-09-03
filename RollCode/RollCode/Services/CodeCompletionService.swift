@@ -1,5 +1,31 @@
 import Foundation
 
+struct CodeCompletionSuggestion: Hashable, Identifiable, Sendable {
+    let label: String
+    let insertText: String
+    let filterText: String
+    let detail: String?
+    let replacementRange: NSRange?
+
+    var id: String {
+        [label, insertText, detail ?? ""].joined(separator: "\u{0}")
+    }
+
+    init(
+        label: String,
+        insertText: String? = nil,
+        filterText: String? = nil,
+        detail: String? = nil,
+        replacementRange: NSRange? = nil
+    ) {
+        self.label = label
+        self.insertText = insertText ?? label
+        self.filterText = filterText ?? label
+        self.detail = detail
+        self.replacementRange = replacementRange
+    }
+}
+
 @MainActor
 final class CodeCompletionService {
     static let shared = CodeCompletionService()
@@ -28,16 +54,19 @@ final class CodeCompletionService {
         in text: String,
         language: CodeLanguage,
         fileURL: URL? = nil,
+        workspaceURL: URL? = nil,
         line: Int = 1,
         character: Int = 0
-    ) async -> [String] {
-        var lspItems: [String] = []
-        if language == .swift, let fileURL {
-            lspItems = await SourceKitLSPService.shared.requestCompletions(
+    ) async -> [CodeCompletionSuggestion] {
+        var lspItems: [CodeCompletionSuggestion] = []
+        if let fileURL {
+            lspItems = await LSPManager.shared.requestCompletions(
+                for: language,
                 url: fileURL,
                 text: text,
                 line: line,
-                character: character
+                character: character,
+                workspaceURL: workspaceURL
             )
         }
 
@@ -48,15 +77,17 @@ final class CodeCompletionService {
             return Array(lspItems.prefix(25))
         }
 
-        var filteredLSP = [String]()
+        var filteredLSP = [CodeCompletionSuggestion]()
         if !lspItems.isEmpty {
             let pLower = trimmedPrefix.lowercased()
             filteredLSP = lspItems.filter {
-                $0.lowercased().hasPrefix(pLower) && $0.caseInsensitiveCompare(trimmedPrefix) != .orderedSame
+                $0.filterText.lowercased().hasPrefix(pLower)
+                    && $0.insertText.caseInsensitiveCompare(trimmedPrefix) != .orderedSame
             }
         }
 
         let localMatches = self.localCompletions(for: trimmedPrefix, in: text, language: language)
+            .map { CodeCompletionSuggestion(label: $0) }
 
         if filteredLSP.isEmpty {
             return localMatches
@@ -65,7 +96,7 @@ final class CodeCompletionService {
         // Blend LSP items (highest priority) with local fallback completions
         var merged = filteredLSP
         for item in localMatches {
-            if !merged.contains(item) {
+            if !merged.contains(where: { $0.insertText == item.insertText }) {
                 merged.append(item)
             }
         }

@@ -7,7 +7,8 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
-		A10100082DBC1CD7BB090EE2 /* SourceKitLSPService.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1010008A922B2F06EF834AD /* SourceKitLSPService.swift */; };
+		A10100092DBC1CD7BB090EE2 /* LanguageServerConfig.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1010009A922B2F06EF834AD /* LanguageServerConfig.swift */; };
+		A10100082DBC1CD7BB090EE2 /* LSPManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1010008A922B2F06EF834AD /* LSPManager.swift */; };
 		A10100072DBC1CD7BB090EE2 /* FileWatcherService.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1010007A922B2F06EF834AD /* FileWatcherService.swift */; };
 		A10100062DBC1CD7BB090EE2 /* ShortcutCheatSheetView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1010006A922B2F06EF834AD /* ShortcutCheatSheetView.swift */; };
 		A10100052DBC1CD7BB090EE2 /* SuggestionOverlayController.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1010005A922B2F06EF834AD /* SuggestionOverlayController.swift */; };
@@ -55,7 +56,8 @@
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
-		B1010008A922B2F06EF834AD /* SourceKitLSPService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SourceKitLSPService.swift; sourceTree = "<group>"; };
+		B1010009A922B2F06EF834AD /* LanguageServerConfig.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LanguageServerConfig.swift; sourceTree = "<group>"; };
+		B1010008A922B2F06EF834AD /* LSPManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LSPManager.swift; sourceTree = "<group>"; };
 		B1010007A922B2F06EF834AD /* FileWatcherService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FileWatcherService.swift; sourceTree = "<group>"; };
 		B1010006A922B2F06EF834AD /* ShortcutCheatSheetView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShortcutCheatSheetView.swift; sourceTree = "<group>"; };
 		B1010005A922B2F06EF834AD /* SuggestionOverlayController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SuggestionOverlayController.swift; sourceTree = "<group>"; };
@@ -106,7 +108,8 @@
 				B1010003A922B2F06EF834AD /* SyntaxCheckService.swift */,
 				B1010004A922B2F06EF834AD /* CodeCompletionService.swift */,
 				B1010007A922B2F06EF834AD /* FileWatcherService.swift */,
-				B1010008A922B2F06EF834AD /* SourceKitLSPService.swift */,
+				B1010009A922B2F06EF834AD /* LanguageServerConfig.swift */,
+				B1010008A922B2F06EF834AD /* LSPManager.swift */,
 				B1010005A922B2F06EF834AD /* SuggestionOverlayController.swift */,
 				8F5C0D8DA9486ACF50CC812A /* CodexEventParser.swift */,
 				50BCDAC7F3D1F9F9A3BD1D9F /* GitDiffService.swift */,
@@ -313,7 +316,8 @@
 				A10100032DBC1CD7BB090EE2 /* SyntaxCheckService.swift in Sources */,
 				A10100042DBC1CD7BB090EE2 /* CodeCompletionService.swift in Sources */,
 				A10100072DBC1CD7BB090EE2 /* FileWatcherService.swift in Sources */,
-				A10100082DBC1CD7BB090EE2 /* SourceKitLSPService.swift in Sources */,
+				A10100092DBC1CD7BB090EE2 /* LanguageServerConfig.swift in Sources */,
+				A10100082DBC1CD7BB090EE2 /* LSPManager.swift in Sources */,
 				A10100052DBC1CD7BB090EE2 /* SuggestionOverlayController.swift in Sources */,
 				A10100022DBC1CD7BB090EE2 /* SettingsView.swift in Sources */,
 				A10100062DBC1CD7BB090EE2 /* ShortcutCheatSheetView.swift in Sources */,

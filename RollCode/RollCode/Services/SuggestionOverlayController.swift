@@ -7,7 +7,7 @@ final class SuggestionOverlayController {
     private weak var textView: NSTextView?
     private var hostingView: NSHostingView<SuggestionListView>?
 
-    private(set) var suggestions: [String] = []
+    private(set) var suggestions: [CodeCompletionSuggestion] = []
     private(set) var selectedIndex: Int = 0
     private(set) var prefixRange: NSRange = NSRange(location: NSNotFound, length: 0)
 
@@ -15,7 +15,7 @@ final class SuggestionOverlayController {
         window?.isVisible == true && !suggestions.isEmpty
     }
 
-    func show(suggestions: [String], prefixRange: NSRange, in textView: NSTextView) {
+    func show(suggestions: [CodeCompletionSuggestion], prefixRange: NSRange, in textView: NSTextView) {
         guard !suggestions.isEmpty else {
             hide()
             return
@@ -93,14 +93,16 @@ final class SuggestionOverlayController {
         return true
     }
 
-    private func commit(_ word: String) {
+    private func commit(_ suggestion: CodeCompletionSuggestion) {
         guard let textView, prefixRange.location != NSNotFound else { return }
         let nsText = textView.string as NSString
-        guard prefixRange.location + prefixRange.length <= nsText.length else { return }
+        let replacementRange = suggestion.replacementRange ?? prefixRange
+        guard replacementRange.location != NSNotFound,
+              replacementRange.location + replacementRange.length <= nsText.length else { return }
 
         let undoManager = textView.undoManager
         undoManager?.beginUndoGrouping()
-        textView.insertText(word, replacementRange: prefixRange)
+        textView.insertText(suggestion.insertText, replacementRange: replacementRange)
         undoManager?.endUndoGrouping()
         hide()
     }
@@ -133,7 +135,7 @@ final class SuggestionOverlayController {
         let screenRect = textView.convert(rect, to: nil)
         let windowScreenRect = parentWindow.convertToScreen(screenRect)
 
-        let width: CGFloat = 220
+        let width: CGFloat = 320
         let itemHeight: CGFloat = 22
         let height: CGFloat = min(CGFloat(suggestions.count) * itemHeight + 10, 150)
         let popupFrame = NSRect(
@@ -152,9 +154,9 @@ private final class NonActivatingSuggestionWindow: NSWindow {
 }
 
 private struct SuggestionListView: View {
-    let suggestions: [String]
+    let suggestions: [CodeCompletionSuggestion]
     let selectedIndex: Int
-    let onSelect: (String) -> Void
+    let onSelect: (CodeCompletionSuggestion) -> Void
 
     var body: some View {
         ScrollViewReader { proxy in
@@ -166,11 +168,17 @@ private struct SuggestionListView: View {
                             Image(systemName: "text.cursor")
                                 .font(.system(size: 9))
                                 .foregroundStyle(isSelected ? Color.white : RollCodeTheme.secondaryText)
-                            Text(item)
+                            Text(item.label)
                                 .font(.system(size: 11, design: .monospaced))
                                 .foregroundStyle(isSelected ? Color.white : RollCodeTheme.primaryText)
                                 .lineLimit(1)
                             Spacer()
+                            if let detail = item.detail, !detail.isEmpty {
+                                Text(detail)
+                                    .font(.system(size: 9, design: .monospaced))
+                                    .foregroundStyle(isSelected ? Color.white.opacity(0.75) : RollCodeTheme.secondaryText)
+                                    .lineLimit(1)
+                            }
                         }
                         .padding(.horizontal, 8)
                         .padding(.vertical, 3)
