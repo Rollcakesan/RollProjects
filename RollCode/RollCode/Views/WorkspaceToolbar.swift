@@ -64,21 +64,11 @@ struct WorkspaceToolbarContent: ToolbarContent {
             .disabled(workspace.rootURL == nil)
             .help("Git Changes (⇧⌘G)")
 
-            Button { workspace.chooseFolder() } label: {
-                Image(systemName: "folder")
-            }
-            .help("Open Folder")
-
             Button { workspace.refreshTree() } label: {
                 Image(systemName: "arrow.clockwise")
             }
             .disabled(workspace.rootURL == nil)
             .help("Refresh Files")
-
-            Button { workspace.createFile() } label: {
-                Image(systemName: "doc.badge.plus")
-            }
-            .help("New File")
 
             Button { terminal.isVisible.toggle() } label: {
                 Image(systemName: terminal.isVisible ? "terminal.fill" : "terminal")
