@@ -10,6 +10,7 @@ struct CodeEditorView: NSViewRepresentable {
     var errorLines: Set<Int> = []
     var gitAddedLines: Set<Int> = []
     var gitModifiedLines: Set<Int> = []
+    var documentURL: URL? = nil
     let tabWidth: Int
     let fontSize: CGFloat
 
@@ -311,8 +312,14 @@ struct CodeEditorView: NSViewRepresentable {
                 }
 
                 let charBefore = nsText.character(at: selectedRange.location - 1)
-                guard let unicodeScalar = UnicodeScalar(charBefore),
-                      CharacterSet.alphanumerics.contains(unicodeScalar) || unicodeScalar == "_" else {
+                guard let unicodeScalar = UnicodeScalar(charBefore) else {
+                    self.suggestionController.hide()
+                    return
+                }
+
+                let isDot = (unicodeScalar == ".")
+                let isWordChar = CharacterSet.alphanumerics.contains(unicodeScalar) || unicodeScalar == "_"
+                guard isDot || isWordChar else {
                     self.suggestionController.hide()
                     return
                 }
@@ -320,15 +327,42 @@ struct CodeEditorView: NSViewRepresentable {
                 let lineRange = nsText.lineRange(for: NSRange(location: selectedRange.location, length: 0))
                 let prefixRange = NSRange(location: lineRange.location, length: selectedRange.location - lineRange.location)
                 let linePrefix = nsText.substring(with: prefixRange)
-                let delimiters = CharacterSet.alphanumerics.union(CharacterSet(charactersIn: "_")).inverted
-                guard let lastWord = linePrefix.components(separatedBy: delimiters).last,
-                      !lastWord.isEmpty else {
-                    self.suggestionController.hide()
-                    return
+
+                // Calculate 1-based line and 0-based character column
+                var lineNumber = 1
+                var scanLoc = 0
+                while scanLoc < lineRange.location {
+                    scanLoc = NSMaxRange(nsText.lineRange(for: NSRange(location: scanLoc, length: 0)))
+                    lineNumber += 1
+                }
+                let columnNumber = selectedRange.location - lineRange.location
+
+                let lastWord: String
+                let wordRange: NSRange
+                if isDot {
+                    lastWord = ""
+                    wordRange = NSRange(location: selectedRange.location, length: 0)
+                } else {
+                    let delimiters = CharacterSet.alphanumerics.union(CharacterSet(charactersIn: "_")).inverted
+                    guard let word = linePrefix.components(separatedBy: delimiters).last, !word.isEmpty else {
+                        self.suggestionController.hide()
+                        return
+                    }
+                    lastWord = word
+                    wordRange = NSRange(location: selectedRange.location - word.utf16.count, length: word.utf16.count)
                 }
 
-                let wordRange = NSRange(location: selectedRange.location - lastWord.utf16.count, length: lastWord.utf16.count)
-                let suggestions = CodeCompletionService.shared.completions(for: lastWord, in: textView.string, language: self.parent.language)
+                let suggestions = await CodeCompletionService.shared.completions(
+                    for: lastWord,
+                    in: textView.string,
+                    language: self.parent.language,
+                    fileURL: self.parent.documentURL,
+                    line: lineNumber,
+                    character: columnNumber
+                )
+
+                guard !Task.isCancelled, textView.selectedRange().location == selectedRange.location else { return }
+
                 if !suggestions.isEmpty {
                     self.suggestionController.show(suggestions: suggestions, prefixRange: wordRange, in: textView)
                 } else {

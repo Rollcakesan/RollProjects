@@ -23,7 +23,60 @@ final class CodeCompletionService {
         }
     }
 
+    func completions(
+        for prefix: String,
+        in text: String,
+        language: CodeLanguage,
+        fileURL: URL? = nil,
+        line: Int = 1,
+        character: Int = 0
+    ) async -> [String] {
+        var lspItems: [String] = []
+        if language == .swift, let fileURL {
+            lspItems = await SourceKitLSPService.shared.requestCompletions(
+                url: fileURL,
+                text: text,
+                line: line,
+                character: character
+            )
+        }
+
+        let trimmedPrefix = prefix.trimmingCharacters(in: .whitespacesAndNewlines)
+
+        // Dot completion with empty prefix (immediately after typing '.')
+        if trimmedPrefix.isEmpty {
+            return Array(lspItems.prefix(25))
+        }
+
+        var filteredLSP = [String]()
+        if !lspItems.isEmpty {
+            let pLower = trimmedPrefix.lowercased()
+            filteredLSP = lspItems.filter {
+                $0.lowercased().hasPrefix(pLower) && $0.caseInsensitiveCompare(trimmedPrefix) != .orderedSame
+            }
+        }
+
+        let localMatches = self.localCompletions(for: trimmedPrefix, in: text, language: language)
+
+        if filteredLSP.isEmpty {
+            return localMatches
+        }
+
+        // Blend LSP items (highest priority) with local fallback completions
+        var merged = filteredLSP
+        for item in localMatches {
+            if !merged.contains(item) {
+                merged.append(item)
+            }
+        }
+        return Array(merged.prefix(25))
+    }
+
     func completions(for prefix: String, in text: String, language: CodeLanguage) -> [String] {
+        localCompletions(for: prefix, in: text, language: language)
+    }
+
+    func localCompletions(for prefix: String, in text: String, language: CodeLanguage) -> [String] {
         let prefix = prefix.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !prefix.isEmpty else { return [] }
 

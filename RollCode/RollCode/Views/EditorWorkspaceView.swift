@@ -232,6 +232,7 @@ private struct EditorDocumentView: View {
                     errorLines: Set(document.diagnostics.map(\.line)),
                     gitAddedLines: document.gitAddedLines,
                     gitModifiedLines: document.gitModifiedLines,
+                    documentURL: document.url,
                     tabWidth: workspace.tabWidth,
                     fontSize: workspace.fontSize
                 )

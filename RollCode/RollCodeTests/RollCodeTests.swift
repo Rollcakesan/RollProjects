@@ -914,6 +914,37 @@ struct RollCodeTests {
         #expect(added.contains(12))
         #expect(!added.contains(10))
     }
+
+    @Test("SourceKitLSPService extracts JSON-RPC messages correctly")
+    func sourceKitLSPExtractsJSONRPCMessages() throws {
+        let jsonString = "{\"jsonrpc\":\"2.0\",\"id\":42,\"result\":{\"items\":[{\"label\":\"title\"}]}}"
+        let jsonBytes = jsonString.data(using: .utf8)!
+        let headerString = "Content-Length: \(jsonBytes.count)\r\n\r\n"
+        var buffer = headerString.data(using: .utf8)! + jsonBytes
+
+        let message = SourceKitLSPService.extractMessage(from: &buffer)
+        #expect(message != nil)
+        #expect((message?["id"] as? NSNumber)?.intValue == 42)
+        #expect(buffer.isEmpty)
+    }
+
+    @Test("CodeCompletionService supports async completions blending")
+    @MainActor
+    func codeCompletionAsyncBlending() async {
+        let text = """
+        struct Book {
+            let title: String
+            func read() {}
+        }
+        let b = Book(title: "Swift")
+        """
+        let matches = await CodeCompletionService.shared.completions(
+            for: "tit",
+            in: text,
+            language: .swift
+        )
+        #expect(matches.contains("title"))
+    }
 }
 
 @MainActor
