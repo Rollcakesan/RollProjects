@@ -26,9 +26,9 @@ struct RollCodeApp: App {
                         workspace.checkForExternalChanges()
                     }
                 }
-                .frame(minWidth: agent.isVisible ? 1080 : 860, minHeight: 560)
+                .frame(minWidth: agent.isVisible ? 1160 : 860, minHeight: 560)
         }
-        .defaultSize(width: 1280, height: 820)
+        .defaultSize(width: 1400, height: 860)
         .windowToolbarStyle(.unified(showsTitle: false))
         .commands {
             CommandGroup(replacing: .newItem) {
