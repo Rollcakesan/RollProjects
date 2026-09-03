@@ -45,7 +45,7 @@ struct StatusBarView: View {
         .foregroundStyle(RollCodeTheme.secondaryText)
         .padding(.horizontal, 10)
         .frame(height: 23)
-        .background(RollCodeTheme.windowBackground)
+        .background(.bar)
         .overlay(alignment: .top) { RollCodeTheme.divider.frame(height: 1) }
     }
 }

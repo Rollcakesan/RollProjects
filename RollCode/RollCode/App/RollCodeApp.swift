@@ -98,6 +98,12 @@ struct RollCodeApp: App {
                     Text("8 Spaces").tag(8)
                 }
             }
+            CommandGroup(replacing: .help) {
+                Button("Keyboard Shortcuts") {
+                    workspace.isShortcutCheatSheetPresented = true
+                }
+                .keyboardShortcut("/", modifiers: [.command, .shift])
+            }
         }
     }
 }

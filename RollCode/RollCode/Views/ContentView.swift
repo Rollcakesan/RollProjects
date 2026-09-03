@@ -45,65 +45,14 @@ struct ContentView: View {
         .toolbar {
             WorkspaceToolbarContent()
         }
-        .alert("RollCode", isPresented: alertBinding) {
-            Button("OK", role: .cancel) { workspace.alertMessage = nil }
-        } message: {
-            Text(workspace.alertMessage ?? "")
-        }
-        .alert("Rename", isPresented: renameBinding) {
-            TextField("New name", text: $workspace.renamingName)
-            Button("Rename") { workspace.confirmRename() }
-            Button("Cancel", role: .cancel) { workspace.cancelRename() }
-        } message: {
-            Text("Enter a new name for \(workspace.renamingURL?.lastPathComponent ?? "this item").")
-        }
-        .alert(workspace.creatingItemIsDirectory ? "New Folder" : "New File", isPresented: createBinding) {
-            TextField("Name", text: $workspace.creatingItemName)
-            Button("Create") { workspace.confirmCreateItem() }
-            Button("Cancel", role: .cancel) { workspace.cancelCreateItem() }
-        } message: {
-            Text("Enter a name for the new \(workspace.creatingItemIsDirectory ? "folder" : "file").")
-        }
-        .sheet(isPresented: $workspace.isQuickOpenPresented) {
-            QuickOpenView(isPresented: $workspace.isQuickOpenPresented)
-        }
-        .sheet(isPresented: $workspace.isWorkspaceSearchPresented) {
-            WorkspaceSearchView(isPresented: $workspace.isWorkspaceSearchPresented)
-        }
-        .sheet(isPresented: $workspace.isGitChangesPresented) {
-            GitChangesView(isPresented: $workspace.isGitChangesPresented)
-        }
-        .confirmationDialog(
-            "Save changes to \(workspace.unconfirmedClosingDocument?.name ?? "file")?",
-            isPresented: confirmCloseBinding,
-            titleVisibility: .visible
-        ) {
-            Button("Save") { workspace.confirmCloseDocument(save: true) }
-            Button("Don't Save", role: .destructive) { workspace.confirmCloseDocument(save: false) }
-            Button("Cancel", role: .cancel) { workspace.cancelCloseDocument() }
-        } message: {
-            Text("Your changes will be lost if you close this tab without saving.")
-        }
-        .confirmationDialog(
-            "Move \(workspace.deletingURL?.lastPathComponent ?? "item") to Trash?",
-            isPresented: deleteBinding,
-            titleVisibility: .visible
-        ) {
-            Button("Move to Trash", role: .destructive) { workspace.confirmDeleteItem() }
-            Button("Cancel", role: .cancel) { workspace.cancelDeleteItem() }
-        } message: {
-            Text("The item can be recovered from Trash.")
-        }
-        .confirmationDialog(
-            "\(workspace.externalConflict?.documentName ?? "File") changed on disk.",
-            isPresented: externalConflictBinding,
-            titleVisibility: .visible
-        ) {
-            Button("Reload from Disk") { workspace.resolveExternalConflict(reload: true) }
-            Button("Keep Editor Version", role: .cancel) { workspace.resolveExternalConflict(reload: false) }
-        } message: {
-            Text("Reload the file or keep the changes currently open in RollCode?")
-        }
+        .workspaceModals(
+            alertBinding: alertBinding,
+            renameBinding: renameBinding,
+            createBinding: createBinding,
+            confirmCloseBinding: confirmCloseBinding,
+            deleteBinding: deleteBinding,
+            externalConflictBinding: externalConflictBinding
+        )
         .fileExporter(
             isPresented: $workspace.isSavingActiveDocumentAs,
             document: workspace.documentBeingSavedAs.map { TextDocumentFile(text: $0.text) },
@@ -337,5 +286,101 @@ private struct SplitDivider: View {
                         startSize = 0
                     }
             )
+    }
+}
+
+extension View {
+    func workspaceModals(
+        alertBinding: Binding<Bool>,
+        renameBinding: Binding<Bool>,
+        createBinding: Binding<Bool>,
+        confirmCloseBinding: Binding<Bool>,
+        deleteBinding: Binding<Bool>,
+        externalConflictBinding: Binding<Bool>
+    ) -> some View {
+        modifier(WorkspaceModalsModifier(
+            alertBinding: alertBinding,
+            renameBinding: renameBinding,
+            createBinding: createBinding,
+            confirmCloseBinding: confirmCloseBinding,
+            deleteBinding: deleteBinding,
+            externalConflictBinding: externalConflictBinding
+        ))
+    }
+}
+
+private struct WorkspaceModalsModifier: ViewModifier {
+    @Environment(WorkspaceModel.self) private var workspace
+    @Binding var alertBinding: Bool
+    @Binding var renameBinding: Bool
+    @Binding var createBinding: Bool
+    @Binding var confirmCloseBinding: Bool
+    @Binding var deleteBinding: Bool
+    @Binding var externalConflictBinding: Bool
+
+    func body(content: Content) -> some View {
+        content
+            .alert("RollCode", isPresented: $alertBinding) {
+                Button("OK", role: .cancel) { workspace.alertMessage = nil }
+            } message: {
+                Text(workspace.alertMessage ?? "")
+            }
+            .alert("Rename", isPresented: $renameBinding) {
+                TextField("New name", text: Bindable(workspace).renamingName)
+                Button("Rename") { workspace.confirmRename() }
+                Button("Cancel", role: .cancel) { workspace.cancelRename() }
+            } message: {
+                Text("Enter a new name for \(workspace.renamingURL?.lastPathComponent ?? "this item").")
+            }
+            .alert(workspace.creatingItemIsDirectory ? "New Folder" : "New File", isPresented: $createBinding) {
+                TextField("Name", text: Bindable(workspace).creatingItemName)
+                Button("Create") { workspace.confirmCreateItem() }
+                Button("Cancel", role: .cancel) { workspace.cancelCreateItem() }
+            } message: {
+                Text("Enter a name for the new \(workspace.creatingItemIsDirectory ? "folder" : "file").")
+            }
+            .sheet(isPresented: Bindable(workspace).isQuickOpenPresented) {
+                QuickOpenView(isPresented: Bindable(workspace).isQuickOpenPresented)
+            }
+            .sheet(isPresented: Bindable(workspace).isWorkspaceSearchPresented) {
+                WorkspaceSearchView(isPresented: Bindable(workspace).isWorkspaceSearchPresented)
+            }
+            .sheet(isPresented: Bindable(workspace).isGitChangesPresented) {
+                GitChangesView(isPresented: Bindable(workspace).isGitChangesPresented)
+            }
+            .sheet(isPresented: Bindable(workspace).isShortcutCheatSheetPresented) {
+                ShortcutCheatSheetView()
+            }
+            .confirmationDialog(
+                "Save changes to \(workspace.unconfirmedClosingDocument?.name ?? "file")?",
+                isPresented: $confirmCloseBinding,
+                titleVisibility: .visible
+            ) {
+                Button("Save") { workspace.confirmCloseDocument(save: true) }
+                Button("Don't Save", role: .destructive) { workspace.confirmCloseDocument(save: false) }
+                Button("Cancel", role: .cancel) { workspace.cancelCloseDocument() }
+            } message: {
+                Text("Your changes will be lost if you close this tab without saving.")
+            }
+            .confirmationDialog(
+                "Move \(workspace.deletingURL?.lastPathComponent ?? "item") to Trash?",
+                isPresented: $deleteBinding,
+                titleVisibility: .visible
+            ) {
+                Button("Move to Trash", role: .destructive) { workspace.confirmDeleteItem() }
+                Button("Cancel", role: .cancel) { workspace.cancelDeleteItem() }
+            } message: {
+                Text("The item can be recovered from Trash.")
+            }
+            .confirmationDialog(
+                "\(workspace.externalConflict?.documentName ?? "File") changed on disk.",
+                isPresented: $externalConflictBinding,
+                titleVisibility: .visible
+            ) {
+                Button("Reload from Disk") { workspace.resolveExternalConflict(reload: true) }
+                Button("Keep Editor Version", role: .cancel) { workspace.resolveExternalConflict(reload: false) }
+            } message: {
+                Text("Reload the file or keep the changes currently open in RollCode?")
+            }
     }
 }

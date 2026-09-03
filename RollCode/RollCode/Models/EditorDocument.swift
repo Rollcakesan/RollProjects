@@ -18,6 +18,8 @@ final class EditorDocument: Identifiable {
     var isPreviewMode = false
     var diagnostics: [SyntaxDiagnostic] = []
     var isCheckingSyntax: Bool = false
+    var gitAddedLines: Set<Int> = []
+    var gitModifiedLines: Set<Int> = []
     private var cachedLineCount: Int
 
     init(url: URL, text: String, diskModificationDate: Date? = nil) {

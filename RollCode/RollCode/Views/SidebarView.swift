@@ -48,7 +48,7 @@ struct SidebarView: View {
                 }
             }
         }
-        .background(RollCodeTheme.sidebarBackground)
+        .background(.ultraThinMaterial)
     }
 }
 

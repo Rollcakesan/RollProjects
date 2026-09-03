@@ -7,6 +7,7 @@ struct AgentPanelView: View {
     @State private var prompt = ""
     @State private var codexPromptDraft = ""
     @State private var geminiPromptDraft = ""
+    @State private var fileMentionQuery: String?
     @FocusState private var promptFocused: Bool
 
     var body: some View {
@@ -423,12 +424,56 @@ struct AgentPanelView: View {
     private var composer: some View {
         VStack(spacing: 0) {
             Divider().overlay(RollCodeTheme.divider)
+
+            // File mention suggestions
+            if let query = fileMentionQuery, let root = workspace.rootNode {
+                let matches = Array(root.matchingFiles(query).prefix(5))
+                if !matches.isEmpty {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("FILES")
+                            .font(.system(size: 8, weight: .bold))
+                            .foregroundStyle(RollCodeTheme.accent)
+                            .padding(.horizontal, 6)
+                            .padding(.top, 2)
+
+                        ForEach(matches) { node in
+                            Button {
+                                insertFileMention(node)
+                            } label: {
+                                HStack(spacing: 6) {
+                                    Image(systemName: "doc.text")
+                                        .font(.system(size: 9))
+                                    Text(node.url.relativePath(from: root.url))
+                                        .font(.system(size: 10, design: .monospaced))
+                                        .lineLimit(1)
+                                    Spacer()
+                                }
+                                .padding(.horizontal, 6)
+                                .padding(.vertical, 3.5)
+                                .background(RollCodeTheme.elevatedBackground)
+                                .clipShape(RoundedRectangle(cornerRadius: 4))
+                            }
+                            .buttonStyle(.plain)
+                        }
+                    }
+                    .padding(5)
+                    .background(RollCodeTheme.windowBackground)
+                    .clipShape(RoundedRectangle(cornerRadius: 6))
+                    .overlay(RoundedRectangle(cornerRadius: 6).stroke(RollCodeTheme.divider))
+                    .padding(.horizontal, 9)
+                    .padding(.top, 5)
+                }
+            }
+
             HStack(alignment: .bottom, spacing: 7) {
-                TextField("Ask \(agent.selectedProvider.rawValue) to change this project…", text: $prompt, axis: .vertical)
+                TextField("Ask \(agent.selectedProvider.rawValue) to change this project… (use @file to reference)", text: $prompt, axis: .vertical)
                     .textFieldStyle(.plain)
                     .font(.system(size: 11))
                     .lineLimit(2...6)
                     .focused($promptFocused)
+                    .onChange(of: prompt) { _, newPrompt in
+                        checkFileMention(in: newPrompt)
+                    }
                     .onSubmit(submit)
                 Button(action: submit) {
                     Image(systemName: "arrow.up.circle.fill")
@@ -441,6 +486,26 @@ struct AgentPanelView: View {
             .padding(9)
         }
         .background(RollCodeTheme.windowBackground)
+    }
+
+    private func checkFileMention(in text: String) {
+        guard let lastWord = text.components(separatedBy: .whitespacesAndNewlines).last,
+              lastWord.hasPrefix("@") else {
+            fileMentionQuery = nil
+            return
+        }
+        fileMentionQuery = String(lastWord.dropFirst())
+    }
+
+    private func insertFileMention(_ node: FileNode) {
+        guard let root = workspace.rootNode else { return }
+        let relPath = node.url.relativePath(from: root.url)
+        if let lastAt = prompt.lastIndex(of: "@") {
+            prompt = String(prompt[..<lastAt]) + "@" + relPath + " "
+        } else {
+            prompt += "@" + relPath + " "
+        }
+        fileMentionQuery = nil
     }
 
     private var unavailableView: some View {
@@ -476,8 +541,30 @@ struct AgentPanelView: View {
 
     private func submit() {
         guard canSubmit, let rootURL = workspace.rootURL, workspace.saveAllDocuments() else { return }
-        let request = prompt
+        var request = prompt
         prompt = ""
+        fileMentionQuery = nil
+
+        // Resolve @file mentions and attach contents into prompt
+        let pattern = #"(?:^|\s)@([A-Za-z0-9_./\-]+)"#
+        if let regex = try? NSRegularExpression(pattern: pattern) {
+            let nsReq = request as NSString
+            let matches = regex.matches(in: request, range: NSRange(location: 0, length: nsReq.length))
+            var referencedFiles: [String] = []
+            for match in matches {
+                guard match.numberOfRanges >= 2 else { continue }
+                let pathRange = match.range(at: 1)
+                let relPath = nsReq.substring(with: pathRange)
+                let targetURL = rootURL.appending(path: relPath)
+                if let content = try? String(contentsOf: targetURL, encoding: .utf8), content.count <= 100_000 {
+                    referencedFiles.append("[Context File: \(relPath)]\n```\n\(content)\n```")
+                }
+            }
+            if !referencedFiles.isEmpty {
+                request += "\n\n" + referencedFiles.joined(separator: "\n\n")
+            }
+        }
+
         agent.send(request, in: rootURL, activeFileURL: workspace.activeDocument?.url)
     }
 

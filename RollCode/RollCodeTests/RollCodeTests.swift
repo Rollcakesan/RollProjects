@@ -879,6 +879,41 @@ struct RollCodeTests {
         let fMatches = CodeCompletionService.shared.completions(for: "f", in: text, language: .swift)
         #expect(fMatches.first == "for" || fMatches.first == "func")
     }
+
+    @Test("WorkspaceModel supports tab reordering and closing other tabs")
+    @MainActor
+    func workspaceModelTabManagement() throws {
+        let workspace = WorkspaceModel()
+        let docA = EditorDocument(url: URL(fileURLWithPath: "/tmp/A.swift"), text: "A")
+        let docB = EditorDocument(url: URL(fileURLWithPath: "/tmp/B.swift"), text: "B")
+        let docC = EditorDocument(url: URL(fileURLWithPath: "/tmp/C.swift"), text: "C")
+
+        workspace.documents = [docA, docB, docC]
+        #expect(workspace.documents.map(\.name) == ["A.swift", "B.swift", "C.swift"])
+
+        // Move C to position 0
+        workspace.moveDocument(from: 2, to: 0)
+        #expect(workspace.documents.map(\.name) == ["C.swift", "A.swift", "B.swift"])
+
+        // Close others except A
+        workspace.closeOtherDocuments(except: docA)
+        #expect(workspace.documents.map(\.name) == ["A.swift"])
+    }
+
+    @Test("GitDiffService parses diff line numbers correctly")
+    func gitDiffServiceLineNumberParsing() throws {
+        let sampleDiff = """
+        @@ -10,3 +10,4 @@
+         let a = 1
+        +let b = 2
+        +let c = 3
+         let d = 4
+        """
+        let (added, _) = GitDiffService.diffLineNumbers(for: sampleDiff)
+        #expect(added.contains(11))
+        #expect(added.contains(12))
+        #expect(!added.contains(10))
+    }
 }
 
 @MainActor

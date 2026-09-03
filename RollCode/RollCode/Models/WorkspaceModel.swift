@@ -14,6 +14,7 @@ final class WorkspaceModel {
     var isQuickOpenPresented = false
     var isWorkspaceSearchPresented = false
     var isGitChangesPresented = false
+    var isShortcutCheatSheetPresented = false
     var isFolderPickerPresented = false
     var editorNavigationRequest: EditorNavigationRequest?
     var renamingURL: URL?
@@ -32,6 +33,7 @@ final class WorkspaceModel {
     private(set) var isLoadingTree = false
 
     var onWorkspaceChanged: (@MainActor @Sendable (URL) -> Void)?
+    @ObservationIgnored private var fileWatcher: FileWatcherService?
     @ObservationIgnored private let defaults: UserDefaults
     @ObservationIgnored private var isCheckingExternalChanges = false
     private static let lastWorkspacePathKey = "RollCode.lastWorkspacePath"
@@ -69,6 +71,8 @@ final class WorkspaceModel {
     }
 
     func clearLastWorkspace() {
+        fileWatcher?.stopWatching()
+        fileWatcher = nil
         defaults.removeObject(forKey: Self.lastWorkspacePathKey)
     }
 
@@ -98,6 +102,9 @@ final class WorkspaceModel {
         fileFilter = ""
         defaults.set(standardizedURL.path, forKey: Self.lastWorkspacePathKey)
         refreshTree()
+        fileWatcher = FileWatcherService(url: standardizedURL) { [weak self] in
+            self?.refreshTree()
+        }
         onWorkspaceChanged?(standardizedURL)
     }
 
@@ -202,8 +209,52 @@ final class WorkspaceModel {
             let document = EditorDocument(url: url, text: text, diskModificationDate: url.modificationDate)
             documents.append(document)
             activeDocumentID = document.id
+            updateGitDiffLines(for: document)
         } catch {
             alertMessage = "Could not open \(url.lastPathComponent): \(error.localizedDescription)"
+        }
+    }
+
+    func moveDocument(from sourceIndex: Int, to destinationIndex: Int) {
+        guard sourceIndex >= 0, sourceIndex < documents.count,
+              destinationIndex >= 0, destinationIndex < documents.count,
+              sourceIndex != destinationIndex else { return }
+        let doc = documents.remove(at: sourceIndex)
+        documents.insert(doc, at: destinationIndex)
+    }
+
+    func closeOtherDocuments(except target: EditorDocument) {
+        let others = documents.filter { $0.id != target.id }
+        for doc in others {
+            closeDocument(doc)
+        }
+    }
+
+    func closeDocumentsToTheRight(of target: EditorDocument) {
+        guard let index = documents.firstIndex(where: { $0.id == target.id }) else { return }
+        let rightDocs = Array(documents[(index + 1)...])
+        for doc in rightDocs {
+            closeDocument(doc)
+        }
+    }
+
+    func updateGitDiffLines(for document: EditorDocument) {
+        guard let rootURL else { return }
+        let docName = document.name
+        let docURL = document.url
+        Task.detached(priority: .utility) {
+            guard let change = try? GitDiffService.changes(in: rootURL).first(where: { $0.path == docName || rootURL.appending(path: $0.path) == docURL }) else {
+                await MainActor.run {
+                    document.gitAddedLines = []
+                    document.gitModifiedLines = []
+                }
+                return
+            }
+            let (added, modified) = GitDiffService.diffLineNumbers(for: change.diff)
+            await MainActor.run {
+                document.gitAddedLines = added
+                document.gitModifiedLines = modified
+            }
         }
     }
 
@@ -247,6 +298,7 @@ final class WorkspaceModel {
         do {
             try document.text.write(to: document.url, atomically: true, encoding: .utf8)
             document.markSaved(modificationDate: document.url.modificationDate)
+            updateGitDiffLines(for: document)
 
             // Non-blocking syntax check on save
             let docURL = document.url

@@ -7,6 +7,8 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		A10100072DBC1CD7BB090EE2 /* FileWatcherService.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1010007A922B2F06EF834AD /* FileWatcherService.swift */; };
+		A10100062DBC1CD7BB090EE2 /* ShortcutCheatSheetView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1010006A922B2F06EF834AD /* ShortcutCheatSheetView.swift */; };
 		A10100052DBC1CD7BB090EE2 /* SuggestionOverlayController.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1010005A922B2F06EF834AD /* SuggestionOverlayController.swift */; };
 		A10100042DBC1CD7BB090EE2 /* CodeCompletionService.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1010004A922B2F06EF834AD /* CodeCompletionService.swift */; };
 		A10100032DBC1CD7BB090EE2 /* SyntaxCheckService.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1010003A922B2F06EF834AD /* SyntaxCheckService.swift */; };
@@ -52,6 +54,8 @@
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
+		B1010007A922B2F06EF834AD /* FileWatcherService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FileWatcherService.swift; sourceTree = "<group>"; };
+		B1010006A922B2F06EF834AD /* ShortcutCheatSheetView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShortcutCheatSheetView.swift; sourceTree = "<group>"; };
 		B1010005A922B2F06EF834AD /* SuggestionOverlayController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SuggestionOverlayController.swift; sourceTree = "<group>"; };
 		B1010004A922B2F06EF834AD /* CodeCompletionService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CodeCompletionService.swift; sourceTree = "<group>"; };
 		B1010003A922B2F06EF834AD /* SyntaxCheckService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SyntaxCheckService.swift; sourceTree = "<group>"; };
@@ -99,6 +103,7 @@
 				B1010001A922B2F06EF834AD /* GeminiAuthService.swift */,
 				B1010003A922B2F06EF834AD /* SyntaxCheckService.swift */,
 				B1010004A922B2F06EF834AD /* CodeCompletionService.swift */,
+				B1010007A922B2F06EF834AD /* FileWatcherService.swift */,
 				B1010005A922B2F06EF834AD /* SuggestionOverlayController.swift */,
 				8F5C0D8DA9486ACF50CC812A /* CodexEventParser.swift */,
 				50BCDAC7F3D1F9F9A3BD1D9F /* GitDiffService.swift */,
@@ -132,6 +137,7 @@
 				838061E9A81A90C22BBD98D3 /* QuickOpenView.swift */,
 				F19EA110FDE9DCE79DB3D1D8 /* SidebarView.swift */,
 				B1010002A922B2F06EF834AD /* SettingsView.swift */,
+				B1010006A922B2F06EF834AD /* ShortcutCheatSheetView.swift */,
 				95C30C09271F19837D613065 /* StatusBarView.swift */,
 				06E3E5E96609BAC7EC257FA5 /* TerminalView.swift */,
 				FD214D2A1312129925D5096C /* WorkspaceSearchView.swift */,
@@ -303,8 +309,10 @@
 				A10100012DBC1CD7BB090EE2 /* GeminiAuthService.swift in Sources */,
 				A10100032DBC1CD7BB090EE2 /* SyntaxCheckService.swift in Sources */,
 				A10100042DBC1CD7BB090EE2 /* CodeCompletionService.swift in Sources */,
+				A10100072DBC1CD7BB090EE2 /* FileWatcherService.swift in Sources */,
 				A10100052DBC1CD7BB090EE2 /* SuggestionOverlayController.swift in Sources */,
 				A10100022DBC1CD7BB090EE2 /* SettingsView.swift in Sources */,
+				A10100062DBC1CD7BB090EE2 /* ShortcutCheatSheetView.swift in Sources */,
 				363D65C9942CB9841923327A /* CodexEventParser.swift in Sources */,
 				58E50C1CFBA9F0F95EB8BDC5 /* ContentView.swift in Sources */,
 				236857F5CF1898DC2CC54FD8 /* EditorDocument.swift in Sources */,

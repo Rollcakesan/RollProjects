@@ -52,6 +52,33 @@ enum GitDiffService {
         .sorted { $0.path.localizedStandardCompare($1.path) == .orderedAscending }
     }
 
+    static func diffLineNumbers(for diff: String) -> (added: Set<Int>, modified: Set<Int>) {
+        var added = Set<Int>()
+        var modified = Set<Int>()
+        let lines = diff.components(separatedBy: .newlines)
+        var currentNewLine = 0
+
+        for line in lines {
+            if line.hasPrefix("@@") {
+                let parts = line.components(separatedBy: " ")
+                if parts.count >= 3, let plusPart = parts.first(where: { $0.hasPrefix("+") }) {
+                    let numStr = plusPart.dropFirst().components(separatedBy: ",")[0]
+                    if let start = Int(numStr) {
+                        currentNewLine = start
+                    }
+                }
+            } else if line.hasPrefix("+") && !line.hasPrefix("+++") {
+                added.insert(currentNewLine)
+                currentNewLine += 1
+            } else if line.hasPrefix("-") && !line.hasPrefix("---") {
+                // deletion marker
+            } else if line.hasPrefix(" ") {
+                currentNewLine += 1
+            }
+        }
+        return (added, modified)
+    }
+
     static func changedPaths(in rootURL: URL) throws -> [String] {
         let repository = try repositoryContext(for: rootURL)
         let statusOutput = try runGit(

@@ -22,17 +22,33 @@ struct EditorWorkspaceView: View {
 
 private struct EditorTabBar: View {
     @Environment(WorkspaceModel.self) private var workspace
+    @State private var draggedDocumentID: UUID?
 
     var body: some View {
         ScrollView(.horizontal, showsIndicators: false) {
             HStack(spacing: 0) {
-                ForEach(workspace.documents) { document in
+                ForEach(Array(workspace.documents.enumerated()), id: \.element.id) { index, document in
                     EditorTab(
                         document: document,
                         isActive: workspace.activeDocumentID == document.id,
                         select: { workspace.activeDocumentID = document.id },
-                        close: { workspace.closeDocument(document) }
+                        close: { workspace.closeDocument(document) },
+                        closeOthers: { workspace.closeOtherDocuments(except: document) },
+                        closeRight: { workspace.closeDocumentsToTheRight(of: document) },
+                        save: { workspace.save(document) }
                     )
+                    .onDrag {
+                        draggedDocumentID = document.id
+                        return NSItemProvider(object: document.id.uuidString as NSString)
+                    }
+                    .onDrop(of: [.text], delegate: TabDropDelegate(
+                        destinationIndex: index,
+                        documents: workspace.documents,
+                        draggedID: $draggedDocumentID,
+                        moveAction: { from, to in
+                            workspace.moveDocument(from: from, to: to)
+                        }
+                    ))
                 }
             }
         }
@@ -41,11 +57,33 @@ private struct EditorTabBar: View {
     }
 }
 
+private struct TabDropDelegate: DropDelegate {
+    let destinationIndex: Int
+    let documents: [EditorDocument]
+    @Binding var draggedID: UUID?
+    let moveAction: (Int, Int) -> Void
+
+    func dropEntered(info: DropInfo) {
+        guard let draggedID,
+              let sourceIndex = documents.firstIndex(where: { $0.id == draggedID }),
+              sourceIndex != destinationIndex else { return }
+        moveAction(sourceIndex, destinationIndex)
+    }
+
+    func performDrop(info: DropInfo) -> Bool {
+        draggedID = nil
+        return true
+    }
+}
+
 private struct EditorTab: View {
     let document: EditorDocument
     let isActive: Bool
     let select: () -> Void
     let close: () -> Void
+    let closeOthers: () -> Void
+    let closeRight: () -> Void
+    let save: () -> Void
 
     var body: some View {
         HStack(spacing: 7) {
@@ -79,6 +117,12 @@ private struct EditorTab: View {
         .contentShape(Rectangle())
         .onTapGesture(perform: select)
         .contextMenu {
+            Button("Close") { close() }
+            Button("Close Others") { closeOthers() }
+            Button("Close to the Right") { closeRight() }
+            Divider()
+            Button("Save") { save() }
+            Divider()
             Button("Show in Finder") {
                 NSWorkspace.shared.activateFileViewerSelecting([document.url])
             }
@@ -186,6 +230,8 @@ private struct EditorDocumentView: View {
                     searchRequest: searchRequest,
                     navigationRequest: workspace.editorNavigationRequest,
                     errorLines: Set(document.diagnostics.map(\.line)),
+                    gitAddedLines: document.gitAddedLines,
+                    gitModifiedLines: document.gitModifiedLines,
                     tabWidth: workspace.tabWidth,
                     fontSize: workspace.fontSize
                 )
