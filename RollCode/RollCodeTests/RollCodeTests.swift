@@ -190,6 +190,39 @@ struct RollCodeTests {
         #expect(twoSpaces.selection.location == 4)
     }
 
+    @Test("EditorSmartEditing auto-dedents closing brace and performs line indent/dedent and soft backspace")
+    func editorSmartEditingIndentFeatures() throws {
+        // 1. Auto-dedent on '}'
+        let dedentBrace = try #require(EditorSmartEditing.edit(
+            for: "}",
+            in: "    ",
+            range: NSRange(location: 4, length: 0),
+            tabWidth: 4
+        ))
+        #expect(dedentBrace.replacement == "}")
+        #expect(dedentBrace.replacementRange?.location == 0)
+        #expect(dedentBrace.replacementRange?.length == 4)
+
+        // 2. Soft tab backspace (deletes 4 spaces in indentation)
+        let backspace = try #require(EditorSmartEditing.backspaceEdit(
+            in: "        code",
+            range: NSRange(location: 8, length: 0),
+            tabWidth: 4
+        ))
+        #expect(backspace.replacementRange?.location == 4)
+        #expect(backspace.replacementRange?.length == 4)
+
+        // 3. Multi-line indent with Tab
+        let source: NSString = "first\nsecond"
+        let indented = EditorSmartEditing.indentLines(in: source, range: NSRange(location: 0, length: source.length), tabWidth: 4)
+        #expect(indented.replacement == "    first\n    second")
+
+        // 4. Multi-line dedent with Shift+Tab
+        let indentedSource: NSString = "    first\n    second"
+        let dedented = EditorSmartEditing.dedentLines(in: indentedSource, range: NSRange(location: 0, length: indentedSource.length), tabWidth: 4)
+        #expect(dedented.replacement == "first\nsecond")
+    }
+
     @Test("WorkspaceSearch finds case-insensitive matches by line and replaces literal text")
     func workspaceSearchFindsAndReplacesLiteralText() throws {
         let root = URL(fileURLWithPath: "/tmp/project", isDirectory: true)

@@ -152,7 +152,54 @@ struct CodeEditorView: NSViewRepresentable {
                     break
                 }
             }
+
+            // Multi-line indent with Tab
+            if commandSelector == #selector(NSResponder.insertTab(_:)) {
+                let selectedRange = textView.selectedRange()
+                let nsText = textView.string as NSString
+                if selectedRange.length > 0 {
+                    let edit = EditorSmartEditing.indentLines(in: nsText, range: selectedRange, tabWidth: parent.tabWidth)
+                    applyEdit(edit, in: textView)
+                    return true
+                }
+            }
+
+            // Dedent with Shift + Tab
+            if commandSelector == #selector(NSResponder.insertBacktab(_:)) {
+                let selectedRange = textView.selectedRange()
+                let nsText = textView.string as NSString
+                let edit = EditorSmartEditing.dedentLines(in: nsText, range: selectedRange, tabWidth: parent.tabWidth)
+                applyEdit(edit, in: textView)
+                return true
+            }
+
+            // Soft Tab Backspace: delete tabWidth spaces if inside indent
+            if commandSelector == #selector(NSResponder.deleteBackward(_:)) {
+                let selectedRange = textView.selectedRange()
+                let nsText = textView.string as NSString
+                if let edit = EditorSmartEditing.backspaceEdit(in: nsText, range: selectedRange, tabWidth: parent.tabWidth) {
+                    applyEdit(edit, in: textView)
+                    return true
+                }
+            }
+
             return false
+        }
+
+        private func applyEdit(_ edit: EditorSmartEdit, in textView: NSTextView) {
+            let targetRange = edit.replacementRange ?? textView.selectedRange()
+            isPerformingSmartEdit = true
+            let undoManager = textView.undoManager
+            undoManager?.beginUndoGrouping()
+            textView.insertText(edit.replacement, replacementRange: targetRange)
+            textView.setSelectedRange(edit.selection)
+            undoManager?.endUndoGrouping()
+            isPerformingSmartEdit = false
+            isInternalTextChange = true
+            parent.text = textView.string
+            isInternalTextChange = false
+            applyHighlighting(language: parent.language, searchTerm: parent.searchTerm)
+            ruler?.needsDisplay = true
         }
 
         private func scheduleCompletion(in textView: NSTextView) {
@@ -221,18 +268,12 @@ struct CodeEditorView: NSViewRepresentable {
                     tabWidth: parent.tabWidth
                   ) else { return true }
 
-            isPerformingSmartEdit = true
-            let undoManager = textView.undoManager
-            undoManager?.beginUndoGrouping()
-            textView.insertText(edit.replacement, replacementRange: affectedCharRange)
-            textView.setSelectedRange(edit.selection)
-            undoManager?.endUndoGrouping()
-            isPerformingSmartEdit = false
-            isInternalTextChange = true
-            parent.text = textView.string
-            isInternalTextChange = false
-            applyHighlighting(language: parent.language, searchTerm: parent.searchTerm)
-            ruler?.needsDisplay = true
+            let resolvedEdit = EditorSmartEdit(
+                replacement: edit.replacement,
+                selection: edit.selection,
+                replacementRange: edit.replacementRange ?? affectedCharRange
+            )
+            applyEdit(resolvedEdit, in: textView)
             return false
         }
 
