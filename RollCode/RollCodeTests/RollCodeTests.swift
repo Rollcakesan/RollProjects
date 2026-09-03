@@ -834,9 +834,13 @@ struct RollCodeTests {
         let bufferMatches = CodeCompletionService.shared.completions(for: "custom", in: text, language: .swift)
         #expect(bufferMatches.contains("customUserIdentifier"))
 
-        // Test 3: Short prefix (< 2 chars) returns empty
-        let shortMatches = CodeCompletionService.shared.completions(for: "c", in: text, language: .swift)
-        #expect(shortMatches.isEmpty)
+        // Test 3: 1-character prefix works
+        let oneCharMatches = CodeCompletionService.shared.completions(for: "g", in: text, language: .swift)
+        #expect(oneCharMatches.contains("guard"))
+
+        // Test 4: Empty prefix returns empty
+        let emptyMatches = CodeCompletionService.shared.completions(for: "", in: text, language: .swift)
+        #expect(emptyMatches.isEmpty)
     }
 }
 

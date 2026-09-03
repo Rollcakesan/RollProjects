@@ -25,7 +25,7 @@ final class CodeCompletionService {
 
     func completions(for prefix: String, in text: String, language: CodeLanguage) -> [String] {
         let prefix = prefix.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard prefix.count >= 2 else { return [] }
+        guard !prefix.isEmpty else { return [] }
 
         // Trigger background scan if needed
         updateCacheAsync(for: text)

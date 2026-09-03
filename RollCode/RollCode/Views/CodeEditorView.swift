@@ -167,7 +167,7 @@ struct CodeEditorView: NSViewRepresentable {
                 guard !Task.isCancelled, let self, let textView = self.textView else { return }
 
                 let selectedRange = textView.selectedRange()
-                guard selectedRange.length == 0, selectedRange.location >= 2 else {
+                guard selectedRange.length == 0, selectedRange.location >= 1 else {
                     self.suggestionController.hide()
                     return
                 }
@@ -189,7 +189,7 @@ struct CodeEditorView: NSViewRepresentable {
                 let linePrefix = nsText.substring(with: prefixRange)
                 let delimiters = CharacterSet.alphanumerics.union(CharacterSet(charactersIn: "_")).inverted
                 guard let lastWord = linePrefix.components(separatedBy: delimiters).last,
-                      lastWord.count >= 2 else {
+                      !lastWord.isEmpty else {
                     self.suggestionController.hide()
                     return
                 }
