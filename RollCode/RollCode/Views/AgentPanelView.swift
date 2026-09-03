@@ -5,6 +5,8 @@ struct AgentPanelView: View {
     @Environment(WorkspaceModel.self) private var workspace
     @Environment(TerminalSession.self) private var terminal
     @State private var prompt = ""
+    @State private var codexPromptDraft = ""
+    @State private var geminiPromptDraft = ""
     @FocusState private var promptFocused: Bool
 
     var body: some View {
@@ -84,9 +86,7 @@ struct AgentPanelView: View {
         HStack(spacing: 2) {
             ForEach(AgentProvider.allCases) { provider in
                 Button {
-                    withAnimation(.easeInOut(duration: 0.12)) {
-                        agent.selectProvider(provider)
-                    }
+                    selectProvider(provider)
                 } label: {
                     HStack(spacing: 3) {
                         Image(systemName: provider.iconName)
@@ -107,6 +107,17 @@ struct AgentPanelView: View {
         .padding(1.5)
         .background(RollCodeTheme.windowBackground)
         .clipShape(RoundedRectangle(cornerRadius: 4.5))
+    }
+
+    private func selectProvider(_ provider: AgentProvider) {
+        guard provider != agent.selectedProvider else { return }
+        if agent.selectedProvider == .codex {
+            codexPromptDraft = prompt
+        } else {
+            geminiPromptDraft = prompt
+        }
+        agent.selectProvider(provider)
+        prompt = (provider == .codex) ? codexPromptDraft : geminiPromptDraft
     }
 
     private var threadSwitcherMenu: some View {
@@ -375,7 +386,7 @@ struct AgentPanelView: View {
         VStack(spacing: 0) {
             Divider().overlay(RollCodeTheme.divider)
             HStack(alignment: .bottom, spacing: 7) {
-                TextField("Ask Codex to change this project…", text: $prompt, axis: .vertical)
+                TextField("Ask \(agent.selectedProvider.rawValue) to change this project…", text: $prompt, axis: .vertical)
                     .textFieldStyle(.plain)
                     .font(.system(size: 11))
                     .lineLimit(2...6)
@@ -433,8 +444,8 @@ struct AgentPanelView: View {
     }
 
     private func openChangedFile(_ path: String) {
-        guard let rootURL = workspace.rootURL else { return }
-        let url = path.hasPrefix("/") ? URL(fileURLWithPath: path) : rootURL.appendingPathComponent(path)
+        guard let workspaceURL = workspace.rootURL else { return }
+        let url = workspaceURL.appending(path: path)
         var isDirectory: ObjCBool = false
         guard FileManager.default.fileExists(atPath: url.path, isDirectory: &isDirectory), !isDirectory.boolValue else { return }
         workspace.openFile(url)
@@ -446,7 +457,7 @@ private struct AgentMessageView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
-            Text(message.role.title)
+            Text(message.displayTitle)
                 .font(.system(size: 9, weight: .bold))
                 .foregroundStyle(roleColor)
             Text(message.text)
@@ -464,7 +475,8 @@ private struct AgentMessageView: View {
     private var roleColor: Color {
         switch message.role {
         case .user: return RollCodeTheme.accent
-        case .assistant: return Color.purple.opacity(0.9)
+        case .assistant:
+            return message.senderName == "GEMINI" ? Color.blue.opacity(0.9) : Color.purple.opacity(0.9)
         case .system: return Color.orange.opacity(0.9)
         }
     }

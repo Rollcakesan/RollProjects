@@ -15,9 +15,29 @@ struct AgentMessage: Identifiable, Equatable, Sendable {
         }
     }
 
-    let id = UUID()
+    let id: UUID
     let role: Role
     let text: String
+    var senderName: String?
+
+    init(role: Role, text: String) {
+        self.id = UUID()
+        self.role = role
+        self.text = text
+        self.senderName = nil
+    }
+
+    init(id: UUID = UUID(), role: Role, text: String, senderName: String? = nil) {
+        self.id = id
+        self.role = role
+        self.text = text
+        self.senderName = senderName
+    }
+
+    var displayTitle: String {
+        if let senderName { return senderName }
+        return role.title
+    }
 }
 
 struct AgentActivity: Identifiable, Equatable, Sendable {

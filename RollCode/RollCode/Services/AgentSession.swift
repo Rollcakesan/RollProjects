@@ -334,7 +334,7 @@ final class AgentSession {
         case .threadStarted(let threadID):
             self.threadID = threadID
         case .message(let text):
-            entries.append(.message(AgentMessage(role: .assistant, text: text)))
+            entries.append(.message(AgentMessage(role: .assistant, text: text, senderName: "CODEX")))
         case .activity(let activity, let changedFiles):
             upsert(.activity(activity))
             mergeChangedFiles(changedFiles)
@@ -373,9 +373,9 @@ final class AgentSession {
     private func appendGeminiOutput(_ text: String) {
         if let last = entries.last, case .message(let message) = last, message.role == .assistant {
             let updated = message.text + "\n" + text
-            entries[entries.count - 1] = .message(AgentMessage(role: .assistant, text: updated))
+            entries[entries.count - 1] = .message(AgentMessage(role: .assistant, text: updated, senderName: "GEMINI"))
         } else {
-            entries.append(.message(AgentMessage(role: .assistant, text: text)))
+            entries.append(.message(AgentMessage(role: .assistant, text: text, senderName: "GEMINI")))
         }
     }
 
