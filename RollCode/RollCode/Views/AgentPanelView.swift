@@ -32,55 +32,39 @@ struct AgentPanelView: View {
     }
 
     private var header: some View {
-        VStack(spacing: 0) {
-            PanelHeader("AGENT") {
-                Image(systemName: "sparkles")
-                    .foregroundStyle(RollCodeTheme.accent)
-                Text("AUTO APPLY")
-                    .font(.system(size: 8, weight: .bold))
-                    .foregroundStyle(Color.green.opacity(0.9))
-                    .padding(.horizontal, 6)
-                    .padding(.vertical, 3)
-                    .background(Color.green.opacity(0.12))
-                    .clipShape(Capsule())
-            } trailing: {
-                HStack(spacing: 7) {
-                    authBadge
+        HStack(spacing: 8) {
+            providerToggle
+            Divider().frame(height: 12).overlay(RollCodeTheme.divider)
+            threadSwitcherMenu
 
-                    if agent.isRunning {
-                        Button { agent.stop() } label: {
-                            Image(systemName: "stop.fill")
-                                .foregroundStyle(Color.red.opacity(0.9))
-                        }
-                        .buttonStyle(.plain)
-                        .help("Stop Agent")
-                    }
-                    Button {
-                        withAnimation(.easeInOut(duration: 0.15)) {
-                            agent.newThread()
-                            prompt = ""
-                        }
-                        promptFocused = true
-                    } label: {
-                        Image(systemName: "plus")
-                    }
-                    .buttonStyle(.plain)
-                    .disabled(agent.isRunning)
-                    .help("New Thread (Clear conversation)")
+            Spacer()
+
+            if agent.isRunning {
+                Button { agent.stop() } label: {
+                    Image(systemName: "stop.fill")
+                        .font(.system(size: 11))
+                        .foregroundStyle(Color.red.opacity(0.9))
                 }
+                .buttonStyle(.plain)
+                .help("Stop Agent")
             }
 
-            // Thread Switcher & Provider Bar
-            HStack(spacing: 8) {
-                providerToggle
-                Divider().frame(height: 12).overlay(RollCodeTheme.divider)
-                threadSwitcherMenu
-                Spacer()
+            Button {
+                agent.newThread()
+                prompt = ""
+                promptFocused = true
+            } label: {
+                Image(systemName: "plus")
+                    .font(.system(size: 11))
+                    .foregroundStyle(RollCodeTheme.secondaryText)
             }
-            .padding(.horizontal, 10)
-            .padding(.vertical, 4)
-            .background(RollCodeTheme.elevatedBackground.opacity(0.4))
+            .buttonStyle(.plain)
+            .disabled(agent.isRunning)
+            .help("New Thread (Clear conversation)")
         }
+        .padding(.horizontal, 10)
+        .frame(height: 34)
+        .background(RollCodeTheme.sidebarBackground)
     }
 
     private var providerToggle: some View {
