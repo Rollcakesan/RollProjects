@@ -1,28 +1,59 @@
 import Foundation
 
-enum CodeCompletionService {
-    static func completions(for prefix: String, in text: String, language: CodeLanguage) -> [String] {
+@MainActor
+final class CodeCompletionService {
+    static let shared = CodeCompletionService()
+
+    private var cachedIdentifiers: Set<String> = []
+    private var lastScannedHash: Int = 0
+    private var isScanning = false
+
+    func updateCacheAsync(for text: String) {
+        let hash = text.hashValue
+        guard hash != lastScannedHash, !isScanning else { return }
+        isScanning = true
+
+        Task.detached(priority: .utility) {
+            let identifiers = Self.extractIdentifiers(from: text)
+            await MainActor.run {
+                self.cachedIdentifiers = identifiers
+                self.lastScannedHash = hash
+                self.isScanning = false
+            }
+        }
+    }
+
+    func completions(for prefix: String, in text: String, language: CodeLanguage) -> [String] {
         let prefix = prefix.trimmingCharacters(in: .whitespacesAndNewlines)
         guard prefix.count >= 2 else { return [] }
+
+        // Trigger background scan if needed
+        updateCacheAsync(for: text)
 
         var candidates = Set<String>()
 
         // 1. Language Keywords
-        for kw in keywords(for: language) {
+        for kw in Self.keywords(for: language) {
             if kw.localizedCaseInsensitiveContains(prefix) && kw.caseInsensitiveCompare(prefix) != .orderedSame {
                 candidates.insert(kw)
             }
         }
 
-        // 2. Buffer words (Identifiers in current file)
-        let words = extractIdentifiers(from: text)
-        for w in words {
+        // 2. Cached identifiers (from background full scan)
+        for w in cachedIdentifiers {
             if w.localizedCaseInsensitiveContains(prefix) && w.caseInsensitiveCompare(prefix) != .orderedSame {
                 candidates.insert(w)
             }
         }
 
-        // Sort candidates: prefix matches first, then shorter, then alphabetical
+        // 3. Local words around prefix (catch immediate words in the same file)
+        let localWords = Self.extractLocalWords(around: prefix, in: text)
+        for w in localWords {
+            if w.localizedCaseInsensitiveContains(prefix) && w.caseInsensitiveCompare(prefix) != .orderedSame {
+                candidates.insert(w)
+            }
+        }
+
         let sorted = candidates.sorted { a, b in
             let aHasPrefix = a.lowercased().hasPrefix(prefix.lowercased())
             let bHasPrefix = b.lowercased().hasPrefix(prefix.lowercased())
@@ -38,7 +69,21 @@ enum CodeCompletionService {
         return Array(sorted.prefix(20))
     }
 
-    private static func extractIdentifiers(from text: String) -> Set<String> {
+    private static func extractLocalWords(around prefix: String, in text: String) -> Set<String> {
+        var words = Set<String>()
+        // Grab a few lines around the cursor quickly
+        let lines = text.components(separatedBy: .newlines)
+        for line in lines.prefix(200) {
+            for word in line.components(separatedBy: CharacterSet.alphanumerics.union(CharacterSet(charactersIn: "_")).inverted) {
+                if word.count >= 3 {
+                    words.insert(word)
+                }
+            }
+        }
+        return words
+    }
+
+    nonisolated private static func extractIdentifiers(from text: String) -> Set<String> {
         var identifiers = Set<String>()
         let pattern = #"\b[A-Za-z_][A-Za-z0-9_]{2,}\b"#
         guard let regex = try? NSRegularExpression(pattern: pattern) else { return [] }

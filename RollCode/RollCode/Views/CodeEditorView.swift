@@ -104,6 +104,7 @@ struct CodeEditorView: NSViewRepresentable {
         private var isPerformingSmartEdit = false
         private var lastSearchRequestID: UUID?
         private var lastNavigationRequestID: UUID?
+        private var completionDebounceTask: Task<Void, Never>?
 
         init(parent: CodeEditorView) {
             self.parent = parent
@@ -114,7 +115,9 @@ struct CodeEditorView: NSViewRepresentable {
             parent.text = textView.string
             applyHighlighting(language: parent.language, searchTerm: parent.searchTerm)
             ruler?.needsDisplay = true
-            triggerCompletionIfNeeded(in: textView)
+
+            CodeCompletionService.shared.updateCacheAsync(for: textView.string)
+            scheduleCompletion(in: textView)
         }
 
         func textView(
@@ -127,25 +130,38 @@ struct CodeEditorView: NSViewRepresentable {
             guard charRange.location != NSNotFound,
                   charRange.location + charRange.length <= nsText.length else { return [] }
             let prefix = nsText.substring(with: charRange)
-            return CodeCompletionService.completions(for: prefix, in: textView.string, language: parent.language)
+            return CodeCompletionService.shared.completions(for: prefix, in: textView.string, language: parent.language)
         }
 
-        private func triggerCompletionIfNeeded(in textView: NSTextView) {
-            let selectedRange = textView.selectedRange()
-            guard selectedRange.length == 0, selectedRange.location >= 2 else { return }
-            let nsText = textView.string as NSString
-            let charBefore = nsText.character(at: selectedRange.location - 1)
-            guard let unicodeScalar = UnicodeScalar(charBefore),
-                  CharacterSet.alphanumerics.contains(unicodeScalar) || unicodeScalar == "_" else { return }
+        private func scheduleCompletion(in textView: NSTextView) {
+            completionDebounceTask?.cancel()
 
-            let lineRange = nsText.lineRange(for: NSRange(location: selectedRange.location, length: 0))
-            let prefixRange = NSRange(location: lineRange.location, length: selectedRange.location - lineRange.location)
-            let linePrefix = nsText.substring(with: prefixRange)
-            let delimiters = CharacterSet.alphanumerics.union(CharacterSet(charactersIn: "_")).inverted
-            guard let lastWord = linePrefix.components(separatedBy: delimiters).last,
-                  lastWord.count >= 2 else { return }
+            // Don't interrupt IME composition (Japanese input, etc.)
+            guard !textView.hasMarkedText() else { return }
 
-            textView.complete(nil)
+            completionDebounceTask = Task { @MainActor [weak self] in
+                // 150ms debounce: wait until user stops typing
+                try? await Task.sleep(for: .milliseconds(150))
+                guard !Task.isCancelled, let self, let textView = self.textView else { return }
+
+                let selectedRange = textView.selectedRange()
+                guard selectedRange.length == 0, selectedRange.location >= 2 else { return }
+                let nsText = textView.string as NSString
+                guard selectedRange.location <= nsText.length else { return }
+
+                let charBefore = nsText.character(at: selectedRange.location - 1)
+                guard let unicodeScalar = UnicodeScalar(charBefore),
+                      CharacterSet.alphanumerics.contains(unicodeScalar) || unicodeScalar == "_" else { return }
+
+                let lineRange = nsText.lineRange(for: NSRange(location: selectedRange.location, length: 0))
+                let prefixRange = NSRange(location: lineRange.location, length: selectedRange.location - lineRange.location)
+                let linePrefix = nsText.substring(with: prefixRange)
+                let delimiters = CharacterSet.alphanumerics.union(CharacterSet(charactersIn: "_")).inverted
+                guard let lastWord = linePrefix.components(separatedBy: delimiters).last,
+                      lastWord.count >= 2 else { return }
+
+                textView.complete(nil)
+            }
         }
 
         func textView(
