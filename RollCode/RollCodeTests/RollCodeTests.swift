@@ -716,6 +716,15 @@ struct RollCodeTests {
             Issue.record("Expected Gemini message")
         }
     }
+
+    @Test("CodexEventParser ignores deprecation warning error items")
+    func codexEventParserIgnoresDeprecationWarnings() {
+        let line = """
+        {"type":"item.completed","item":{"id":"item_0","type":"error","message":"`[features].web_search_request` is deprecated because web search is enabled by default."}}
+        """
+        let event = CodexEventParser.parse(line)
+        #expect(event == nil)
+    }
 }
 
 @MainActor

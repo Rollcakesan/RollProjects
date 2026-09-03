@@ -57,6 +57,7 @@ final class AgentSession {
 
     @ObservationIgnored private var errorBuffer = ""
     @ObservationIgnored private var workspaceURL: URL?
+    @ObservationIgnored private var initialChangedPaths: Set<String> = []
 
     init(
         executableURL: URL? = CodexExecutableLocator.locate(),
@@ -107,6 +108,7 @@ final class AgentSession {
         entries.append(.message(AgentMessage(role: .user, text: prompt)))
         errorBuffer = ""
         self.workspaceURL = workspaceURL.standardizedFileURL
+        self.initialChangedPaths = Set((try? GitDiffService.changedPaths(in: workspaceURL)) ?? [])
 
         let process = Process()
         let standardOutput = Pipe()
@@ -386,9 +388,10 @@ final class AgentSession {
         guard runState.process === process else { return }
         let changedPaths: [String]
         if let workspaceURL {
-            changedPaths = await Task.detached(priority: .utility) {
+            let current = await Task.detached(priority: .utility) {
                 (try? GitDiffService.changedPaths(in: workspaceURL)) ?? []
             }.value
+            changedPaths = current.filter { !self.initialChangedPaths.contains($0) }
         } else {
             changedPaths = []
         }

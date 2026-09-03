@@ -140,10 +140,17 @@ enum CodexEventParser {
                 state: state
             ), changedFiles: [])
         case "error":
-            return .error(item.message ?? "Codex reported an error.")
+            guard let msg = item.message, !msg.isEmpty else { return nil }
+            if isDeprecationOrWarning(msg) { return nil }
+            return .error(msg)
         default:
             return nil
         }
+    }
+
+    private static func isDeprecationOrWarning(_ text: String) -> Bool {
+        let lower = text.lowercased()
+        return lower.contains("deprecated") || lower.contains("warning:")
     }
 
     private static func activityState(_ rawValue: String?, eventType: String) -> AgentActivity.State {
