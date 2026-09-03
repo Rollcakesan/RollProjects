@@ -75,6 +75,7 @@ private struct FileTreeNodeView: View {
     let node: FileNode
     let depth: Int
     @Binding var expandedURLs: Set<URL>
+    @State private var isHovered = false
 
     var isExpanded: Bool { expandedURLs.contains(node.url) }
     var isSelected: Bool { workspace.activeDocument?.url == node.url }
@@ -133,11 +134,17 @@ private struct FileTreeNodeView: View {
 
             Spacer(minLength: 0)
         }
-        .padding(.horizontal, 4)
-        .frame(height: 23)
-        .background(isSelected ? RollCodeTheme.elevatedBackground : Color.clear)
+        .padding(.horizontal, 6)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .frame(height: 24)
+        .background(
+            isSelected
+                ? RollCodeTheme.elevatedBackground
+                : (isHovered ? RollCodeTheme.elevatedBackground.opacity(0.45) : Color.clear)
+        )
         .clipShape(RoundedRectangle(cornerRadius: 4))
         .contentShape(Rectangle())
+        .onHover { isHovered = $0 }
         .onTapGesture {
             if node.isDirectory {
                 if isExpanded {
