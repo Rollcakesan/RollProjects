@@ -3,10 +3,11 @@ import Observation
 
 @Observable
 @MainActor
-final class TerminalSession {
-    var output = ""
-    var isVisible = true
-    private(set) var isRunning = false
+final class TerminalInstance: Identifiable {
+    let id: UUID
+    var title: String
+    var output: String = ""
+    private(set) var isRunning: Bool = false
     private(set) var workingDirectory: URL?
 
     @ObservationIgnored private var process: Process?
@@ -14,10 +15,16 @@ final class TerminalSession {
     @ObservationIgnored private var commandHistory: [String] = []
     @ObservationIgnored private var historyIndex: Int?
 
+    init(id: UUID = UUID(), title: String = "zsh", workingDirectory: URL? = nil) {
+        self.id = id
+        self.title = title
+        self.workingDirectory = workingDirectory
+    }
+
     func start(in directory: URL) {
         stop()
         workingDirectory = directory
-        output = "RollCode Terminal — \(directory.path)\n"
+        output = "RollCode Terminal (\(title)) — \(directory.path)\n"
 
         let process = Process()
         process.executableURL = URL(fileURLWithPath: "/bin/zsh")
@@ -27,7 +34,7 @@ final class TerminalSession {
         let outputPipe = Pipe()
         let errorPipe = Pipe()
         let inputPipe = Pipe()
-        
+
         process.standardOutput = outputPipe
         process.standardError = errorPipe
         process.standardInput = inputPipe
@@ -76,9 +83,9 @@ final class TerminalSession {
         let command = command.trimmingCharacters(in: .newlines)
         guard !command.isEmpty else { return }
         remember(command)
-        
+
         appendOutput("\(command)\n")
-        
+
         guard write(command + "\n") else {
             appendOutput("\n[Shell is not running]\n")
             return
@@ -156,6 +163,109 @@ final class TerminalSession {
 
     deinit {
         process?.terminate()
+    }
+}
+
+@Observable
+@MainActor
+final class TerminalSession {
+    var isVisible = true
+    private(set) var tabs: [TerminalInstance] = []
+    var activeTabID: UUID?
+
+    var activeTab: TerminalInstance? {
+        if let activeTabID, let found = tabs.first(where: { $0.id == activeTabID }) {
+            return found
+        }
+        return tabs.first
+    }
+
+    var output: String {
+        get { activeTab?.output ?? "" }
+        set { activeTab?.output = newValue }
+    }
+
+    var isRunning: Bool {
+        activeTab?.isRunning ?? false
+    }
+
+    var workingDirectory: URL? {
+        activeTab?.workingDirectory
+    }
+
+    init() {
+        let initial = TerminalInstance(title: "Terminal 1")
+        tabs = [initial]
+        activeTabID = initial.id
+    }
+
+    @discardableResult
+    func createTab(in directory: URL? = nil, title: String? = nil) -> TerminalInstance {
+        let dir = directory ?? workingDirectory ?? FileManager.default.homeDirectoryForCurrentUser
+        let tabNumber = tabs.count + 1
+        let newTab = TerminalInstance(title: title ?? "Terminal \(tabNumber)", workingDirectory: dir)
+        tabs.append(newTab)
+        activeTabID = newTab.id
+        newTab.start(in: dir)
+        return newTab
+    }
+
+    func closeTab(id: UUID) {
+        guard tabs.count > 1 else {
+            activeTab?.restart()
+            return
+        }
+        if let index = tabs.firstIndex(where: { $0.id == id }) {
+            let tab = tabs.remove(at: index)
+            tab.stop()
+            if activeTabID == id {
+                let nextIndex = min(index, tabs.count - 1)
+                activeTabID = tabs[nextIndex].id
+            }
+        }
+    }
+
+    func selectTab(id: UUID) {
+        guard tabs.contains(where: { $0.id == id }) else { return }
+        activeTabID = id
+    }
+
+    func start(in directory: URL) {
+        if let active = activeTab {
+            active.start(in: directory)
+        } else {
+            createTab(in: directory)
+        }
+    }
+
+    func send(_ command: String) {
+        activeTab?.send(command)
+    }
+
+    func interrupt() {
+        activeTab?.interrupt()
+    }
+
+    func clear() {
+        activeTab?.clear()
+    }
+
+    func restart() {
+        activeTab?.restart()
+    }
+
+    func stop() {
+        for tab in tabs {
+            tab.stop()
+        }
+    }
+
+    func previousCommand() -> String {
+        activeTab?.previousCommand() ?? ""
+    }
+
+    func nextCommand() -> String {
+        activeTab?.nextCommand() ?? ""
     }
 }
 

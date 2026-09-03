@@ -774,6 +774,27 @@ struct RollCodeTests {
             }
         }
     }
+
+    @Test("TerminalSession manages multiple tabs and tab switching")
+    @MainActor
+    func terminalSessionManagesMultipleTabs() {
+        let terminal = TerminalSession()
+        #expect(terminal.tabs.count == 1)
+        let firstTab = terminal.tabs[0]
+        #expect(terminal.activeTabID == firstTab.id)
+
+        let secondTab = terminal.createTab(title: "Build Task")
+        #expect(terminal.tabs.count == 2)
+        #expect(terminal.activeTabID == secondTab.id)
+        #expect(terminal.activeTab?.id == secondTab.id)
+
+        terminal.selectTab(id: firstTab.id)
+        #expect(terminal.activeTabID == firstTab.id)
+
+        terminal.closeTab(id: firstTab.id)
+        #expect(terminal.tabs.count == 1)
+        #expect(terminal.activeTabID == secondTab.id)
+    }
 }
 
 @MainActor
