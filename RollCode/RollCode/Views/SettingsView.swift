@@ -119,17 +119,28 @@ struct SettingsView: View {
                     .font(.system(size: 11))
                     .foregroundStyle(RollCodeTheme.secondaryText)
 
-                HStack {
-                    Button {
-                        agent.geminiAuth.requestLogin(in: terminal)
-                    } label: {
-                        Label("Log In with Google", systemImage: "person.crop.circle.badge.checkmark")
-                    }
-                    .buttonStyle(.borderedProminent)
+                HStack(spacing: 10) {
+                    if agent.geminiAuth.isLoggingIn {
+                        ProgressView().controlSize(.small)
+                        Text("Waiting for browser login…")
+                            .font(.system(size: 11))
+                            .foregroundStyle(RollCodeTheme.secondaryText)
+                        Button("Cancel") {
+                            agent.geminiAuth.cancelLogin()
+                        }
+                        .controlSize(.small)
+                    } else {
+                        Button {
+                            agent.geminiAuth.loginWithBrowser()
+                        } label: {
+                            Label("Log In with Google (Browser)", systemImage: "arrow.up.right.square")
+                        }
+                        .buttonStyle(.borderedProminent)
 
-                    if isGeminiLoggedIn {
-                        Button("Log Out") {
-                            agent.geminiAuth.logout()
+                        if isGeminiLoggedIn {
+                            Button("Log Out") {
+                                agent.geminiAuth.logout()
+                            }
                         }
                     }
                 }

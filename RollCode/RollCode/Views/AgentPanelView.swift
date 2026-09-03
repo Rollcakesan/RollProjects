@@ -201,18 +201,22 @@ struct AgentPanelView: View {
                 }
                 .help("Authenticated via GEMINI_API_KEY")
             case .unauthenticated:
-                Button {
-                    agent.geminiAuth.requestLogin(in: terminal)
-                } label: {
-                    HStack(spacing: 3) {
-                        Image(systemName: "person.crop.circle.badge.plus")
-                        Text("Log In")
+                if agent.geminiAuth.isLoggingIn {
+                    ProgressView().controlSize(.mini)
+                } else {
+                    Button {
+                        agent.geminiAuth.loginWithBrowser()
+                    } label: {
+                        HStack(spacing: 3) {
+                            Image(systemName: "arrow.up.right.square")
+                            Text("Log In")
+                        }
+                        .font(.system(size: 9, weight: .medium))
                     }
-                    .font(.system(size: 9, weight: .medium))
+                    .buttonStyle(.bordered)
+                    .controlSize(.mini)
+                    .help("Log in with Google account via browser")
                 }
-                .buttonStyle(.bordered)
-                .controlSize(.mini)
-                .help("Log in with Google account via browser")
             case .cliNotInstalled:
                 EmptyView()
             }
@@ -296,11 +300,20 @@ struct AgentPanelView: View {
                                 .foregroundStyle(RollCodeTheme.secondaryText)
                         }
                         Spacer()
-                        Button("Log In") {
-                            agent.geminiAuth.requestLogin(in: terminal)
+                        if agent.geminiAuth.isLoggingIn {
+                            HStack(spacing: 4) {
+                                ProgressView().controlSize(.small)
+                                Text("Waiting…")
+                                    .font(.system(size: 10))
+                                    .foregroundStyle(RollCodeTheme.secondaryText)
+                            }
+                        } else {
+                            Button("Log In with Google") {
+                                agent.geminiAuth.loginWithBrowser()
+                            }
+                            .buttonStyle(.borderedProminent)
+                            .controlSize(.small)
                         }
-                        .buttonStyle(.borderedProminent)
-                        .controlSize(.small)
                     }
                     .padding(8)
                     .background(RollCodeTheme.elevatedBackground)
