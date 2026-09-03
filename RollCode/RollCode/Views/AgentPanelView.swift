@@ -26,6 +26,7 @@ struct AgentPanelView: View {
         .background(RollCodeTheme.sidebarBackground)
         .onAppear {
             agent.auth.refresh()
+            agent.geminiAuth.refresh()
             agent.loadPastCodexSessions()
         }
     }
@@ -193,25 +194,43 @@ struct AgentPanelView: View {
     @ViewBuilder
     private var authBadge: some View {
         if agent.selectedProvider == .gemini {
-            if agent.geminiExecutableURL != nil {
+            switch agent.geminiAuth.status {
+            case .loggedIn(let account):
                 HStack(spacing: 4) {
                     Circle()
-                        .fill(Color.purple)
+                        .fill(Color.green)
                         .frame(width: 6, height: 6)
-                    Text("Gemini CLI")
+                    Text(account ?? "Google")
+                        .font(.system(size: 9))
+                        .foregroundStyle(RollCodeTheme.secondaryText)
+                        .lineLimit(1)
+                }
+                .help("Logged in via Google Account")
+            case .apiKey:
+                HStack(spacing: 4) {
+                    Circle()
+                        .fill(Color.blue)
+                        .frame(width: 6, height: 6)
+                    Text("API Key")
                         .font(.system(size: 9))
                         .foregroundStyle(RollCodeTheme.secondaryText)
                 }
-                .help("Gemini CLI is ready")
-            } else {
-                HStack(spacing: 4) {
-                    Circle()
-                        .fill(Color.gray)
-                        .frame(width: 6, height: 6)
-                    Text("Gemini CLI Missing")
-                        .font(.system(size: 9))
-                        .foregroundStyle(RollCodeTheme.secondaryText)
+                .help("Authenticated via GEMINI_API_KEY")
+            case .unauthenticated:
+                Button {
+                    agent.geminiAuth.requestLogin(in: terminal)
+                } label: {
+                    HStack(spacing: 3) {
+                        Image(systemName: "person.crop.circle.badge.plus")
+                        Text("Log In")
+                    }
+                    .font(.system(size: 9, weight: .medium))
                 }
+                .buttonStyle(.bordered)
+                .controlSize(.mini)
+                .help("Log in with Google account via browser")
+            case .cliNotInstalled:
+                EmptyView()
             }
         } else {
             switch agent.auth.status {
@@ -273,6 +292,28 @@ struct AgentPanelView: View {
                         Spacer()
                         Button("Log In") {
                             agent.auth.requestLogin(in: terminal)
+                        }
+                        .buttonStyle(.borderedProminent)
+                        .controlSize(.small)
+                    }
+                    .padding(8)
+                    .background(RollCodeTheme.elevatedBackground)
+                    .clipShape(RoundedRectangle(cornerRadius: 6))
+                } else if agent.selectedProvider == .gemini && agent.geminiAuth.status == .unauthenticated {
+                    HStack(spacing: 8) {
+                        Image(systemName: "person.badge.key.fill")
+                            .foregroundStyle(Color.blue)
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("Gemini Login")
+                                .font(.system(size: 11, weight: .medium))
+                                .foregroundStyle(RollCodeTheme.primaryText)
+                            Text("Log in with Google via browser, or enter an API key in Settings (⌘,).")
+                                .font(.system(size: 10))
+                                .foregroundStyle(RollCodeTheme.secondaryText)
+                        }
+                        Spacer()
+                        Button("Log In") {
+                            agent.geminiAuth.requestLogin(in: terminal)
                         }
                         .buttonStyle(.borderedProminent)
                         .controlSize(.small)

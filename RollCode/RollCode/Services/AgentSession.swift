@@ -51,6 +51,7 @@ final class AgentSession {
     var activeThreadTitle: String { activeThread.title }
 
     let auth: CodexAuthService
+    let geminiAuth: GeminiAuthService
     @ObservationIgnored let executableURL: URL?
     @ObservationIgnored let geminiExecutableURL: URL?
     var onRunCompleted: (@MainActor @Sendable () -> Void)?
@@ -62,11 +63,13 @@ final class AgentSession {
     init(
         executableURL: URL? = CodexExecutableLocator.locate(),
         geminiExecutableURL: URL? = GeminiExecutableLocator.locate(),
-        auth: CodexAuthService = CodexAuthService()
+        auth: CodexAuthService = CodexAuthService(),
+        geminiAuth: GeminiAuthService = GeminiAuthService()
     ) {
         self.executableURL = executableURL
         self.geminiExecutableURL = geminiExecutableURL
         self.auth = auth
+        self.geminiAuth = geminiAuth
     }
 
     var isAvailable: Bool { currentExecutableURL != nil }
@@ -298,6 +301,17 @@ final class AgentSession {
             }
         }
         env["PATH"] = paths.joined(separator: ":")
+
+        if selectedProvider == .gemini {
+            let key = geminiAuth.storedAPIKey
+            if !key.isEmpty {
+                env["GEMINI_API_KEY"] = key
+            }
+            let project = geminiAuth.storedProjectID
+            if !project.isEmpty {
+                env["GOOGLE_CLOUD_PROJECT"] = project
+            }
+        }
         return env
     }
 

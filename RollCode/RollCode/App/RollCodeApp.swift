@@ -30,6 +30,14 @@ struct RollCodeApp: App {
         }
         .defaultSize(width: 1280, height: 820)
         .windowToolbarStyle(.unified(showsTitle: false))
+
+        Settings {
+            SettingsView()
+                .environment(workspace)
+                .environment(terminal)
+                .environment(agent)
+                .preferredColorScheme(.dark)
+        }
         .commands {
             CommandGroup(replacing: .newItem) {
                 Button("Open Folder…") { workspace.chooseFolder() }
