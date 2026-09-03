@@ -18,9 +18,28 @@ final class AgentSession {
     }
 
     var isVisible = true
-    private(set) var entries: [AgentEntry] = []
-    private(set) var threadID: String?
+    private(set) var threads: [AgentThread] = []
+    private(set) var activeThread = AgentThread()
+    private(set) var pastCodexSessions: [CodexSessionSummary] = []
     private var runState = RunState.idle
+
+    var entries: [AgentEntry] {
+        get { activeThread.entries }
+        set {
+            activeThread.entries = newValue
+            activeThread.updatedAt = Date()
+        }
+    }
+
+    var threadID: String? {
+        get { activeThread.codexThreadID }
+        set {
+            activeThread.codexThreadID = newValue
+            activeThread.updatedAt = Date()
+        }
+    }
+
+    var activeThreadTitle: String { activeThread.title }
 
     let auth: CodexAuthService
     @ObservationIgnored let executableURL: URL?
@@ -43,6 +62,10 @@ final class AgentSession {
     func send(_ prompt: String, in workspaceURL: URL, activeFileURL: URL? = nil) {
         let prompt = prompt.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !prompt.isEmpty, !isRunning, let executableURL else { return }
+
+        if activeThread.title == "New Thread" || activeThread.entries.isEmpty {
+            activeThread.title = String(prompt.prefix(40))
+        }
 
         entries.removeAll { entry in
             if case .message = entry { return false }
@@ -103,9 +126,82 @@ final class AgentSession {
         resetThreadState()
     }
 
+    func switchToThread(_ thread: AgentThread) {
+        guard thread.id != activeThread.id else { return }
+        if isRunning {
+            stop(resetThread: false)
+        }
+        archiveCurrentThreadIfNeeded()
+        activeThread = thread
+        errorBuffer = ""
+    }
+
+    func deleteThread(id: UUID) {
+        threads.removeAll { $0.id == id }
+        if activeThread.id == id {
+            if let first = threads.first {
+                activeThread = first
+            } else {
+                activeThread = AgentThread()
+            }
+            errorBuffer = ""
+        }
+    }
+
+    func resumePastCodexSession(_ session: CodexSessionSummary) {
+        if isRunning {
+            stop(resetThread: false)
+        }
+        archiveCurrentThreadIfNeeded()
+        activeThread = AgentThread(
+            codexThreadID: session.id,
+            title: session.displayTitle,
+            updatedAt: session.updatedAt ?? Date(),
+            entries: [.message(AgentMessage(role: .system, text: "Resumed Codex session: \(session.displayTitle)"))]
+        )
+        errorBuffer = ""
+    }
+
+    func loadPastCodexSessions() {
+        let sessionIndexURL = FileManager.default.homeDirectoryForCurrentUser.appending(path: ".codex/session_index.jsonl")
+        guard FileManager.default.fileExists(atPath: sessionIndexURL.path),
+              let content = try? String(contentsOf: sessionIndexURL, encoding: .utf8) else {
+            pastCodexSessions = []
+            return
+        }
+
+        var sessions: [CodexSessionSummary] = []
+        let lines = content.components(separatedBy: .newlines).reversed()
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+
+        for line in lines where !line.isEmpty {
+            guard let data = line.data(using: .utf8),
+                  let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+                  let id = json["id"] as? String,
+                  let threadName = json["thread_name"] as? String else { continue }
+
+            let dateString = json["updated_at"] as? String
+            let date = dateString.flatMap { formatter.date(from: $0) ?? ISO8601DateFormatter().date(from: $0) }
+            sessions.append(CodexSessionSummary(id: id, threadName: threadName, updatedAt: date))
+            if sessions.count >= 20 { break }
+        }
+        pastCodexSessions = sessions
+    }
+
     private func resetThreadState() {
-        threadID = nil
-        entries = []
+        archiveCurrentThreadIfNeeded()
+        activeThread = AgentThread()
+        errorBuffer = ""
+    }
+
+    private func archiveCurrentThreadIfNeeded() {
+        guard !activeThread.entries.isEmpty || activeThread.codexThreadID != nil else { return }
+        if let index = threads.firstIndex(where: { $0.id == activeThread.id }) {
+            threads[index] = activeThread
+        } else {
+            threads.insert(activeThread, at: 0)
+        }
     }
 
     private func argumentsForCurrentThread() -> [String] {

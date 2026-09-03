@@ -646,6 +646,42 @@ struct RollCodeTests {
             #expect(service.status.displayText == "API Key")
         }
     }
+
+    @Test("AgentSession supports multiple threads and switching")
+    @MainActor
+    func agentSessionSupportsMultipleThreads() throws {
+        let session = AgentSession(executableURL: nil)
+        #expect(session.entries.isEmpty)
+        #expect(session.threads.isEmpty)
+
+        session.entries = [.message(AgentMessage(role: .user, text: "First question"))]
+        let firstThreadID = session.activeThread.id
+
+        session.newThread()
+        #expect(session.entries.isEmpty)
+        #expect(session.threads.count == 1)
+        #expect(session.threads.first?.id == firstThreadID)
+
+        session.entries = [.message(AgentMessage(role: .user, text: "Second question"))]
+
+        let firstThread = session.threads.first!
+        session.switchToThread(firstThread)
+        #expect(session.activeThread.id == firstThreadID)
+        #expect(session.entries.count == 1)
+        #expect(session.threads.count == 2)
+    }
+
+    @Test("AgentSession resumes past Codex session into new thread")
+    @MainActor
+    func agentSessionResumesPastCodexSession() throws {
+        let session = AgentSession(executableURL: nil)
+        let past = CodexSessionSummary(id: "test-thread-123", threadName: "Past Discussion", updatedAt: Date())
+        session.resumePastCodexSession(past)
+
+        #expect(session.threadID == "test-thread-123")
+        #expect(session.activeThreadTitle == "Past Discussion")
+        #expect(session.entries.count == 1)
+    }
 }
 
 @MainActor

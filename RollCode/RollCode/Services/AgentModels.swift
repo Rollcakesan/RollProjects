@@ -72,3 +72,36 @@ enum CodexEvent: Equatable, Sendable {
     case error(String)
 }
 
+struct AgentThread: Identifiable, Equatable, Sendable {
+    let id: UUID
+    var codexThreadID: String?
+    var title: String
+    var updatedAt: Date
+    var entries: [AgentEntry]
+
+    init(
+        id: UUID = UUID(),
+        codexThreadID: String? = nil,
+        title: String = "New Thread",
+        updatedAt: Date = Date(),
+        entries: [AgentEntry] = []
+    ) {
+        self.id = id
+        self.codexThreadID = codexThreadID
+        self.title = title
+        self.updatedAt = updatedAt
+        self.entries = entries
+    }
+}
+
+struct CodexSessionSummary: Identifiable, Equatable, Sendable {
+    let id: String
+    let threadName: String
+    let updatedAt: Date?
+
+    var displayTitle: String {
+        let trimmed = threadName.trimmingCharacters(in: .whitespacesAndNewlines)
+        return trimmed.isEmpty ? "Untitled Session" : trimmed
+    }
+}
+

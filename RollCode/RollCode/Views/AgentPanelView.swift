@@ -24,40 +24,128 @@ struct AgentPanelView: View {
         .background(RollCodeTheme.sidebarBackground)
         .onAppear {
             agent.auth.refresh()
+            agent.loadPastCodexSessions()
         }
     }
 
     private var header: some View {
-        PanelHeader("AGENT") {
-            Image(systemName: "sparkles")
-                .foregroundStyle(RollCodeTheme.accent)
-            Text("AUTO APPLY")
-                .font(.system(size: 8, weight: .bold))
-                .foregroundStyle(Color.green.opacity(0.9))
-                .padding(.horizontal, 6)
-                .padding(.vertical, 3)
-                .background(Color.green.opacity(0.12))
-                .clipShape(Capsule())
-        } trailing: {
-            HStack(spacing: 7) {
-                authBadge
+        VStack(spacing: 0) {
+            PanelHeader("AGENT") {
+                Image(systemName: "sparkles")
+                    .foregroundStyle(RollCodeTheme.accent)
+                Text("AUTO APPLY")
+                    .font(.system(size: 8, weight: .bold))
+                    .foregroundStyle(Color.green.opacity(0.9))
+                    .padding(.horizontal, 6)
+                    .padding(.vertical, 3)
+                    .background(Color.green.opacity(0.12))
+                    .clipShape(Capsule())
+            } trailing: {
+                HStack(spacing: 7) {
+                    authBadge
 
-                if agent.isRunning {
-                    Button { agent.stop() } label: {
-                        Image(systemName: "stop.fill")
-                            .foregroundStyle(Color.red.opacity(0.9))
+                    if agent.isRunning {
+                        Button { agent.stop() } label: {
+                            Image(systemName: "stop.fill")
+                                .foregroundStyle(Color.red.opacity(0.9))
+                        }
+                        .buttonStyle(.plain)
+                        .help("Stop Agent")
+                    }
+                    Button {
+                        withAnimation(.easeInOut(duration: 0.15)) {
+                            agent.newThread()
+                            prompt = ""
+                        }
+                        promptFocused = true
+                    } label: {
+                        Image(systemName: "plus")
                     }
                     .buttonStyle(.plain)
-                    .help("Stop Agent")
+                    .disabled(agent.isRunning)
+                    .help("New Thread (Clear conversation)")
                 }
-                Button { agent.newThread() } label: {
-                    Image(systemName: "plus")
-                }
-                .buttonStyle(.plain)
-                .disabled(agent.isRunning)
-                .help("New Thread")
             }
+
+            // Thread Switcher Bar
+            HStack(spacing: 6) {
+                threadSwitcherMenu
+                Spacer()
+            }
+            .padding(.horizontal, 10)
+            .padding(.vertical, 4)
+            .background(RollCodeTheme.elevatedBackground.opacity(0.4))
         }
+    }
+
+    private var threadSwitcherMenu: some View {
+        Menu {
+            Button {
+                withAnimation {
+                    agent.newThread()
+                    prompt = ""
+                }
+                promptFocused = true
+            } label: {
+                Label("New Thread", systemImage: "plus")
+            }
+
+            if !agent.threads.isEmpty {
+                Divider()
+                Section("Current Sessions") {
+                    ForEach(agent.threads) { thread in
+                        Button {
+                            withAnimation {
+                                agent.switchToThread(thread)
+                                prompt = ""
+                            }
+                        } label: {
+                            HStack {
+                                if thread.id == agent.activeThread.id {
+                                    Image(systemName: "checkmark")
+                                }
+                                Text(thread.title)
+                            }
+                        }
+                    }
+                }
+            }
+
+            if !agent.pastCodexSessions.isEmpty {
+                Divider()
+                Section("Past Codex Sessions") {
+                    ForEach(agent.pastCodexSessions) { session in
+                        Button {
+                            withAnimation {
+                                agent.resumePastCodexSession(session)
+                                prompt = ""
+                            }
+                        } label: {
+                            Text(session.displayTitle)
+                        }
+                    }
+                }
+            }
+        } label: {
+            HStack(spacing: 5) {
+                Image(systemName: "bubble.left.and.bubble.right")
+                    .font(.system(size: 9))
+                    .foregroundStyle(RollCodeTheme.accent)
+                Text(agent.activeThreadTitle)
+                    .font(.system(size: 10, weight: .medium))
+                    .foregroundStyle(RollCodeTheme.primaryText)
+                    .lineLimit(1)
+                Image(systemName: "chevron.up.chevron.down")
+                    .font(.system(size: 8))
+                    .foregroundStyle(RollCodeTheme.secondaryText)
+            }
+            .padding(.horizontal, 6)
+            .padding(.vertical, 2.5)
+            .background(RollCodeTheme.windowBackground)
+            .clipShape(RoundedRectangle(cornerRadius: 4))
+        }
+        .menuStyle(.borderlessButton)
+        .fixedSize()
     }
 
     @ViewBuilder
