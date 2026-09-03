@@ -841,6 +841,10 @@ struct RollCodeTests {
         // Test 4: Empty prefix returns empty
         let emptyMatches = CodeCompletionService.shared.completions(for: "", in: text, language: .swift)
         #expect(emptyMatches.isEmpty)
+
+        // Test 5: Language keywords are prioritised first
+        let fMatches = CodeCompletionService.shared.completions(for: "f", in: text, language: .swift)
+        #expect(fMatches.first == "for" || fMatches.first == "func")
     }
 }
 
