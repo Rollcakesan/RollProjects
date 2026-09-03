@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		A10100042DBC1CD7BB090EE2 /* CodeCompletionService.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1010004A922B2F06EF834AD /* CodeCompletionService.swift */; };
 		A10100032DBC1CD7BB090EE2 /* SyntaxCheckService.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1010003A922B2F06EF834AD /* SyntaxCheckService.swift */; };
 		A10100012DBC1CD7BB090EE2 /* GeminiAuthService.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1010001A922B2F06EF834AD /* GeminiAuthService.swift */; };
 		A10100022DBC1CD7BB090EE2 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1010002A922B2F06EF834AD /* SettingsView.swift */; };
@@ -50,6 +51,7 @@
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
+		B1010004A922B2F06EF834AD /* CodeCompletionService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CodeCompletionService.swift; sourceTree = "<group>"; };
 		B1010003A922B2F06EF834AD /* SyntaxCheckService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SyntaxCheckService.swift; sourceTree = "<group>"; };
 		B1010001A922B2F06EF834AD /* GeminiAuthService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GeminiAuthService.swift; sourceTree = "<group>"; };
 		B1010002A922B2F06EF834AD /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
@@ -94,6 +96,7 @@
 				14E27D90A922B2F06EF834AD /* CodexAuthService.swift */,
 				B1010001A922B2F06EF834AD /* GeminiAuthService.swift */,
 				B1010003A922B2F06EF834AD /* SyntaxCheckService.swift */,
+				B1010004A922B2F06EF834AD /* CodeCompletionService.swift */,
 				8F5C0D8DA9486ACF50CC812A /* CodexEventParser.swift */,
 				50BCDAC7F3D1F9F9A3BD1D9F /* GitDiffService.swift */,
 				EE1CBC30691ED77150C53A0C /* TerminalSession.swift */,
@@ -296,6 +299,7 @@
 				101651C81DBC1CD7BB090EE2 /* CodexAuthService.swift in Sources */,
 				A10100012DBC1CD7BB090EE2 /* GeminiAuthService.swift in Sources */,
 				A10100032DBC1CD7BB090EE2 /* SyntaxCheckService.swift in Sources */,
+				A10100042DBC1CD7BB090EE2 /* CodeCompletionService.swift in Sources */,
 				A10100022DBC1CD7BB090EE2 /* SettingsView.swift in Sources */,
 				363D65C9942CB9841923327A /* CodexEventParser.swift in Sources */,
 				58E50C1CFBA9F0F95EB8BDC5 /* ContentView.swift in Sources */,

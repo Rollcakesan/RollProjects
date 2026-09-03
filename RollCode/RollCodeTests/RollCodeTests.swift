@@ -815,6 +815,28 @@ struct RollCodeTests {
         #expect(!invalidResult.isEmpty)
         #expect(invalidResult[0].severity == .error)
     }
+
+    @Test("CodeCompletionService completes language keywords and buffer identifiers")
+    func codeCompletionCompletesKeywordsAndBufferWords() {
+        let text = """
+        struct RollCodeWorkspace {
+            let customUserIdentifier = "test"
+            func setupWorkspaceEnvironment() {}
+        }
+        """
+
+        // Test 1: Language keyword prefix
+        let keywordMatches = CodeCompletionService.completions(for: "gua", in: text, language: .swift)
+        #expect(keywordMatches.contains("guard"))
+
+        // Test 2: Buffer identifier prefix
+        let bufferMatches = CodeCompletionService.completions(for: "custom", in: text, language: .swift)
+        #expect(bufferMatches.contains("customUserIdentifier"))
+
+        // Test 3: Short prefix (< 2 chars) returns empty
+        let shortMatches = CodeCompletionService.completions(for: "c", in: text, language: .swift)
+        #expect(shortMatches.isEmpty)
+    }
 }
 
 @MainActor

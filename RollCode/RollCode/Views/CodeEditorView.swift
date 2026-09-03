@@ -33,7 +33,7 @@ struct CodeEditorView: NSViewRepresentable {
         textView.isAutomaticQuoteSubstitutionEnabled = false
         textView.isAutomaticDashSubstitutionEnabled = false
         textView.isAutomaticTextReplacementEnabled = false
-        textView.isAutomaticTextCompletionEnabled = false
+        textView.isAutomaticTextCompletionEnabled = true
         textView.isContinuousSpellCheckingEnabled = false
         textView.writingToolsBehavior = .none
         textView.backgroundColor = EditorPalette.background
@@ -114,6 +114,38 @@ struct CodeEditorView: NSViewRepresentable {
             parent.text = textView.string
             applyHighlighting(language: parent.language, searchTerm: parent.searchTerm)
             ruler?.needsDisplay = true
+            triggerCompletionIfNeeded(in: textView)
+        }
+
+        func textView(
+            _ textView: NSTextView,
+            completions words: [String],
+            forPartialWordRange charRange: NSRange,
+            indexOfSelectedItem index: UnsafeMutablePointer<Int>?
+        ) -> [String] {
+            let nsText = textView.string as NSString
+            guard charRange.location != NSNotFound,
+                  charRange.location + charRange.length <= nsText.length else { return [] }
+            let prefix = nsText.substring(with: charRange)
+            return CodeCompletionService.completions(for: prefix, in: textView.string, language: parent.language)
+        }
+
+        private func triggerCompletionIfNeeded(in textView: NSTextView) {
+            let selectedRange = textView.selectedRange()
+            guard selectedRange.length == 0, selectedRange.location >= 2 else { return }
+            let nsText = textView.string as NSString
+            let charBefore = nsText.character(at: selectedRange.location - 1)
+            guard let unicodeScalar = UnicodeScalar(charBefore),
+                  CharacterSet.alphanumerics.contains(unicodeScalar) || unicodeScalar == "_" else { return }
+
+            let lineRange = nsText.lineRange(for: NSRange(location: selectedRange.location, length: 0))
+            let prefixRange = NSRange(location: lineRange.location, length: selectedRange.location - lineRange.location)
+            let linePrefix = nsText.substring(with: prefixRange)
+            let delimiters = CharacterSet.alphanumerics.union(CharacterSet(charactersIn: "_")).inverted
+            guard let lastWord = linePrefix.components(separatedBy: delimiters).last,
+                  lastWord.count >= 2 else { return }
+
+            textView.complete(nil)
         }
 
         func textView(
