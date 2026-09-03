@@ -185,6 +185,7 @@ private struct EditorDocumentView: View {
                     searchTerm: searchTerm,
                     searchRequest: searchRequest,
                     navigationRequest: workspace.editorNavigationRequest,
+                    errorLines: Set(document.diagnostics.map(\.line)),
                     tabWidth: workspace.tabWidth,
                     fontSize: workspace.fontSize
                 )

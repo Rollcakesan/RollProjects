@@ -7,6 +7,7 @@ struct CodeEditorView: NSViewRepresentable {
     let searchTerm: String
     let searchRequest: EditorSearchRequest?
     let navigationRequest: EditorNavigationRequest?
+    var errorLines: Set<Int> = []
     let tabWidth: Int
     let fontSize: CGFloat
 
@@ -60,6 +61,7 @@ struct CodeEditorView: NSViewRepresentable {
 
         scrollView.documentView = textView
         let ruler = LineNumberRulerView(textView: textView)
+        ruler.errorLines = errorLines
         scrollView.verticalRulerView = ruler
         scrollView.hasVerticalRuler = true
         scrollView.rulersVisible = true
@@ -89,6 +91,7 @@ struct CodeEditorView: NSViewRepresentable {
         context.coordinator.applyHighlighting(language: language, searchTerm: searchTerm)
         context.coordinator.handleSearchRequest(searchRequest, query: searchTerm)
         context.coordinator.handleNavigationRequest(navigationRequest)
+        context.coordinator.ruler?.errorLines = errorLines
         context.coordinator.ruler?.needsDisplay = true
     }
 
@@ -221,8 +224,34 @@ struct CodeEditorView: NSViewRepresentable {
                     textStorage.addAttribute(.foregroundColor, value: NSColor.white, range: match.range)
                 }
             }
+
+            for errorLine in parent.errorLines {
+                if let range = characterRange(forLine: errorLine, in: textStorage.string) {
+                    textStorage.addAttribute(.backgroundColor, value: NSColor.systemRed.withAlphaComponent(0.18), range: range)
+                    textStorage.addAttribute(.underlineColor, value: NSColor.systemRed, range: range)
+                    textStorage.addAttribute(.underlineStyle, value: NSUnderlineStyle.patternDot.rawValue | NSUnderlineStyle.single.rawValue, range: range)
+                }
+            }
             textStorage.endEditing()
             isApplyingAttributes = false
+        }
+
+        private func characterRange(forLine targetLine: Int, in string: String) -> NSRange? {
+            let nsString = string as NSString
+            var currentLine = 1
+            var index = 0
+            while index < nsString.length {
+                let lineRange = nsString.lineRange(for: NSRange(location: index, length: 0))
+                if currentLine == targetLine {
+                    return lineRange
+                }
+                index = NSMaxRange(lineRange)
+                currentLine += 1
+            }
+            if currentLine == targetLine && nsString.length == 0 {
+                return NSRange(location: 0, length: 0)
+            }
+            return nil
         }
     }
 }
@@ -340,6 +369,7 @@ private enum SyntaxRules {
 @MainActor
 final class LineNumberRulerView: NSRulerView {
     private weak var textView: NSTextView?
+    var errorLines: Set<Int> = []
 
     init(textView: NSTextView) {
         self.textView = textView
@@ -373,14 +403,27 @@ final class LineNumberRulerView: NSRulerView {
         while characterIndex < text.length {
             let lineRange = text.lineRange(for: NSRange(location: characterIndex, length: 0))
             let glyphIndex = layoutManager.glyphIndexForCharacter(at: characterIndex)
+            let isError = errorLines.contains(lineNumber)
+
             if NSLocationInRange(glyphIndex, visibleGlyphRange) {
                 let lineRect = layoutManager.lineFragmentRect(forGlyphAt: glyphIndex, effectiveRange: nil)
-                let label = "\(lineNumber)" as NSString
-                let labelSize = label.size(withAttributes: attributes)
                 let y = lineRect.minY + textView.textContainerOrigin.y - visibleRect.minY
+
+                if isError {
+                    let dotRect = NSRect(x: 5, y: y + 4, width: 5, height: 5)
+                    NSColor.systemRed.setFill()
+                    NSBezierPath(ovalIn: dotRect).fill()
+                }
+
+                let lineAttrs: [NSAttributedString.Key: Any] = isError ? [
+                    .font: NSFont.monospacedDigitSystemFont(ofSize: 10, weight: .bold),
+                    .foregroundColor: NSColor.systemRed
+                ] : attributes
+                let label = "\(lineNumber)" as NSString
+                let labelSize = label.size(withAttributes: lineAttrs)
                 label.draw(
                     at: NSPoint(x: ruleThickness - labelSize.width - 8, y: y + 1),
-                    withAttributes: attributes
+                    withAttributes: lineAttrs
                 )
             } else if glyphIndex > NSMaxRange(visibleGlyphRange) {
                 break
@@ -390,11 +433,23 @@ final class LineNumberRulerView: NSRulerView {
         }
 
         if text.length == 0 || text.hasSuffix("\n") {
+            let isError = errorLines.contains(lineNumber)
             let lineRect = layoutManager.extraLineFragmentRect
-            let label = "\(lineNumber)" as NSString
-            let labelSize = label.size(withAttributes: attributes)
             let y = lineRect.minY + textView.textContainerOrigin.y - visibleRect.minY
-            label.draw(at: NSPoint(x: ruleThickness - labelSize.width - 8, y: y + 1), withAttributes: attributes)
+
+            if isError {
+                let dotRect = NSRect(x: 5, y: y + 4, width: 5, height: 5)
+                NSColor.systemRed.setFill()
+                NSBezierPath(ovalIn: dotRect).fill()
+            }
+
+            let lineAttrs: [NSAttributedString.Key: Any] = isError ? [
+                .font: NSFont.monospacedDigitSystemFont(ofSize: 10, weight: .bold),
+                .foregroundColor: NSColor.systemRed
+            ] : attributes
+            let label = "\(lineNumber)" as NSString
+            let labelSize = label.size(withAttributes: lineAttrs)
+            label.draw(at: NSPoint(x: ruleThickness - labelSize.width - 8, y: y + 1), withAttributes: lineAttrs)
         }
     }
 }
