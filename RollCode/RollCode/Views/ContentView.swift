@@ -28,7 +28,7 @@ struct ContentView: View {
 
                 if agent.isVisible {
                     AgentPanelView()
-                        .frame(minWidth: 320, idealWidth: 525, maxWidth: 900)
+                        .frame(minWidth: 360, idealWidth: 380, maxWidth: 900)
                 }
             }
 

@@ -27,6 +27,10 @@ struct WorkspaceToolbarContent: ToolbarContent {
             }
         }
 
+        ToolbarItem(placement: .principal) {
+            Spacer()
+        }
+
         ToolbarItemGroup(placement: .primaryAction) {
             Button { agent.isVisible.toggle() } label: {
                 Image(systemName: "sparkles")
