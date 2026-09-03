@@ -69,14 +69,22 @@ enum CodeLanguage: String, Sendable {
     case cFamily, go, rust, yaml, plainText
 
     init(url: URL) {
-        switch url.pathExtension.lowercased() {
+        let ext = url.pathExtension.lowercased()
+        let filename = url.lastPathComponent.lowercased()
+
+        if filename == "dockerfile" || filename == ".zshrc" || filename == ".bashrc" || filename == ".bash_profile" || filename == ".profile" {
+            self = .shell
+            return
+        }
+
+        switch ext {
         case "swift": self = .swift
         case "js", "jsx", "mjs", "cjs": self = .javascript
         case "ts", "tsx": self = .typescript
-        case "py": self = .python
+        case "py", "pyw": self = .python
         case "html", "htm": self = .html
         case "css", "scss", "sass": self = .css
-        case "json": self = .json
+        case "json", "jsonc": self = .json
         case "sh", "zsh", "bash": self = .shell
         case "md", "markdown": self = .markdown
         case "c", "h", "cc", "cpp", "cxx", "hpp", "m", "mm": self = .cFamily
