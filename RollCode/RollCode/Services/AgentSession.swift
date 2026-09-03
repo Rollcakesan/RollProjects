@@ -116,16 +116,15 @@ final class AgentSession {
         process.currentDirectoryURL = workspaceURL
 
         let contextualPrompt = makeContextualPrompt(prompt, activeFileURL: activeFileURL)
+        var environment = makeEnvironment()
 
         if selectedProvider == .codex {
             process.arguments = argumentsForCurrentThread()
-            var environment = ProcessInfo.processInfo.environment
             environment["CODEX_INTERNAL_ORIGINATOR_OVERRIDE"] = "rollcode"
-            process.environment = environment
         } else {
             process.arguments = ["-p", contextualPrompt, "-y"]
-            process.environment = ProcessInfo.processInfo.environment
         }
+        process.environment = environment
 
         process.standardOutput = standardOutput
         process.standardError = standardError
@@ -269,6 +268,33 @@ final class AgentSession {
             context += " The active editor file is \(activeFileURL.relativePath(from: workspaceURL))."
         }
         return "\(context)\n\nUser request:\n\(prompt)"
+    }
+
+    private func makeEnvironment() -> [String: String] {
+        var env = ProcessInfo.processInfo.environment
+        var paths = (env["PATH"] ?? "").split(separator: ":").map(String.init)
+        let home = FileManager.default.homeDirectoryForCurrentUser.path
+
+        let additions = [
+            "/opt/homebrew/bin",
+            "/opt/homebrew/sbin",
+            "/usr/local/bin",
+            "\(home)/.nvm/current/bin",
+            "\(home)/.volta/bin",
+            "\(home)/.cargo/bin",
+            "/usr/bin",
+            "/bin",
+            "/usr/sbin",
+            "/sbin"
+        ]
+
+        for path in additions.reversed() {
+            if !paths.contains(path) {
+                paths.insert(path, at: 0)
+            }
+        }
+        env["PATH"] = paths.joined(separator: ":")
+        return env
     }
 
     private func monitor(_ process: Process, standardOutput: Pipe, standardError: Pipe) {
