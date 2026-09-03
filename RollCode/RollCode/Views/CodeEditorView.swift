@@ -33,7 +33,7 @@ struct CodeEditorView: NSViewRepresentable {
         textView.isAutomaticQuoteSubstitutionEnabled = false
         textView.isAutomaticDashSubstitutionEnabled = false
         textView.isAutomaticTextReplacementEnabled = false
-        textView.isAutomaticTextCompletionEnabled = true
+        textView.isAutomaticTextCompletionEnabled = false
         textView.isContinuousSpellCheckingEnabled = false
         textView.writingToolsBehavior = .none
         textView.backgroundColor = EditorPalette.background
@@ -105,6 +105,7 @@ struct CodeEditorView: NSViewRepresentable {
         private var lastSearchRequestID: UUID?
         private var lastNavigationRequestID: UUID?
         private var completionDebounceTask: Task<Void, Never>?
+        let suggestionController = SuggestionOverlayController()
 
         init(parent: CodeEditorView) {
             self.parent = parent
@@ -120,24 +121,45 @@ struct CodeEditorView: NSViewRepresentable {
             scheduleCompletion(in: textView)
         }
 
-        func textView(
-            _ textView: NSTextView,
-            completions words: [String],
-            forPartialWordRange charRange: NSRange,
-            indexOfSelectedItem index: UnsafeMutablePointer<Int>?
-        ) -> [String] {
-            let nsText = textView.string as NSString
-            guard charRange.location != NSNotFound,
-                  charRange.location + charRange.length <= nsText.length else { return [] }
-            let prefix = nsText.substring(with: charRange)
-            return CodeCompletionService.shared.completions(for: prefix, in: textView.string, language: parent.language)
+        func textViewDidChangeSelection(_ notification: Notification) {
+            if suggestionController.isVisible {
+                guard let textView,
+                      textView.selectedRange().location == suggestionController.prefixRange.location + suggestionController.prefixRange.length else {
+                    suggestionController.hide()
+                    return
+                }
+            }
+        }
+
+        func textView(_ textView: NSTextView, doCommandBy commandSelector: Selector) -> Bool {
+            if suggestionController.isVisible {
+                switch commandSelector {
+                case #selector(NSResponder.moveUp(_:)):
+                    suggestionController.selectPrevious()
+                    return true
+                case #selector(NSResponder.moveDown(_:)):
+                    suggestionController.selectNext()
+                    return true
+                case #selector(NSResponder.insertNewline(_:)), #selector(NSResponder.insertTab(_:)):
+                    return suggestionController.commitSelected()
+                case #selector(NSResponder.cancelOperation(_:)):
+                    suggestionController.hide()
+                    return true
+                default:
+                    break
+                }
+            }
+            return false
         }
 
         private func scheduleCompletion(in textView: NSTextView) {
             completionDebounceTask?.cancel()
 
             // Don't interrupt IME composition (Japanese input, etc.)
-            guard !textView.hasMarkedText() else { return }
+            guard !textView.hasMarkedText() else {
+                suggestionController.hide()
+                return
+            }
 
             completionDebounceTask = Task { @MainActor [weak self] in
                 // 150ms debounce: wait until user stops typing
@@ -145,22 +167,40 @@ struct CodeEditorView: NSViewRepresentable {
                 guard !Task.isCancelled, let self, let textView = self.textView else { return }
 
                 let selectedRange = textView.selectedRange()
-                guard selectedRange.length == 0, selectedRange.location >= 2 else { return }
+                guard selectedRange.length == 0, selectedRange.location >= 2 else {
+                    self.suggestionController.hide()
+                    return
+                }
                 let nsText = textView.string as NSString
-                guard selectedRange.location <= nsText.length else { return }
+                guard selectedRange.location <= nsText.length else {
+                    self.suggestionController.hide()
+                    return
+                }
 
                 let charBefore = nsText.character(at: selectedRange.location - 1)
                 guard let unicodeScalar = UnicodeScalar(charBefore),
-                      CharacterSet.alphanumerics.contains(unicodeScalar) || unicodeScalar == "_" else { return }
+                      CharacterSet.alphanumerics.contains(unicodeScalar) || unicodeScalar == "_" else {
+                    self.suggestionController.hide()
+                    return
+                }
 
                 let lineRange = nsText.lineRange(for: NSRange(location: selectedRange.location, length: 0))
                 let prefixRange = NSRange(location: lineRange.location, length: selectedRange.location - lineRange.location)
                 let linePrefix = nsText.substring(with: prefixRange)
                 let delimiters = CharacterSet.alphanumerics.union(CharacterSet(charactersIn: "_")).inverted
                 guard let lastWord = linePrefix.components(separatedBy: delimiters).last,
-                      lastWord.count >= 2 else { return }
+                      lastWord.count >= 2 else {
+                    self.suggestionController.hide()
+                    return
+                }
 
-                textView.complete(nil)
+                let wordRange = NSRange(location: selectedRange.location - lastWord.utf16.count, length: lastWord.utf16.count)
+                let suggestions = CodeCompletionService.shared.completions(for: lastWord, in: textView.string, language: self.parent.language)
+                if !suggestions.isEmpty {
+                    self.suggestionController.show(suggestions: suggestions, prefixRange: wordRange, in: textView)
+                } else {
+                    self.suggestionController.hide()
+                }
             }
         }
 
