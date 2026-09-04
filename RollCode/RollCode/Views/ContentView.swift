@@ -152,7 +152,7 @@ enum RollCodeTheme {
     static let nsCaret = NSColor(red: 0.40, green: 0.61, blue: 0.98, alpha: 1)
     static let nsSelection = NSColor(red: 0.20, green: 0.32, blue: 0.52, alpha: 1)
     static let nsSearchMatch = NSColor(red: 0.64, green: 0.43, blue: 0.12, alpha: 0.9)
-    static let editorFont = NSFont.monospacedSystemFont(ofSize: 12.5, weight: .regular)
+    static let editorFont = NSFont.monospacedSystemFont(ofSize: 14.5, weight: .regular)
 }
 
 struct EmptyStateView<Actions: View>: View {

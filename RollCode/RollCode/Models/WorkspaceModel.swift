@@ -44,14 +44,47 @@ final class WorkspaceModel {
 
         var fontSize: CGFloat {
             switch self {
-            case .small: return 11.0
-            case .medium: return 12.5
-            case .large: return 14.5
+            case .small: return 12.5
+            case .medium: return 14.5
+            case .large: return 16.5
+            }
+        }
+    }
+
+    enum EditorFontScale: String, CaseIterable, Identifiable {
+        case small = "small"
+        case medium = "medium"
+        case large = "large"
+
+        var id: String { rawValue }
+
+        var displayName: String {
+            switch self {
+            case .small: return "Small"
+            case .medium: return "Medium"
+            case .large: return "Large"
+            }
+        }
+
+        var fontSize: CGFloat {
+            switch self {
+            case .small: return 12.5
+            case .medium: return 14.5
+            case .large: return 16.5
             }
         }
     }
 
     private(set) var fontSize: CGFloat
+    var editorFontScale: EditorFontScale {
+        if fontSize <= 13.0 {
+            return .small
+        } else if fontSize >= 15.5 {
+            return .large
+        } else {
+            return .medium
+        }
+    }
     private(set) var uiFontScale: UIFontScale
     var uiFontSize: CGFloat { uiFontScale.fontSize }
     private(set) var tabWidth: Int
@@ -78,7 +111,7 @@ final class WorkspaceModel {
         let savedTabWidth = defaults.integer(forKey: Self.tabWidthKey)
         self.tabWidth = [2, 4, 8].contains(savedTabWidth) ? savedTabWidth : 4
         let savedFontSize = defaults.double(forKey: Self.fontSizeKey)
-        self.fontSize = savedFontSize >= 9 && savedFontSize <= 32 ? CGFloat(savedFontSize) : 12.5
+        self.fontSize = savedFontSize >= 9 && savedFontSize <= 32 ? CGFloat(savedFontSize) : 14.5
         if let savedScaleString = defaults.string(forKey: Self.uiFontScaleKey),
            let savedScale = UIFontScale(rawValue: savedScaleString) {
             self.uiFontScale = savedScale
@@ -86,9 +119,9 @@ final class WorkspaceModel {
             // Backward compatibility with legacy numeric uiFontSize
             let legacySize = defaults.double(forKey: Self.legacyUIFontSizeKey)
             if legacySize > 0 {
-                if legacySize <= 11.5 {
+                if legacySize <= 13.0 {
                     self.uiFontScale = .small
-                } else if legacySize >= 13.5 {
+                } else if legacySize >= 15.5 {
                     self.uiFontScale = .large
                 } else {
                     self.uiFontScale = .medium
@@ -194,12 +227,16 @@ final class WorkspaceModel {
     }
 
     func resetZoom() {
-        setFontSize(12.5)
+        setFontSize(14.5)
     }
 
     func setFontSize(_ size: CGFloat) {
         fontSize = min(max(size, 9), 32)
         defaults.set(Double(fontSize), forKey: Self.fontSizeKey)
+    }
+
+    func setEditorFontScale(_ scale: EditorFontScale) {
+        setFontSize(scale.fontSize)
     }
 
     func setUIFontScale(_ scale: UIFontScale) {
@@ -228,9 +265,9 @@ final class WorkspaceModel {
     }
 
     func setUIFontSize(_ size: CGFloat) {
-        if size <= 11.5 {
+        if size <= 13.0 {
             setUIFontScale(.small)
-        } else if size >= 13.5 {
+        } else if size >= 15.5 {
             setUIFontScale(.large)
         } else {
             setUIFontScale(.medium)

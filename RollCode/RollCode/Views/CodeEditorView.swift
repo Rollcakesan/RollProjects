@@ -539,7 +539,7 @@ private enum EditorPalette {
         .monospacedSystemFont(ofSize: size, weight: .regular)
     }
 
-    static func paragraphStyle(tabWidth: Int, fontSize: CGFloat = 12.5) -> NSParagraphStyle {
+    static func paragraphStyle(tabWidth: Int, fontSize: CGFloat = 14.5) -> NSParagraphStyle {
         let style = NSMutableParagraphStyle()
         let spaceWidth = (" " as NSString).size(withAttributes: [.font: font(size: fontSize)]).width
         style.defaultTabInterval = spaceWidth * CGFloat(tabWidth)

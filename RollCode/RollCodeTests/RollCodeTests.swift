@@ -397,17 +397,27 @@ struct RollCodeTests {
         defer { defaults.removePersistentDomain(forName: suiteName) }
 
         let workspace = WorkspaceModel(defaults: defaults, restoresLastWorkspace: false)
-        #expect(workspace.fontSize == 12.5)
+        #expect(workspace.fontSize == 14.5)
+        #expect(workspace.editorFontScale == .medium)
 
         workspace.zoomIn()
+        #expect(workspace.fontSize == 15.5)
+
+        workspace.zoomOut()
+        workspace.zoomOut()
         #expect(workspace.fontSize == 13.5)
 
-        workspace.zoomOut()
-        workspace.zoomOut()
-        #expect(workspace.fontSize == 11.5)
-
         workspace.resetZoom()
+        #expect(workspace.fontSize == 14.5)
+        #expect(workspace.editorFontScale == .medium)
+
+        workspace.setEditorFontScale(.small)
         #expect(workspace.fontSize == 12.5)
+        #expect(workspace.editorFontScale == .small)
+
+        workspace.setEditorFontScale(.large)
+        #expect(workspace.fontSize == 16.5)
+        #expect(workspace.editorFontScale == .large)
 
         workspace.setFontSize(35)
         #expect(workspace.fontSize == 32)
@@ -1082,11 +1092,11 @@ struct RollCodeTests {
 
         let workspace = WorkspaceModel(defaults: testDefaults)
         #expect(workspace.uiFontScale == .medium)
-        #expect(workspace.uiFontSize == 12.5)
+        #expect(workspace.uiFontSize == 14.5)
 
         workspace.zoomInUI()
         #expect(workspace.uiFontScale == .large)
-        #expect(workspace.uiFontSize == 14.5)
+        #expect(workspace.uiFontSize == 16.5)
 
         workspace.zoomInUI()
         #expect(workspace.uiFontScale == .large)
@@ -1096,7 +1106,7 @@ struct RollCodeTests {
 
         workspace.zoomOutUI()
         #expect(workspace.uiFontScale == .small)
-        #expect(workspace.uiFontSize == 11.0)
+        #expect(workspace.uiFontSize == 12.5)
 
         workspace.resetUIZoom()
         #expect(workspace.uiFontScale == .medium)
@@ -1104,7 +1114,7 @@ struct RollCodeTests {
         workspace.setUIFontScale(.large)
         let restored = WorkspaceModel(defaults: testDefaults)
         #expect(restored.uiFontScale == .large)
-        #expect(restored.uiFontSize == 14.5)
+        #expect(restored.uiFontSize == 16.5)
     }
 
     @Test("GeminiAuthService resolves effectiveProjectID from stored setting and projects.json")

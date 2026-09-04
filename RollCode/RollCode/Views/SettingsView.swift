@@ -49,10 +49,20 @@ struct SettingsView: View {
                     Text("8 Spaces").tag(8)
                 }
 
+                Picker("Editor Font Size", selection: Binding(
+                    get: { workspace.editorFontScale },
+                    set: { workspace.setEditorFontScale($0) }
+                )) {
+                    ForEach(WorkspaceModel.EditorFontScale.allCases) { scale in
+                        Text(scale.displayName).tag(scale)
+                    }
+                }
+                .pickerStyle(.segmented)
+
                 HStack {
-                    Text("Editor Font Size")
+                    Text("Fine Adjustment")
                     Spacer()
-                    Text("\(Int(workspace.fontSize)) pt")
+                    Text(workspace.fontSize.truncatingRemainder(dividingBy: 1) == 0 ? "\(Int(workspace.fontSize)) pt" : String(format: "%.1f pt", workspace.fontSize))
                         .foregroundStyle(RollCodeTheme.secondaryText)
                     Button("-") { workspace.zoomOut() }
                     Button("+") { workspace.zoomIn() }
