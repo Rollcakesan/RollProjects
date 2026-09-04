@@ -38,8 +38,8 @@
 ### `agent_thread_management`
 - **New Thread**: `AgentSession.newThread()` - Archives the active conversation and starts a fresh thread.
 - **Switch Thread**: `AgentSession.switchToThread(_ thread: AgentThread)` - Restores previous message history, token tallies, and turn metrics.
-- **Delete Thread**: `AgentSession.deleteThread(_ thread: AgentThread)` - Permanently removes a conversation thread.
-- **Stop Execution**: `AgentSession.stop(resetThread: Bool = false)` - Cancels running turns or terminates active CLI/App Server sub-processes.
+- **Delete Thread**: `AgentSession.deleteThread(id: UUID)` - Permanently removes a conversation thread by its unique ID.
+- **Stop Execution**: `AgentSession.stop()` - Cancels running turns or terminates active CLI/App Server sub-processes.
 
 ---
 
