@@ -51,16 +51,6 @@ final class EditorDocument: Identifiable {
     }
 }
 
-struct EditorSearchRequest: Equatable, Sendable {
-    enum Direction: Sendable {
-        case previous
-        case next
-    }
-
-    let id = UUID()
-    let direction: Direction
-}
-
 struct EditorNavigationRequest: Equatable, Sendable {
     let id = UUID()
     let line: Int

@@ -4,8 +4,6 @@ import SwiftUI
 struct CodeEditorView: NSViewRepresentable {
     @Binding var text: String
     let language: CodeLanguage
-    let searchTerm: String
-    let searchRequest: EditorSearchRequest?
     let navigationRequest: EditorNavigationRequest?
     var errorLines: Set<Int> = []
     var gitAddedLines: Set<Int> = []
@@ -34,6 +32,8 @@ struct CodeEditorView: NSViewRepresentable {
         textView.importsGraphics = false
         textView.allowsUndo = true
         textView.usesFindPanel = true
+        textView.usesFindBar = true
+        textView.isIncrementalSearchingEnabled = true
         textView.isAutomaticQuoteSubstitutionEnabled = false
         textView.isAutomaticDashSubstitutionEnabled = false
         textView.isAutomaticTextReplacementEnabled = false
@@ -73,7 +73,7 @@ struct CodeEditorView: NSViewRepresentable {
         scrollView.rulersVisible = true
         context.coordinator.textView = textView
         context.coordinator.ruler = ruler
-        context.coordinator.applyHighlighting(language: language, searchTerm: searchTerm)
+        context.coordinator.applyHighlighting(language: language)
         return scrollView
     }
 
@@ -94,8 +94,7 @@ struct CodeEditorView: NSViewRepresentable {
             textView.string = text
             textView.setSelectedRange(NSRange(location: min(selection.location, text.utf16.count), length: 0))
         }
-        context.coordinator.applyHighlighting(language: language, searchTerm: searchTerm)
-        context.coordinator.handleSearchRequest(searchRequest, query: searchTerm)
+        context.coordinator.applyHighlighting(language: language)
         context.coordinator.handleNavigationRequest(navigationRequest)
         context.coordinator.ruler?.errorLines = errorLines
         context.coordinator.ruler?.gitAddedLines = gitAddedLines
@@ -111,7 +110,6 @@ struct CodeEditorView: NSViewRepresentable {
         var isInternalTextChange = false
         private var isApplyingAttributes = false
         private var isPerformingSmartEdit = false
-        private var lastSearchRequestID: UUID?
         private var lastNavigationRequestID: UUID?
         private var completionDebounceTask: Task<Void, Never>?
         let suggestionController = SuggestionOverlayController()
@@ -125,7 +123,7 @@ struct CodeEditorView: NSViewRepresentable {
             isInternalTextChange = true
             parent.text = textView.string
             isInternalTextChange = false
-            applyHighlighting(language: parent.language, searchTerm: parent.searchTerm)
+            applyHighlighting(language: parent.language)
             ruler?.needsDisplay = true
 
             scheduleCompletion(in: textView)
@@ -282,7 +280,7 @@ struct CodeEditorView: NSViewRepresentable {
             isInternalTextChange = true
             parent.text = textView.string
             isInternalTextChange = false
-            applyHighlighting(language: parent.language, searchTerm: parent.searchTerm)
+            applyHighlighting(language: parent.language)
             ruler?.needsDisplay = true
         }
 
@@ -395,41 +393,6 @@ struct CodeEditorView: NSViewRepresentable {
             return false
         }
 
-        func handleSearchRequest(_ request: EditorSearchRequest?, query: String) {
-            guard let request,
-                  request.id != lastSearchRequestID,
-                  !query.isEmpty,
-                  let textView else { return }
-            lastSearchRequestID = request.id
-
-            let text = textView.string as NSString
-            let selection = textView.selectedRange()
-            let fullRange = NSRange(location: 0, length: text.length)
-            let match: NSRange
-
-            switch request.direction {
-            case .next:
-                let start = min(NSMaxRange(selection), text.length)
-                let remaining = NSRange(location: start, length: text.length - start)
-                let next = text.range(of: query, options: .caseInsensitive, range: remaining)
-                match = next.location == NSNotFound
-                    ? text.range(of: query, options: .caseInsensitive, range: fullRange)
-                    : next
-            case .previous:
-                let end = min(selection.location, text.length)
-                let preceding = NSRange(location: 0, length: end)
-                let previous = text.range(of: query, options: [.caseInsensitive, .backwards], range: preceding)
-                match = previous.location == NSNotFound
-                    ? text.range(of: query, options: [.caseInsensitive, .backwards], range: fullRange)
-                    : previous
-            }
-
-            guard match.location != NSNotFound else { return }
-            textView.setSelectedRange(match)
-            textView.scrollRangeToVisible(match)
-            textView.window?.makeFirstResponder(textView)
-        }
-
         func handleNavigationRequest(_ request: EditorNavigationRequest?) {
             guard let request,
                   request.id != lastNavigationRequestID,
@@ -449,7 +412,7 @@ struct CodeEditorView: NSViewRepresentable {
             textView.window?.makeFirstResponder(textView)
         }
 
-        func applyHighlighting(language: CodeLanguage, searchTerm: String) {
+        func applyHighlighting(language: CodeLanguage) {
             guard let textStorage = textView?.textStorage, let textView else { return }
             let fullLength = textStorage.length
             guard fullLength > 0 else { return }
@@ -479,17 +442,6 @@ struct CodeEditorView: NSViewRepresentable {
             for rule in SyntaxRules.rules(for: language) {
                 for match in rule.regex.matches(in: textStorage.string, range: activeRange) {
                     textStorage.addAttribute(.foregroundColor, value: rule.color, range: match.range)
-                }
-            }
-
-            if !searchTerm.isEmpty,
-               let expression = try? NSRegularExpression(
-                pattern: NSRegularExpression.escapedPattern(for: searchTerm),
-                options: [.caseInsensitive]
-               ) {
-                for match in expression.matches(in: textStorage.string, range: activeRange) {
-                    textStorage.addAttribute(.backgroundColor, value: EditorPalette.searchMatch, range: match.range)
-                    textStorage.addAttribute(.foregroundColor, value: NSColor.white, range: match.range)
                 }
             }
 
@@ -531,7 +483,6 @@ private enum EditorPalette {
     static var foreground: NSColor { RollCodeTheme.nsForeground }
     static var caret: NSColor { RollCodeTheme.nsCaret }
     static var selection: NSColor { RollCodeTheme.nsSelection }
-    static var searchMatch: NSColor { RollCodeTheme.nsSearchMatch }
     static var font: NSFont { RollCodeTheme.editorFont }
 
     static func font(size: CGFloat) -> NSFont {

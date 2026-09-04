@@ -134,43 +134,13 @@ private struct EditorTab: View {
 private struct EditorDocumentView: View {
     @Environment(WorkspaceModel.self) private var workspace
     @Bindable var document: EditorDocument
-    @State private var searchTerm = ""
-    @State private var showsSearch = false
-    @State private var searchRequest: EditorSearchRequest?
     @State private var showsGoToLine = false
     @State private var targetLine = ""
     @FocusState private var goToLineFocused: Bool
 
     var body: some View {
         VStack(spacing: 0) {
-            if showsSearch {
-                HStack(spacing: 8) {
-                    SearchField(text: $searchTerm, prompt: "Find in file")
-                        .frame(width: 230)
-                    Text(matchDescription)
-                        .font(.system(size: 10))
-                        .foregroundStyle(RollCodeTheme.secondaryText)
-                    Spacer()
-                    Button { find(.previous) } label: {
-                        Image(systemName: "chevron.up")
-                    }
-                    .buttonStyle(.plain)
-                    .help("Previous Match")
-                    Button { find(.next) } label: {
-                        Image(systemName: "chevron.down")
-                    }
-                    .buttonStyle(.plain)
-                    .help("Next Match")
-                    Button { showsSearch = false; searchTerm = "" } label: {
-                        Image(systemName: "xmark")
-                    }
-                    .buttonStyle(.plain)
-                    .foregroundStyle(RollCodeTheme.secondaryText)
-                }
-                .padding(.horizontal, 10)
-                .frame(height: 37)
-                .background(RollCodeTheme.elevatedBackground)
-            } else if showsGoToLine {
+            if showsGoToLine {
                 HStack(spacing: 8) {
                     Text("Go to line:")
                         .font(.system(size: 11, weight: .medium))
@@ -227,8 +197,6 @@ private struct EditorDocumentView: View {
                 CodeEditorView(
                     text: $document.text,
                     language: document.language,
-                    searchTerm: searchTerm,
-                    searchRequest: searchRequest,
                     navigationRequest: workspace.editorNavigationRequest,
                     errorLines: Set(document.diagnostics.map(\.line)),
                     gitAddedLines: document.gitAddedLines,
@@ -241,28 +209,12 @@ private struct EditorDocumentView: View {
             }
         }
         .background {
-            Group {
-                Button("") { showsSearch = true; showsGoToLine = false }
-                    .keyboardShortcut("f", modifiers: .command)
-                Button("") { showsGoToLine = true; showsSearch = false }
-                    .keyboardShortcut("l", modifiers: .command)
-            }
-            .buttonStyle(.plain)
-            .frame(width: 0, height: 0)
-            .opacity(0)
+            Button("") { showsGoToLine = true }
+                .keyboardShortcut("l", modifiers: .command)
+                .buttonStyle(.plain)
+                .frame(width: 0, height: 0)
+                .opacity(0)
         }
-    }
-
-    private var matchDescription: String {
-        guard !searchTerm.isEmpty,
-              let regex = try? Regex(NSRegularExpression.escapedPattern(for: searchTerm)).ignoresCase() else { return "" }
-        let count = document.text.matches(of: regex).count
-        return count == 1 ? "1 match" : "\(count) matches"
-    }
-
-    private func find(_ direction: EditorSearchRequest.Direction) {
-        guard !searchTerm.isEmpty else { return }
-        searchRequest = EditorSearchRequest(direction: direction)
     }
 
     private func performGoToLine() {
