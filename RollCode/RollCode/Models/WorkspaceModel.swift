@@ -362,14 +362,14 @@ final class WorkspaceModel {
         let docName = document.name
         let docURL = document.url
         Task.detached(priority: .utility) {
-            guard let change = try? GitDiffService.changes(in: rootURL).first(where: { $0.path == docName || rootURL.appending(path: $0.path) == docURL }) else {
+            guard let change = try? GitBridgeService.changes(in: rootURL).first(where: { $0.path == docName || rootURL.appending(path: $0.path) == docURL }) else {
                 await MainActor.run {
                     document.gitAddedLines = []
                     document.gitModifiedLines = []
                 }
                 return
             }
-            let (added, modified) = GitDiffService.diffLineNumbers(for: change.diff)
+            let (added, modified) = GitBridgeService.diffLineNumbers(for: change.diff)
             await MainActor.run {
                 document.gitAddedLines = added
                 document.gitModifiedLines = modified

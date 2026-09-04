@@ -1,30 +1,6 @@
 import Foundation
 
-struct CodeCompletionSuggestion: Hashable, Identifiable, Sendable {
-    let label: String
-    let insertText: String
-    let filterText: String
-    let detail: String?
-    let replacementRange: NSRange?
-
-    var id: String {
-        [label, insertText, detail ?? ""].joined(separator: "\u{0}")
-    }
-
-    init(
-        label: String,
-        insertText: String? = nil,
-        filterText: String? = nil,
-        detail: String? = nil,
-        replacementRange: NSRange? = nil
-    ) {
-        self.label = label
-        self.insertText = insertText ?? label
-        self.filterText = filterText ?? label
-        self.detail = detail
-        self.replacementRange = replacementRange
-    }
-}
+public typealias CodeCompletionSuggestion = LSPCompletionItem
 
 @MainActor
 final class CodeCompletionService {
@@ -81,7 +57,8 @@ final class CodeCompletionService {
         if !lspItems.isEmpty {
             let pLower = trimmedPrefix.lowercased()
             filteredLSP = lspItems.filter {
-                $0.filterText.lowercased().hasPrefix(pLower)
+                let candidate = ($0.filterText ?? $0.label).lowercased()
+                return candidate.hasPrefix(pLower)
                     && $0.insertText.caseInsensitiveCompare(trimmedPrefix) != .orderedSame
             }
         }

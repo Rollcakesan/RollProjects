@@ -54,7 +54,7 @@ extension WorkspaceModel {
     func gitChanges() async throws -> [GitChange] {
         guard let rootURL else { return [] }
         return try await Task.detached(priority: .userInitiated) {
-            try GitDiffService.changes(in: rootURL)
+            try GitBridgeService.changes(in: rootURL)
         }.value
     }
 
@@ -64,7 +64,7 @@ extension WorkspaceModel {
             throw GitDiffError.commandFailed("Save edited files before committing.")
         }
         try await Task.detached(priority: .userInitiated) {
-            try GitDiffService.commit(in: rootURL, message: message)
+            try GitBridgeService.commit(in: rootURL, message: message)
         }.value
         refreshTree()
     }

@@ -256,7 +256,7 @@ struct RollCodeTests {
         #expect(replacement.text == "let value = $EDITOR\\name\n// $EDITOR\\name and $EDITOR\\name")
     }
 
-    @Test("GitDiffService returns tracked and untracked changes")
+    @Test("GitBridgeService returns tracked and untracked changes")
     func gitDiffServiceReturnsWorkingTreeChanges() throws {
         try withTemporaryDirectory { root in
             try runGit(["init", "--quiet"], in: root)
@@ -271,14 +271,14 @@ struct RollCodeTests {
             try "after\n".write(to: tracked, atomically: true, encoding: .utf8)
             try "new\n".write(to: root.appendingPathComponent("new.txt"), atomically: true, encoding: .utf8)
 
-            let changes = try GitDiffService.changes(in: root)
+            let changes = try GitBridgeService.changes(in: root)
             #expect(changes.map(\.path) == ["new.txt", "tracked.txt"])
             #expect(changes.first(where: { $0.path == "tracked.txt" })?.diff.contains("+after") == true)
             #expect(changes.first(where: { $0.path == "new.txt" })?.diff.contains("new file mode") == true)
         }
     }
 
-    @Test("GitDiffService shows staged files before the first commit")
+    @Test("GitBridgeService shows staged files before the first commit")
     func gitDiffServiceSupportsRepositoryWithoutHead() throws {
         try withTemporaryDirectory { root in
             try runGit(["init", "--quiet"], in: root)
@@ -286,7 +286,7 @@ struct RollCodeTests {
             try "first".write(to: file, atomically: true, encoding: .utf8)
             try runGit(["add", "first.txt"], in: root)
 
-            let changes = try GitDiffService.changes(in: root)
+            let changes = try GitBridgeService.changes(in: root)
             #expect(changes.map(\.path) == ["first.txt"])
             #expect(changes.first?.diff.contains("+first") == true)
         }
@@ -485,7 +485,7 @@ struct RollCodeTests {
         }
     }
 
-    @Test("GitDiffService commits changes and updates status")
+    @Test("GitBridgeService commits changes and updates status")
     func gitDiffServiceCommitsChanges() throws {
         try withTemporaryDirectory { root in
             try runGit(["init"], in: root)
@@ -495,17 +495,17 @@ struct RollCodeTests {
             let testFile = root.appendingPathComponent("file.txt")
             try "hello".write(to: testFile, atomically: true, encoding: .utf8)
 
-            let changesBefore = try GitDiffService.changes(in: root)
+            let changesBefore = try GitBridgeService.changes(in: root)
             #expect(!changesBefore.isEmpty)
 
-            try GitDiffService.commit(in: root, message: "Initial commit")
+            try GitBridgeService.commit(in: root, message: "Initial commit")
 
-            let changesAfter = try GitDiffService.changes(in: root)
+            let changesAfter = try GitBridgeService.changes(in: root)
             #expect(changesAfter.isEmpty)
         }
     }
 
-    @Test("GitDiffService limits changes and commits to an opened repository subfolder")
+    @Test("GitBridgeService limits changes and commits to an opened repository subfolder")
     func gitDiffServiceScopesOperationsToWorkspace() throws {
         try withTemporaryDirectory { root in
             try runGit(["init", "--quiet"], in: root)
@@ -523,18 +523,18 @@ struct RollCodeTests {
             try "outside change".write(to: outside, atomically: true, encoding: .utf8)
             try "inside change".write(to: inside, atomically: true, encoding: .utf8)
 
-            let changes = try GitDiffService.changes(in: subfolder)
+            let changes = try GitBridgeService.changes(in: subfolder)
             #expect(changes.map(\.path) == ["inside.txt"])
             #expect(changes.first?.diff.contains("+inside change") == true)
 
-            try GitDiffService.commit(in: subfolder, message: "Update subproject")
-            #expect(try GitDiffService.changes(in: subfolder).isEmpty)
-            #expect(try GitDiffService.changedPaths(in: root) == ["outside.txt"])
+            try GitBridgeService.commit(in: subfolder, message: "Update subproject")
+            #expect(try GitBridgeService.changes(in: subfolder).isEmpty)
+            #expect(try GitBridgeService.changedPaths(in: root) == ["outside.txt"])
             #expect(try runGitOutput(["show", "--pretty=format:", "--name-only", "HEAD"], in: root).trimmed == "Subproject/inside.txt")
         }
     }
 
-    @Test("GitDiffService restores staging state when commit fails")
+    @Test("GitBridgeService restores staging state when commit fails")
     func gitDiffServiceRestoresIndexAfterFailedCommit() throws {
         try withTemporaryDirectory { root in
             try runGit(["init", "--quiet"], in: root)
@@ -551,10 +551,10 @@ struct RollCodeTests {
             try FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: hook.path)
 
             #expect(throws: GitDiffError.self) {
-                try GitDiffService.commit(in: root, message: "Rejected")
+                try GitBridgeService.commit(in: root, message: "Rejected")
             }
             #expect(try runGitOutput(["diff", "--cached", "--name-only"], in: root).trimmed.isEmpty)
-            #expect(try GitDiffService.changedPaths(in: root) == ["file.txt"])
+            #expect(try GitBridgeService.changedPaths(in: root) == ["file.txt"])
         }
     }
 
@@ -579,7 +579,7 @@ struct RollCodeTests {
 
             #expect(try String(contentsOf: file, encoding: .utf8) == "editor change")
             #expect(workspace.activeDocument?.isDirty == false)
-            #expect(try GitDiffService.changedPaths(in: root).isEmpty)
+            #expect(try GitBridgeService.changedPaths(in: root).isEmpty)
         }
     }
 
@@ -916,7 +916,7 @@ struct RollCodeTests {
         #expect(workspace.documents.map(\.name) == ["A.swift"])
     }
 
-    @Test("GitDiffService parses diff line numbers correctly")
+    @Test("GitBridgeService parses diff line numbers correctly")
     func gitDiffServiceLineNumberParsing() throws {
         let sampleDiff = """
         @@ -10,3 +10,4 @@
@@ -925,7 +925,7 @@ struct RollCodeTests {
         +let c = 3
          let d = 4
         """
-        let (added, _) = GitDiffService.diffLineNumbers(for: sampleDiff)
+        let (added, _) = GitBridgeService.diffLineNumbers(for: sampleDiff)
         #expect(added.contains(11))
         #expect(added.contains(12))
         #expect(!added.contains(10))

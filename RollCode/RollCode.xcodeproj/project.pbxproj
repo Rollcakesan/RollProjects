@@ -33,7 +33,6 @@
 		C3010006A922B2F06EF834AD /* LSPServerConfig.swift in Sources */ = {isa = PBXBuildFile; fileRef = C3010002A922B2F06EF834AD /* LSPServerConfig.swift */; };
 		C3010007A922B2F06EF834AD /* LSPClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = C3010003A922B2F06EF834AD /* LSPClient.swift */; };
 		C3010008A922B2F06EF834AD /* LSPClientManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = C3010004A922B2F06EF834AD /* LSPClientManager.swift */; };
-		A10100082DBC1CD7BB090EE2 /* LSPManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1010008A922B2F06EF834AD /* LSPManager.swift */; };
 		A10100062DBC1CD7BB090EE2 /* ShortcutCheatSheetView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1010006A922B2F06EF834AD /* ShortcutCheatSheetView.swift */; };
 		A10100052DBC1CD7BB090EE2 /* SuggestionOverlayController.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1010005A922B2F06EF834AD /* SuggestionOverlayController.swift */; };
 		A10100042DBC1CD7BB090EE2 /* CodeCompletionService.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1010004A922B2F06EF834AD /* CodeCompletionService.swift */; };
@@ -47,7 +46,6 @@
 		41DA4DA7784C1173E4636615 /* QuickOpenView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 838061E9A81A90C22BBD98D3 /* QuickOpenView.swift */; };
 		58E50C1CFBA9F0F95EB8BDC5 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8C72D31622D2C578313E4592 /* ContentView.swift */; };
 		5C96E77FF30CF39E08441593 /* WorkspaceModel+Search.swift in Sources */ = {isa = PBXBuildFile; fileRef = F9EEEE206A75557B9C6E93B6 /* WorkspaceModel+Search.swift */; };
-		78E6AC0D5AB26CB245C2F433 /* GitDiffService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 50BCDAC7F3D1F9F9A3BD1D9F /* GitDiffService.swift */; };
 		8C902C37A357B6D62BDE498A /* StatusBarView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 95C30C09271F19837D613065 /* StatusBarView.swift */; };
 		8DBD4209F7CCD35BF417AE85 /* GitChangesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2C6F410620414229ED11ECD0 /* GitChangesView.swift */; };
 		ABFEB9698D7F1107FCCE094A /* AgentPanelView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C9C767C9339F05FD8B88FF4D /* AgentPanelView.swift */; };
@@ -101,7 +99,6 @@
 		C4010010A922B2F06EF834AD /* MarkdownBlocks.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "UI/MarkdownBlocks.swift"; sourceTree = "<group>"; };
 		C4010011A922B2F06EF834AD /* ModelCatalogService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Core/ModelCatalogService.swift"; sourceTree = "<group>"; };
 		C4010012A922B2F06EF834AD /* PromptInputBar.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "UI/PromptInputBar.swift"; sourceTree = "<group>"; };
-		B1010008A922B2F06EF834AD /* LSPManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LSPManager.swift; sourceTree = "<group>"; };
 		B1010006A922B2F06EF834AD /* ShortcutCheatSheetView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShortcutCheatSheetView.swift; sourceTree = "<group>"; };
 		B1010005A922B2F06EF834AD /* SuggestionOverlayController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SuggestionOverlayController.swift; sourceTree = "<group>"; };
 		B1010004A922B2F06EF834AD /* CodeCompletionService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CodeCompletionService.swift; sourceTree = "<group>"; };
@@ -114,7 +111,6 @@
 		39D36B8757FCD6E258124A17 /* EditorSmartEditing.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EditorSmartEditing.swift; sourceTree = "<group>"; };
 		431906205771AD178AFE3D62 /* CodeEditorView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CodeEditorView.swift; sourceTree = "<group>"; };
 		48D8E08B9D3380DF5FEF51D2 /* WorkspaceModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkspaceModel.swift; sourceTree = "<group>"; };
-		50BCDAC7F3D1F9F9A3BD1D9F /* GitDiffService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GitDiffService.swift; sourceTree = "<group>"; };
 		6052BD8029E5C5686780E276 /* EditorDocument.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EditorDocument.swift; sourceTree = "<group>"; };
 		838061E9A81A90C22BBD98D3 /* QuickOpenView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QuickOpenView.swift; sourceTree = "<group>"; };
 		8650E1550FF5B564D5154EF5 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
@@ -167,9 +163,7 @@
 			children = (
 				B1010003A922B2F06EF834AD /* SyntaxCheckService.swift */,
 				B1010004A922B2F06EF834AD /* CodeCompletionService.swift */,
-				B1010008A922B2F06EF834AD /* LSPManager.swift */,
 				B1010005A922B2F06EF834AD /* SuggestionOverlayController.swift */,
-				50BCDAC7F3D1F9F9A3BD1D9F /* GitDiffService.swift */,
 			);
 			path = Services;
 			sourceTree = "<group>";
@@ -449,7 +443,6 @@
 				D59906FAAE255735531190E5 /* CodeEditorView.swift in Sources */,
 				A10100032DBC1CD7BB090EE2 /* SyntaxCheckService.swift in Sources */,
 				A10100042DBC1CD7BB090EE2 /* CodeCompletionService.swift in Sources */,
-				A10100082DBC1CD7BB090EE2 /* LSPManager.swift in Sources */,
 				A10100052DBC1CD7BB090EE2 /* SuggestionOverlayController.swift in Sources */,
 				A10100022DBC1CD7BB090EE2 /* SettingsView.swift in Sources */,
 				A10100062DBC1CD7BB090EE2 /* ShortcutCheatSheetView.swift in Sources */,
@@ -458,7 +451,6 @@
 				F6E0EA9CBF792581BEBD500C /* EditorSmartEditing.swift in Sources */,
 				D14EDE2AF7E1C44A04148482 /* EditorWorkspaceView.swift in Sources */,
 				8DBD4209F7CCD35BF417AE85 /* GitChangesView.swift in Sources */,
-				78E6AC0D5AB26CB245C2F433 /* GitDiffService.swift in Sources */,
 				41DA4DA7784C1173E4636615 /* QuickOpenView.swift in Sources */,
 				34D92B120E17117437B4C83A /* RollCodeApp.swift in Sources */,
 				DE6BF8C0C0BCACF4BB84013E /* SidebarView.swift in Sources */,

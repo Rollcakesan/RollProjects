@@ -66,37 +66,9 @@ struct EditorNavigationRequest: Equatable, Sendable {
     let line: Int
 }
 
-enum CodeLanguage: String, Sendable {
-    case swift, javascript, typescript, python, html, css, json, shell, markdown
-    case cFamily, go, rust, yaml, plainText
+public typealias CodeLanguage = LSPDocumentLanguage
 
-    init(url: URL) {
-        let ext = url.pathExtension.lowercased()
-        let filename = url.lastPathComponent.lowercased()
-
-        if filename == "dockerfile" || filename == ".zshrc" || filename == ".bashrc" || filename == ".bash_profile" || filename == ".profile" {
-            self = .shell
-            return
-        }
-
-        switch ext {
-        case "swift": self = .swift
-        case "js", "jsx", "mjs", "cjs": self = .javascript
-        case "ts", "tsx": self = .typescript
-        case "py", "pyw": self = .python
-        case "html", "htm": self = .html
-        case "css", "scss", "sass": self = .css
-        case "json", "jsonc": self = .json
-        case "sh", "zsh", "bash": self = .shell
-        case "md", "markdown": self = .markdown
-        case "c", "h", "cc", "cpp", "cxx", "hpp", "m", "mm": self = .cFamily
-        case "go": self = .go
-        case "rs": self = .rust
-        case "yaml", "yml": self = .yaml
-        default: self = .plainText
-        }
-    }
-
+extension CodeLanguage {
     var displayName: String {
         switch self {
         case .javascript: return "JavaScript"
