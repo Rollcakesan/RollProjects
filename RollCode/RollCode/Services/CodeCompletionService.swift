@@ -6,25 +6,6 @@ public typealias CodeCompletionSuggestion = LSPCompletionItem
 final class CodeCompletionService {
     static let shared = CodeCompletionService()
 
-    private var cachedFrequencies: [String: Int] = [:]
-    private var lastScannedHash: Int = 0
-    private var isScanning = false
-
-    func updateCacheAsync(for text: String) {
-        let hash = text.hashValue
-        guard hash != lastScannedHash, !isScanning else { return }
-        isScanning = true
-
-        Task.detached(priority: .utility) {
-            let frequencies = Self.extractWordFrequencies(from: text)
-            await MainActor.run {
-                self.cachedFrequencies = frequencies
-                self.lastScannedHash = hash
-                self.isScanning = false
-            }
-        }
-    }
-
     func completions(
         for prefix: String,
         in text: String,
@@ -85,112 +66,31 @@ final class CodeCompletionService {
     }
 
     func localCompletions(for prefix: String, in text: String, language: CodeLanguage) -> [String] {
-        let prefix = prefix.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !prefix.isEmpty else { return [] }
+        let trimmedPrefix = prefix.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmedPrefix.isEmpty else { return [] }
 
-        // Trigger background scan if needed
-        updateCacheAsync(for: text)
-
+        let prefixLower = trimmedPrefix.lowercased()
         let keywordList = Self.keywords(for: language)
-        let keywordSet = Set(keywordList)
-        let localWords = Self.extractLocalWords(around: prefix, in: text)
 
-        var candidateWords = Set<String>()
+        // 1. Language keywords starting with prefix (prioritized)
+        let matchingKeywords = keywordList.filter {
+            $0.lowercased().hasPrefix(prefixLower) && $0.caseInsensitiveCompare(trimmedPrefix) != .orderedSame
+        }
 
-        // 1. Language Keywords
-        for kw in keywordList {
-            if kw.localizedCaseInsensitiveContains(prefix) && kw.caseInsensitiveCompare(prefix) != .orderedSame {
-                candidateWords.insert(kw)
+        // 2. Local buffer identifiers starting with prefix
+        let localWords = Self.extractLocalWords(in: text)
+        let matchingLocalWords = localWords
+            .filter {
+                $0.lowercased().hasPrefix(prefixLower)
+                && $0.caseInsensitiveCompare(trimmedPrefix) != .orderedSame
+                && !matchingKeywords.contains($0)
             }
-        }
+            .sorted { $0.localizedStandardCompare($1) == .orderedAscending }
 
-        // 2. Cached identifiers (with frequencies)
-        for (w, _) in cachedFrequencies {
-            if w.localizedCaseInsensitiveContains(prefix) && w.caseInsensitiveCompare(prefix) != .orderedSame {
-                candidateWords.insert(w)
-            }
-        }
-
-        // 3. Local words around current cursor
-        for w in localWords {
-            if w.localizedCaseInsensitiveContains(prefix) && w.caseInsensitiveCompare(prefix) != .orderedSame {
-                candidateWords.insert(w)
-            }
-        }
-
-        let prefixLower = prefix.lowercased()
-
-        // Score candidates based on user priority:
-        // Priority 1: Prefix match over infix match
-        // Priority 2: Language keyword / standard keyword
-        // Priority 3: Local word (near current editing location)
-        // Priority 4: Usage frequency in the file
-        // Priority 5: Exact case prefix match
-        // Priority 6: Shorter length
-        // Priority 7: Alphabetical order
-        let scored = candidateWords.map { word -> ScoredCandidate in
-            let wordLower = word.lowercased()
-            let startsWithPrefix = wordLower.hasPrefix(prefixLower)
-            let isKeyword = keywordSet.contains(word)
-            let isLocal = localWords.contains(word)
-            let frequency = cachedFrequencies[word] ?? (isLocal ? 1 : 0)
-            let exactCaseMatch = word.hasPrefix(prefix)
-
-            return ScoredCandidate(
-                word: word,
-                startsWithPrefix: startsWithPrefix,
-                isKeyword: isKeyword,
-                isLocal: isLocal,
-                frequency: frequency,
-                exactCaseMatch: exactCaseMatch,
-                length: word.count
-            )
-        }
-
-        let sorted = scored.sorted()
-        return sorted.prefix(20).map(\.word)
+        return Array((matchingKeywords + matchingLocalWords).prefix(20))
     }
 
-    private struct ScoredCandidate: Comparable {
-        let word: String
-        let startsWithPrefix: Bool
-        let isKeyword: Bool
-        let isLocal: Bool
-        let frequency: Int
-        let exactCaseMatch: Bool
-        let length: Int
-
-        static func < (lhs: ScoredCandidate, rhs: ScoredCandidate) -> Bool {
-            // 1. Prefix matches first
-            if lhs.startsWithPrefix != rhs.startsWithPrefix {
-                return lhs.startsWithPrefix
-            }
-            // 2. Language keywords & general reserved words first
-            if lhs.isKeyword != rhs.isKeyword {
-                return lhs.isKeyword
-            }
-            // 3. Local words (near cursor) next
-            if lhs.isLocal != rhs.isLocal {
-                return lhs.isLocal
-            }
-            // 4. Higher frequency words next
-            if lhs.frequency != rhs.frequency {
-                return lhs.frequency > rhs.frequency
-            }
-            // 5. Exact case match
-            if lhs.exactCaseMatch != rhs.exactCaseMatch {
-                return lhs.exactCaseMatch
-            }
-            // 6. Shorter words next
-            if lhs.length != rhs.length {
-                return lhs.length < rhs.length
-            }
-            // 7. Alphabetical
-            return lhs.word.localizedStandardCompare(rhs.word) == .orderedAscending
-        }
-    }
-
-    private static func extractLocalWords(around prefix: String, in text: String) -> Set<String> {
+    private static func extractLocalWords(in text: String) -> Set<String> {
         var words = Set<String>()
         let lines = text.components(separatedBy: .newlines)
         for line in lines.prefix(200) {
@@ -201,20 +101,6 @@ final class CodeCompletionService {
             }
         }
         return words
-    }
-
-    nonisolated private static func extractWordFrequencies(from text: String) -> [String: Int] {
-        var frequencies: [String: Int] = [:]
-        let pattern = #"\b[A-Za-z_][A-Za-z0-9_]{1,}\b"#
-        guard let regex = try? NSRegularExpression(pattern: pattern) else { return [:] }
-
-        let nsText = text as NSString
-        let matches = regex.matches(in: text, range: NSRange(location: 0, length: nsText.length))
-        for match in matches {
-            let word = nsText.substring(with: match.range)
-            frequencies[word, default: 0] += 1
-        }
-        return frequencies
     }
 
     static func keywords(for language: CodeLanguage) -> [String] {

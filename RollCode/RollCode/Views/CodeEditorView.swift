@@ -128,7 +128,6 @@ struct CodeEditorView: NSViewRepresentable {
             applyHighlighting(language: parent.language, searchTerm: parent.searchTerm)
             ruler?.needsDisplay = true
 
-            CodeCompletionService.shared.updateCacheAsync(for: textView.string)
             scheduleCompletion(in: textView)
         }
 
