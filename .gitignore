@@ -8,3 +8,5 @@ coverage/
 xcuserdata/
 .data/
 Port/public/react-app.js
+.build/
+.swiftpm/

@@ -852,27 +852,6 @@ final class AgentSession {
     }
 }
 
-enum CodexExecutableLocator {
-    static func locate(environment: [String: String] = ProcessInfo.processInfo.environment) -> URL? {
-        var candidates = [
-            "/Applications/ChatGPT.app/Contents/Resources/codex",
-            "/opt/homebrew/bin/codex",
-            "/usr/local/bin/codex"
-        ]
-        if let path = environment["PATH"] {
-            candidates += path.split(separator: ":").map { "\($0)/codex" }
-        }
-
-        for path in candidates {
-            let standardized = URL(fileURLWithPath: path).standardizedFileURL
-            if FileManager.default.isExecutableFile(atPath: standardized.path) {
-                return standardized
-            }
-        }
-        return nil
-    }
-}
-
 enum GeminiExecutableLocator {
     static func locate(environment: [String: String] = ProcessInfo.processInfo.environment) -> URL? {
         var candidates = [

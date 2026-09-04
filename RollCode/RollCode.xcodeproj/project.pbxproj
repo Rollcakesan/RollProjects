@@ -7,6 +7,8 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		C1010003A922B2F06EF834AD /* CodexAppServerClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = C1010001A922B2F06EF834AD /* CodexAppServerClient.swift */; };
+		C1010004A922B2F06EF834AD /* Models.swift in Sources */ = {isa = PBXBuildFile; fileRef = C1010002A922B2F06EF834AD /* Models.swift */; };
 		A10100092DBC1CD7BB090EE2 /* LanguageServerConfig.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1010009A922B2F06EF834AD /* LanguageServerConfig.swift */; };
 		A10100082DBC1CD7BB090EE2 /* LSPManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1010008A922B2F06EF834AD /* LSPManager.swift */; };
 		A10100072DBC1CD7BB090EE2 /* FileWatcherService.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1010007A922B2F06EF834AD /* FileWatcherService.swift */; };
@@ -98,6 +100,8 @@
 		EE1CBC30691ED77150C53A0C /* TerminalSession.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TerminalSession.swift; sourceTree = "<group>"; };
 		F19EA110FDE9DCE79DB3D1D8 /* SidebarView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SidebarView.swift; sourceTree = "<group>"; };
 		F9EEEE206A75557B9C6E93B6 /* WorkspaceModel+Search.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "WorkspaceModel+Search.swift"; sourceTree = "<group>"; };
+		C1010001A922B2F06EF834AD /* CodexAppServerClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CodexAppServerClient.swift; sourceTree = "<group>"; };
+		C1010002A922B2F06EF834AD /* Models.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Models.swift; sourceTree = "<group>"; };
 		FD214D2A1312129925D5096C /* WorkspaceSearchView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkspaceSearchView.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
@@ -163,8 +167,18 @@
 			children = (
 				CD2CDD9EA4C99B0494CB364A /* RollCode */,
 				C40FF0B39E5B53C368FF6902 /* RollCodeTests */,
+				C1010005A922B2F06EF834AD /* Packages */,
 				C7B6CB3D0685FBC310777B78 /* Products */,
 			);
+			sourceTree = "<group>";
+		};
+		C1010005A922B2F06EF834AD /* Packages */ = {
+			isa = PBXGroup;
+			children = (
+				C1010001A922B2F06EF834AD /* CodexAppServerClient.swift */,
+				C1010002A922B2F06EF834AD /* Models.swift */,
+			);
+			path = Packages/CodexAppServerKit/Sources/CodexAppServerKit;
 			sourceTree = "<group>";
 		};
 		6B6C74CEFBD0CCE922D99C91 /* App */ = {
@@ -313,6 +327,8 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				C1010003A922B2F06EF834AD /* CodexAppServerClient.swift in Sources */,
+				C1010004A922B2F06EF834AD /* Models.swift in Sources */,
 				A82B2722068CFA9987B1D958 /* AgentModels.swift in Sources */,
 				B1010010A922B2F06EF834AD /* ModelCatalogService.swift in Sources */,
 				B1010020A922B2F06EF834AD /* CodexAppServerService.swift in Sources */,
