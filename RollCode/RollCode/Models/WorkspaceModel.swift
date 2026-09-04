@@ -28,6 +28,7 @@ final class WorkspaceModel {
     var isSavingActiveDocumentAs = false
     private var savingDocumentID: UUID?
     private(set) var fontSize: CGFloat
+    private(set) var uiFontSize: CGFloat
     private(set) var tabWidth: Int
     private(set) var restoresLastWorkspace: Bool
     private(set) var isLoadingTree = false
@@ -40,6 +41,7 @@ final class WorkspaceModel {
     private static let restoreLastWorkspaceKey = "RollCode.restoreLastWorkspace"
     private static let tabWidthKey = "RollCode.editorTabWidth"
     private static let fontSizeKey = "RollCode.editorFontSize"
+    private static let uiFontSizeKey = "RollCode.uiFontSize"
 
     var lastWorkspacePath: String? {
         defaults.string(forKey: Self.lastWorkspacePathKey)
@@ -51,6 +53,8 @@ final class WorkspaceModel {
         self.tabWidth = [2, 4, 8].contains(savedTabWidth) ? savedTabWidth : 4
         let savedFontSize = defaults.double(forKey: Self.fontSizeKey)
         self.fontSize = savedFontSize >= 9 && savedFontSize <= 32 ? CGFloat(savedFontSize) : 12.5
+        let savedUIFontSize = defaults.double(forKey: Self.uiFontSizeKey)
+        self.uiFontSize = savedUIFontSize >= 10 && savedUIFontSize <= 18 ? CGFloat(savedUIFontSize) : 12.0
         let userPrefersRestore = defaults.object(forKey: Self.restoreLastWorkspaceKey) as? Bool ?? true
         self.restoresLastWorkspace = userPrefersRestore
 
@@ -154,6 +158,23 @@ final class WorkspaceModel {
     func setFontSize(_ size: CGFloat) {
         fontSize = min(max(size, 9), 32)
         defaults.set(Double(fontSize), forKey: Self.fontSizeKey)
+    }
+
+    func zoomInUI() {
+        setUIFontSize(min(uiFontSize + 1, 18))
+    }
+
+    func zoomOutUI() {
+        setUIFontSize(max(uiFontSize - 1, 10))
+    }
+
+    func resetUIZoom() {
+        setUIFontSize(12.0)
+    }
+
+    func setUIFontSize(_ size: CGFloat) {
+        uiFontSize = min(max(size, 10), 18)
+        defaults.set(Double(uiFontSize), forKey: Self.uiFontSizeKey)
     }
 
     func quickOpenFiles(matching query: String) -> [FileNode] {

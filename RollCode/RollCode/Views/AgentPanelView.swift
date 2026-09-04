@@ -612,12 +612,13 @@ struct AgentPanelView: View {
 }
 
 private struct AgentMessageView: View {
+    @Environment(WorkspaceModel.self) private var workspace
     let message: AgentMessage
 
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
             Text(message.displayTitle)
-                .font(.system(size: 9, weight: .bold))
+                .font(.system(size: max(workspace.uiFontSize - 3, 8.5), weight: .bold))
                 .foregroundStyle(roleColor)
 
             let blocks = MarkdownBlockParser.parse(from: message.text)
@@ -626,13 +627,13 @@ private struct AgentMessageView: View {
                 case .text(let content):
                     if let attributed = try? AttributedString(markdown: content, options: .init(interpretedSyntax: .inlineOnlyPreservingWhitespace)) {
                         Text(attributed)
-                            .font(.system(size: 11))
+                            .font(.system(size: workspace.uiFontSize))
                             .foregroundStyle(RollCodeTheme.primaryText)
                             .textSelection(.enabled)
                             .fixedSize(horizontal: false, vertical: true)
                     } else {
                         Text(content)
-                            .font(.system(size: 11))
+                            .font(.system(size: workspace.uiFontSize))
                             .foregroundStyle(RollCodeTheme.primaryText)
                             .textSelection(.enabled)
                             .fixedSize(horizontal: false, vertical: true)

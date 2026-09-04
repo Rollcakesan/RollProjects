@@ -1072,6 +1072,33 @@ struct RollCodeTests {
         let stripped = AgentSession.stripANSIEscapes(from: raw)
         #expect(stripped == "Success: Updated 2 files")
     }
+
+    @Test("WorkspaceModel manages and persists uiFontSize zoom levels")
+    @MainActor
+    func workspaceModelManagesUIFontSize() {
+        let suiteName = "RollCodeTest_UIFont_\(UUID().uuidString)"
+        let testDefaults = UserDefaults(suiteName: suiteName)!
+        defer { testDefaults.removePersistentDomain(forName: suiteName) }
+
+        let workspace = WorkspaceModel(defaults: testDefaults)
+        #expect(workspace.uiFontSize == 12.0)
+
+        workspace.zoomInUI()
+        #expect(workspace.uiFontSize == 13.0)
+
+        workspace.setUIFontSize(25.0)
+        #expect(workspace.uiFontSize == 18.0)
+
+        workspace.setUIFontSize(5.0)
+        #expect(workspace.uiFontSize == 10.0)
+
+        workspace.resetUIZoom()
+        #expect(workspace.uiFontSize == 12.0)
+
+        workspace.setUIFontSize(14.0)
+        let restored = WorkspaceModel(defaults: testDefaults)
+        #expect(restored.uiFontSize == 14.0)
+    }
 }
 
 @MainActor

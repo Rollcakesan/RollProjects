@@ -121,14 +121,14 @@ private struct FileTreeNodeView: View {
 
             // File / Folder icon
             Image(systemName: node.iconName)
-                .font(.system(size: 11))
+                .font(.system(size: max(workspace.uiFontSize - 1, 9)))
                 .foregroundStyle(nodeIconColor)
                 .frame(width: 16)
                 .padding(.trailing, 3)
 
             // Name label
             Text(node.name)
-                .font(.system(size: 12, weight: (node.isDirectory && isExpanded) ? .medium : .regular))
+                .font(.system(size: workspace.uiFontSize, weight: (node.isDirectory && isExpanded) ? .medium : .regular))
                 .foregroundStyle(isSelected ? RollCodeTheme.primaryText : (node.isDirectory ? RollCodeTheme.primaryText.opacity(0.9) : RollCodeTheme.secondaryText.opacity(0.95)))
                 .lineLimit(1)
 
@@ -136,7 +136,7 @@ private struct FileTreeNodeView: View {
         }
         .padding(.horizontal, 6)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .frame(height: 24)
+        .frame(height: max(workspace.uiFontSize * 1.9, 22))
         .background(
             isSelected
                 ? RollCodeTheme.elevatedBackground

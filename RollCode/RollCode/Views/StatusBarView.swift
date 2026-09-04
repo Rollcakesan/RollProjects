@@ -41,7 +41,7 @@ struct StatusBarView: View {
                 ActiveDocumentStatus(document: document)
             }
         }
-        .font(.system(size: 10))
+        .font(.system(size: max(workspace.uiFontSize - 1.5, 9.5)))
         .foregroundStyle(RollCodeTheme.secondaryText)
         .padding(.horizontal, 10)
         .frame(height: 23)

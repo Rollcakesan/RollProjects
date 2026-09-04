@@ -39,7 +39,7 @@ struct SettingsView: View {
 
     private var generalTab: some View {
         Form {
-            Section("Editor") {
+            Section("Editor & Display") {
                 Picker("Tab Width", selection: Binding(
                     get: { workspace.tabWidth },
                     set: { workspace.setTabWidth($0) }
@@ -50,13 +50,23 @@ struct SettingsView: View {
                 }
 
                 HStack {
-                    Text("Font Size")
+                    Text("Editor Font Size")
                     Spacer()
                     Text("\(Int(workspace.fontSize)) pt")
                         .foregroundStyle(RollCodeTheme.secondaryText)
                     Button("-") { workspace.zoomOut() }
                     Button("+") { workspace.zoomIn() }
                     Button("Reset") { workspace.resetZoom() }
+                }
+
+                HStack {
+                    Text("UI Font Size")
+                    Spacer()
+                    Text("\(Int(workspace.uiFontSize)) pt")
+                        .foregroundStyle(RollCodeTheme.secondaryText)
+                    Button("-") { workspace.zoomOutUI() }
+                    Button("+") { workspace.zoomInUI() }
+                    Button("Reset") { workspace.resetUIZoom() }
                 }
             }
 

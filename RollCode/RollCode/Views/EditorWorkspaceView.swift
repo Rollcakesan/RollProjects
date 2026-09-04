@@ -77,6 +77,7 @@ private struct TabDropDelegate: DropDelegate {
 }
 
 private struct EditorTab: View {
+    @Environment(WorkspaceModel.self) private var workspace
     let document: EditorDocument
     let isActive: Bool
     let select: () -> Void
@@ -88,10 +89,10 @@ private struct EditorTab: View {
     var body: some View {
         HStack(spacing: 7) {
             Image(systemName: document.language.systemImageName)
-                .font(.system(size: 10))
+                .font(.system(size: max(workspace.uiFontSize - 2, 9)))
                 .foregroundStyle(isActive ? RollCodeTheme.accent : RollCodeTheme.secondaryText)
             Text(document.name)
-                .font(.system(size: 11, weight: isActive ? .medium : .regular))
+                .font(.system(size: max(workspace.uiFontSize - 1, 10), weight: isActive ? .medium : .regular))
                 .lineLimit(1)
             if document.isDirty {
                 Circle()
