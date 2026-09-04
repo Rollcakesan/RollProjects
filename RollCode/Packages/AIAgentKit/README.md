@@ -1,141 +1,74 @@
-# AIAgentKit
+# MCP Tool Specification: AIAgentKit
 
-Unified AI Agent Orchestration, Communication, and State Management framework for macOS applications.
-
-`AIAgentKit` brings together OpenAI Codex (CLI and Codex App Server via JSON-RPC) and Google Gemini (CLI and REST APIs) into a single, cohesive Swift package. It manages authentication, process life cycles, multi-thread session history, model catalogs with reasoning effort configurations, streaming events, and token tracking.
-
----
-
-## Features
-
-- **Multi-Provider Architecture**:
-  - **Codex**: Full support for local `codex` CLI and long-running Codex App Server (`codex app-server`) with JSON-RPC stdio protocol.
-  - **Gemini**: Full support for Google Gemini CLI with automated GCP Project ID resolution (`projects.json`), API Key fallbacks, and Google Generative Language Model Catalog integration.
-- **Session & Thread Management**:
-  - Multi-threaded conversation sessions (`AgentThread`), automatic persistence, thread switching, and past session resume.
-  - Granular token usage tracking (`input`, `cached`, `output`, `total`).
-- **Catalog & Reasoning Effort**:
-  - Unified model registry (`AIModelInfo`) supporting speed tiers (Fast / Standard / Deep Thinking) and reasoning effort controls (`low`, `medium`, `high`).
-- **Zero Heavy External Dependencies**:
-  - Pure Swift concurrency (`async/await`, `@Observable`, `@MainActor`).
-  - Seamless integration with `GitBridgeKit` for real-time workspace diff detection.
+> **Role**: Unified AI agent orchestrator for OpenAI Codex (stdio JSON-RPC App Server & CLI) and Google Gemini (CLI & API).  
+> **Concurrency**: Managed by `@MainActor` `@Observable` engine `AgentSession`. Background tasks stream events asynchronously.  
+> **Package**: `import AIAgentKit`
 
 ---
 
-## Architecture
+## Tool Definitions
 
-```
-AIAgentKit/
-├── Core/
-│   ├── AgentModels.swift          # AgentMessage, AgentActivity, AgentThread, TokenUsage
-│   └── ModelCatalogService.swift  # Model catalog, speed tiers, reasoning effort
-├── Providers/
-│   ├── Codex/
-│   │   ├── CodexModels.swift          # JSON-RPC models & notifications
-│   │   ├── CodexAppServerClient.swift # Process lifecycle & JSON-RPC communication
-│   │   ├── CodexEventParser.swift     # Streaming event decoder
-│   │   └── CodexAuthService.swift     # ChatGPT login & auth detector
-│   └── Gemini/
-│       ├── GeminiAuthService.swift    # ~/.gemini detector & projects.json resolver
-│       └── GeminiExecutableLocator.swift # CLI path resolution
-└── Engine/
-    └── AgentSession.swift         # Multi-thread engine, provider dispatch & run loop
-```
+### `agent_send_prompt`
+- **Method**: `AgentSession.send(_ prompt: String, in workspaceURL: URL, activeFileURL: URL? = nil)`
+- **Description**: Submits a prompt turn to the currently selected provider (`codex` or `gemini`). Injects active file context, computes initial git changed paths, and starts event streaming.
+- **Parameters**:
+  - `prompt` (`String`): User task or instruction.
+  - `workspaceURL` (`URL`): Target project / repository root path.
+  - `activeFileURL` (`URL?`): Currently focused editor document URL for relative path context injection.
+- **Side Effects**: Appends user message and streaming activity/message entries into `AgentSession.entries`.
 
----
+### `agent_select_provider`
+- **Method**: `AgentSession.selectProvider(_ provider: AgentProvider)`
+- **Description**: Switches the active engine between `.codex` (OpenAI Codex) and `.gemini` (Google Gemini).
+- **Parameters**:
+  - `provider` (`AgentProvider`): `.codex` or `.gemini`.
 
-## Installation
+### `agent_set_model`
+- **Method**: `AgentSession.setModel(_ modelID: String)`
+- **Description**: Updates the model identifier for the active provider and persists selection to user preferences and thread metadata.
+- **Parameters**:
+  - `modelID` (`String`): Model ID (e.g. `"gpt-5.6-sol"`, `"gemini-2.5-pro"`).
 
-Add `AIAgentKit` as a local package dependency in your `Package.swift`:
+### `agent_set_reasoning_effort`
+- **Method**: `AgentSession.setReasoningEffort(_ effort: ReasoningEffort)`
+- **Description**: Sets the thinking depth tier for models supporting reasoning effort.
+- **Parameters**:
+  - `effort` (`ReasoningEffort`): `.low`, `.medium`, or `.high`.
 
-```swift
-// swift-tools-version: 6.0
-import PackageDescription
-
-let package = Package(
-    name: "MyApp",
-    dependencies: [
-        .package(path: "../AIAgentKit")
-    ],
-    targets: [
-        .target(
-            name: "MyApp",
-            dependencies: [
-                .product(name: "AIAgentKit", package: "AIAgentKit")
-            ]
-        )
-    ]
-)
-```
+### `agent_thread_management`
+- **New Thread**: `AgentSession.newThread()` - Archives the active conversation and starts a fresh thread.
+- **Switch Thread**: `AgentSession.switchToThread(_ thread: AgentThread)` - Restores previous message history, token tallies, and turn metrics.
+- **Delete Thread**: `AgentSession.deleteThread(_ thread: AgentThread)` - Permanently removes a conversation thread.
+- **Stop Execution**: `AgentSession.stop(resetThread: Bool = false)` - Cancels running turns or terminates active CLI/App Server sub-processes.
 
 ---
 
-## Quick Start
+## Shared Models & State Representation
 
-### 1. Initialize `AgentSession`
-
+### `AgentEntry`
+Discriminated union representing the linear thread conversation stream:
 ```swift
-import AIAgentKit
-
-@MainActor
-let agent = AgentSession()
-
-// Select provider: .codex or .gemini
-agent.selectProvider(.codex)
-
-// Configure model and reasoning effort
-agent.setModel("gpt-5.6-sol")
-agent.setReasoningEffort(.high)
+public enum AgentEntry: Identifiable, Sendable {
+    case message(AgentMessage)     // User or Assistant text blocks
+    case activity(AgentActivity)   // Real-time tool executions / reasoning status
+    case changes([String])         // Modified workspace relative paths
+    case usage(AgentTokenUsage)    // Turn token usage breakdown
+}
 ```
 
-### 2. Send Prompts
-
+### `AgentTokenUsage`
 ```swift
-let workspaceURL = URL(fileURLWithPath: "/path/to/my/project")
-
-agent.send("Run unit tests and fix any failing assertions.", in: workspaceURL)
-```
-
-### 3. Observe Events & Streamed Messages
-
-`AgentSession` is marked with `@Observable` and `@MainActor`, making it instantly reactive in SwiftUI:
-
-```swift
-import SwiftUI
-import AIAgentKit
-
-struct MyChatView: View {
-    @Environment(AgentSession.self) private var agent
-
-    var body: some View {
-        List(agent.entries) { entry in
-            switch entry {
-            case .message(let msg):
-                Text("\(msg.displayTitle): \(msg.text)")
-            case .activity(let act):
-                Text("[\(act.state.rawValue)] \(act.title)")
-            case .changes(let files):
-                Text("Modified: \(files.joined(separator: ", "))")
-            case .usage(let tokens):
-                Text("Tokens: \(tokens)")
-            }
-        }
-    }
+public struct AgentTokenUsage: Codable, Hashable, Sendable {
+    public let input: Int
+    public let cached: Int
+    public let output: Int
+    public let total: Int
 }
 ```
 
 ---
 
-## Testing
-
-Run the included unit test suite:
-
-```bash
-swift test --package-path Packages/AIAgentKit
-```
-
----
-
-## License
-
-MIT License. See [LICENSE](LICENSE) for details.
+## Constraints & Guardrails
+1. **Thread Affiliation**: Switching providers preserves previous thread state separately (`codexLatestThread` vs `geminiLatestThread`).
+2. **Git Awareness**: Auto-detects modified workspace paths between turn start and completion using `GitBridgeKit`.
+3. **Cancellation**: Calling `stop()` guarantees process termination and cleans up stdin/stdout pipes.

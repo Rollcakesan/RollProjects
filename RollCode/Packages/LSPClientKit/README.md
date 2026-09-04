@@ -1,118 +1,71 @@
-# LSPClientKit
+# MCP Tool Specification: LSPClientKit
 
-[![Swift 6.0](https://img.shields.io/badge/Swift-6.0-orange.svg)](https://swift.org)
-[![macOS 14.0+](https://img.shields.io/badge/macOS-14.0+-blue.svg)](https://apple.com)
-[![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
-
-A pure-Swift, zero-dependency client library for communicating with **Language Server Protocol (LSP)** servers over standard I/O (JSON-RPC 2.0).
-
-Built for macOS code editors, IDEs, and developer tools. Provides automated binary discovery, process pooling, document synchronization (`didOpen`, `didChange`, `didClose`), auto-completion, and document formatting.
+> **Role**: Language Server Protocol (JSON-RPC 2.0 stdio) manager for code intelligence (completions, formatting, document synchronization).  
+> **Concurrency**: Managed by `@MainActor` singleton `LSPManager.shared`. Background server tasks run on isolated sub-processes.  
+> **Package**: `import LSPClientKit`
 
 ---
 
-## 🌟 Supported Language Servers
+## Tool Definitions
 
-`LSPClientKit` automatically discovers and connects to standard language servers installed via Homebrew, Xcode, Cargo, or Go:
+### `lsp_request_completions`
+- **Method**: `LSPManager.shared.requestCompletions(for: LSPDocumentLanguage, url: URL, text: String, line: Int, character: Int, workspaceURL: URL? = nil) async -> [LSPCompletionItem]`
+- **Description**: Requests code completion items at a specific 0-based line/character cursor position. Synchronizes document content with the LSP server via `didOpen`/`didChange` before querying.
+- **Parameters**:
+  - `for` (`LSPDocumentLanguage`): Target language (`.swift`, `.typescript`, `.python`, `.rust`, `.go`, etc.).
+  - `url` (`URL`): Document file URL.
+  - `text` (`String`): Current buffer snapshot.
+  - `line` (`Int`): 0-based line index.
+  - `character` (`Int`): 0-based UTF-16 character offset.
+  - `workspaceURL` (`URL?`): Optional workspace root; falls back to parent directory of `url`.
+- **Returns**: `[LSPCompletionItem]`
+  - `label` (`String`): Display name in autocomplete popup.
+  - `insertText` (`String`): Text to insert into editor.
+  - `filterText` (`String?`): Custom prefix match query.
+  - `detail` (`String?`): Type signature or short documentation.
+  - `replacementRange` (`NSRange?`): Range in editor buffer to replace.
 
-| Language | Language Server | Auto-Discovered Commands |
-| :--- | :--- | :--- |
-| **Swift / C / Obj-C** | `sourcekit-lsp` | `sourcekit-lsp` (Xcode bundled) |
-| **TypeScript / JavaScript** | `typescript-language-server` | `typescript-language-server --stdio` |
-| **Python** | `pyright` / `pylsp` | `pyright-langserver --stdio`, `pylsp` |
-| **Rust** | `rust-analyzer` | `rust-analyzer` |
-| **Go** | `gopls` | `gopls` |
-| **HTML / CSS / JSON** | VS Code Language Servers | `vscode-html-language-server`, `vscode-css-language-server`, `vscode-json-language-server` |
-| **Shell** | `bash-language-server` | `bash-language-server start` |
-| **YAML** | `yaml-language-server` | `yaml-language-server --stdio` |
+### `lsp_format_document`
+- **Method**: `LSPManager.shared.formatDocument(for: LSPDocumentLanguage, url: URL, text: String, tabWidth: Int, workspaceURL: URL? = nil) async -> String?`
+- **Description**: Formats the entire document using the active language server (`textDocument/formatting`). Returns the transformed text, or `nil` if formatting failed or is unsupported.
+- **Parameters**:
+  - `for` (`LSPDocumentLanguage`): Target language enum.
+  - `url` (`URL`): Document file URL.
+  - `text` (`String`): Current buffer content.
+  - `tabWidth` (`Int`): Indentation spaces (e.g. 2 or 4).
+  - `workspaceURL` (`URL?`): Workspace root directory.
+- **Returns**: `String?` (formatted source string or `nil`).
 
----
+### `lsp_close_document`
+- **Method**: `LSPManager.shared.closeDocument(_ url: URL)`
+- **Description**: Emits `textDocument/didClose` across all active language servers to free server-side document buffers.
+- **Parameters**:
+  - `url` (`URL`): Document file URL.
 
-## 📐 Architecture
+### `lsp_activate_workspace`
+- **Method**: `LSPManager.shared.activateWorkspace(_ workspaceURL: URL)`
+- **Description**: Evicts and terminates language server processes whose root path does not match `workspaceURL`.
 
-```text
-┌─────────────────────────────────────────────────────────────┐
-│                    Your macOS App / IDE                     │
-│               (e.g., RollCode, Code Editor)                 │
-└──────────────────────────────┬──────────────────────────────┘
-                               │ Swift Async/Await
-┌──────────────────────────────▼──────────────────────────────┐
-│                         LSPManager                          │
-│   - Process Pooling by (Workspace Root + Server ID)         │
-│   - Language Server Discovery & Resolution                  │
-└──────────────────────────────┬──────────────────────────────┘
-                               │
-┌──────────────────────────────▼──────────────────────────────┐
-│                         LSPClient                           │
-│   - JSON-RPC 2.0 over Stdio Pipes (Content-Length Framing)  │
-│   - Document Sync (didOpen / didChange / didClose)          │
-│   - Position Encoding Negotiation (UTF-8, UTF-16, UTF-32)   │
-│   - Completion & Formatting Response Decoders               │
-└──────────────────────────────┬──────────────────────────────┘
-                               │ Standard I/O (Pipes)
-┌──────────────────────────────▼──────────────────────────────┐
-│            sourcekit-lsp / pyright / rust-analyzer          │
-└─────────────────────────────────────────────────────────────┘
-```
-
----
-
-## 🚀 Quickstart
-
-```swift
-import LSPClientKit
-
-@MainActor
-func requestSwiftCompletions() async {
-    let manager = LSPManager.shared
-
-    let fileURL = URL(fileURLWithPath: "/path/to/MyFile.swift")
-    let sourceText = """
-    import Foundation
-
-    func test() {
-        print("Hello")
-    }
-    """
-
-    // Query completion suggestions at line 4, character 8
-    let suggestions = await manager.requestCompletions(
-        for: .swift,
-        url: fileURL,
-        text: sourceText,
-        line: 4,
-        character: 8
-    )
-
-    for item in suggestions {
-        print("\(item.label) -> \(item.insertText) (\(item.detail ?? ""))")
-    }
-}
-```
+### `lsp_stop_all_servers`
+- **Method**: `LSPManager.shared.stopAllServers()`
+- **Description**: Gracefully shuts down all active background LSP server processes (`shutdown` followed by `exit`).
 
 ---
 
-## 📚 API Reference
+## Language Support & Auto-Discovery
 
-### `LSPManager`
-High-level singleton managing process pools across multiple active workspace folders.
+Auto-discovers binaries via standard PATH and developer tools:
+- **Swift / C-Family**: `sourcekit-lsp` (Xcode bundled / toolchains)
+- **TypeScript / JavaScript**: `typescript-language-server`
+- **Python**: `pyright-langserver`, `pylsp`
+- **Rust**: `rust-analyzer`
+- **Go**: `gopls`
+- **HTML / CSS / JSON**: `vscode-*-language-server`
+- **Shell**: `bash-language-server`
+- **YAML**: `yaml-language-server`
 
-| Method | Description |
-| :--- | :--- |
-| `requestCompletions(for:url:text:line:character:workspaceURL:) async -> [LSPCompletionItem]` | Fetches auto-completion suggestions. |
-| `formatDocument(for:url:text:tabWidth:workspaceURL:) async -> String?` | Formats the document using the language server. |
-| `activateWorkspace(URL)` | Evicts inactive language server processes when switching workspaces. |
-| `closeDocument(URL)` | Sends `textDocument/didClose` notification to active language servers. |
-| `stopAllServers()` | Gracefully terminates all active language server background processes. |
+---
 
-### Data Models
-
-#### `LSPCompletionItem`
-```swift
-public struct LSPCompletionItem: Hashable, Identifiable, Sendable {
-    public let label: String
-    public let insertText: String
-    public let filterText: String
-    public let detail: String?
-    public let replacementRange: NSRange?
-}
-```
+## Constraints & Guardrails
+1. **Position Encoding**: LSP uses 0-based UTF-16 code unit offsets for `character`.
+2. **Process Isolation**: Servers run in child processes with dedicated stdin/stdout pipes and automatic zombie cleanup on deinit.
