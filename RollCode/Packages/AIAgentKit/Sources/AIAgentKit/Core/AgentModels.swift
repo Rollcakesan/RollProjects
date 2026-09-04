@@ -1,12 +1,12 @@
 import Foundation
 
-struct AgentMessage: Identifiable, Equatable, Sendable, Codable {
-    enum Role: String, Sendable, Codable {
+public struct AgentMessage: Identifiable, Equatable, Sendable, Codable {
+    public enum Role: String, Sendable, Codable {
         case user
         case assistant
         case system
 
-        var title: String {
+        public var title: String {
             switch self {
             case .user: "YOU"
             case .assistant: "CODEX"
@@ -15,38 +15,38 @@ struct AgentMessage: Identifiable, Equatable, Sendable, Codable {
         }
     }
 
-    let id: UUID
-    let role: Role
-    let text: String
-    var senderName: String?
+    public let id: UUID
+    public let role: Role
+    public let text: String
+    public var senderName: String?
 
-    init(role: Role, text: String) {
+    public init(role: Role, text: String) {
         self.id = UUID()
         self.role = role
         self.text = text
         self.senderName = nil
     }
 
-    init(id: UUID = UUID(), role: Role, text: String, senderName: String? = nil) {
+    public init(id: UUID = UUID(), role: Role, text: String, senderName: String? = nil) {
         self.id = id
         self.role = role
         self.text = text
         self.senderName = senderName
     }
 
-    var displayTitle: String {
+    public var displayTitle: String {
         if let senderName { return senderName }
         return role.title
     }
 }
 
-struct AgentActivity: Identifiable, Equatable, Sendable, Codable {
-    enum State: String, Sendable, Codable {
+public struct AgentActivity: Identifiable, Equatable, Sendable, Codable {
+    public enum State: String, Sendable, Codable {
         case running
         case completed
         case failed
 
-        var iconName: String {
+        public var iconName: String {
             switch self {
             case .running: "circle.dotted"
             case .completed: "checkmark.circle.fill"
@@ -55,14 +55,21 @@ struct AgentActivity: Identifiable, Equatable, Sendable, Codable {
         }
     }
 
-    let id: String
-    let title: String
-    let detail: String
-    let state: State
+    public let id: String
+    public let title: String
+    public let detail: String
+    public let state: State
+
+    public init(id: String, title: String, detail: String, state: State) {
+        self.id = id
+        self.title = title
+        self.detail = detail
+        self.state = state
+    }
 }
 
-enum AgentEntry: Identifiable, Equatable, Sendable, Codable {
-    enum ID: Hashable, Sendable {
+public enum AgentEntry: Identifiable, Equatable, Sendable, Codable {
+    public enum ID: Hashable, Sendable {
         case message(UUID)
         case activity(String)
         case changes
@@ -74,7 +81,7 @@ enum AgentEntry: Identifiable, Equatable, Sendable, Codable {
     case changes([String])
     case usage(String)
 
-    var id: ID {
+    public var id: ID {
         switch self {
         case .message(let message): .message(message.id)
         case .activity(let activity): .activity(activity.id)
@@ -87,7 +94,7 @@ enum AgentEntry: Identifiable, Equatable, Sendable, Codable {
         case type, message, activity, changes, usage
     }
 
-    init(from decoder: Decoder) throws {
+    public init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         let type = try container.decode(String.self, forKey: .type)
         switch type {
@@ -110,7 +117,7 @@ enum AgentEntry: Identifiable, Equatable, Sendable, Codable {
         }
     }
 
-    func encode(to encoder: Encoder) throws {
+    public func encode(to encoder: Encoder) throws {
         var container = encoder.container(keyedBy: CodingKeys.self)
         switch self {
         case .message(let msg):
@@ -129,7 +136,7 @@ enum AgentEntry: Identifiable, Equatable, Sendable, Codable {
     }
 }
 
-enum CodexEvent: Equatable, Sendable {
+public enum CodexEvent: Equatable, Sendable {
     case threadStarted(String)
     case message(String)
     case activity(AgentActivity, changedFiles: [String])
@@ -137,13 +144,13 @@ enum CodexEvent: Equatable, Sendable {
     case error(String)
 }
 
-enum AgentProvider: String, CaseIterable, Identifiable, Sendable, Codable {
+public enum AgentProvider: String, CaseIterable, Identifiable, Sendable, Codable {
     case codex = "Codex"
     case gemini = "Gemini"
 
-    var id: String { rawValue }
+    public var id: String { rawValue }
 
-    var iconName: String {
+    public var iconName: String {
         switch self {
         case .codex: "sparkles"
         case .gemini: "bolt.fill"
@@ -151,16 +158,22 @@ enum AgentProvider: String, CaseIterable, Identifiable, Sendable, Codable {
     }
 }
 
-struct AgentTokenUsage: Equatable, Sendable, Codable {
-    var inputTokens: Int
-    var cachedTokens: Int
-    var outputTokens: Int
+public struct AgentTokenUsage: Equatable, Sendable, Codable {
+    public var inputTokens: Int
+    public var cachedTokens: Int
+    public var outputTokens: Int
 
-    var totalTokens: Int {
+    public init(inputTokens: Int, cachedTokens: Int, outputTokens: Int) {
+        self.inputTokens = inputTokens
+        self.cachedTokens = cachedTokens
+        self.outputTokens = outputTokens
+    }
+
+    public var totalTokens: Int {
         inputTokens + outputTokens
     }
 
-    static func parse(from description: String) -> AgentTokenUsage? {
+    public static func parse(from description: String) -> AgentTokenUsage? {
         let inputMatch = description.firstMatch(of: #/(\d+)\s+input/#)
         let cachedMatch = description.firstMatch(of: #/(\d+)\s+cached/#)
         let outputMatch = description.firstMatch(of: #/(\d+)\s+output/#)
@@ -175,21 +188,21 @@ struct AgentTokenUsage: Equatable, Sendable, Codable {
     }
 }
 
-struct AgentThread: Identifiable, Equatable, Sendable, Codable {
-    let id: UUID
-    var provider: AgentProvider
-    var codexThreadID: String?
-    var title: String
-    var updatedAt: Date
-    var entries: [AgentEntry]
-    var model: String?
-    var reasoningEffort: String?
-    var inputTokens: Int
-    var outputTokens: Int
-    var cachedTokens: Int
-    var lastDurationSeconds: Double?
+public struct AgentThread: Identifiable, Equatable, Sendable, Codable {
+    public let id: UUID
+    public var provider: AgentProvider
+    public var codexThreadID: String?
+    public var title: String
+    public var updatedAt: Date
+    public var entries: [AgentEntry]
+    public var model: String?
+    public var reasoningEffort: String?
+    public var inputTokens: Int
+    public var outputTokens: Int
+    public var cachedTokens: Int
+    public var lastDurationSeconds: Double?
 
-    init(
+    public init(
         id: UUID = UUID(),
         provider: AgentProvider = .codex,
         codexThreadID: String? = nil,
@@ -222,7 +235,7 @@ struct AgentThread: Identifiable, Equatable, Sendable, Codable {
         case model, reasoningEffort, inputTokens, outputTokens, cachedTokens, lastDurationSeconds
     }
 
-    init(from decoder: Decoder) throws {
+    public init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         self.id = try container.decode(UUID.self, forKey: .id)
         self.provider = try container.decode(AgentProvider.self, forKey: .provider)
@@ -239,27 +252,33 @@ struct AgentThread: Identifiable, Equatable, Sendable, Codable {
     }
 }
 
-struct CodexSessionSummary: Identifiable, Equatable, Sendable {
-    let id: String
-    let threadName: String
-    let updatedAt: Date?
+public struct CodexSessionSummary: Identifiable, Equatable, Sendable {
+    public let id: String
+    public let threadName: String
+    public let updatedAt: Date?
 
-    var displayTitle: String {
+    public init(id: String, threadName: String, updatedAt: Date?) {
+        self.id = id
+        self.threadName = threadName
+        self.updatedAt = updatedAt
+    }
+
+    public var displayTitle: String {
         let trimmed = threadName.trimmingCharacters(in: .whitespacesAndNewlines)
         return trimmed.isEmpty ? "Untitled Session" : trimmed
     }
 }
 
-enum ANSIEscapeCleaner: Sendable {
+public enum ANSIEscapeCleaner: Sendable {
     nonisolated(unsafe) private static let controlSequence = #/\u{001B}(?:\[[0-?]*[ -/]*[@-~]|\][^\u{0007}]*(?:\u{0007}|\u{001B}\\))/#
 
-    static func clean(_ text: String) -> String {
+    public static func clean(_ text: String) -> String {
         text.replacing(controlSequence, with: "")
             .replacing("\r\n", with: "\n")
             .replacing("\r", with: "")
     }
 
-    static func stripEscapes(from text: String) -> String {
+    public static func stripEscapes(from text: String) -> String {
         text.replacing(controlSequence, with: "")
     }
 }

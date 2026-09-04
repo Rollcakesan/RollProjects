@@ -1,6 +1,9 @@
 import AppKit
 import SwiftUI
 import UniformTypeIdentifiers
+#if canImport(AIAgentKit)
+import AIAgentKit
+#endif
 
 struct ContentView: View {
     @Environment(WorkspaceModel.self) private var workspace

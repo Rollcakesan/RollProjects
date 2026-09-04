@@ -95,12 +95,14 @@ final class CodexAuthService {
         return base64
     }
 
-    func requestLogin(in terminal: TerminalSession) {
+    func requestLogin(in terminal: (any TerminalCommandExecuting)? = nil) {
+        guard let terminal else { return }
         terminal.isVisible = true
         terminal.send("codex login")
     }
 
-    func requestLogout(in terminal: TerminalSession) {
+    func requestLogout(in terminal: (any TerminalCommandExecuting)? = nil) {
+        guard let terminal else { return }
         terminal.isVisible = true
         terminal.send("codex logout")
     }

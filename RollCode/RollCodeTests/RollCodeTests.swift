@@ -1,5 +1,11 @@
 import Foundation
 import Testing
+#if canImport(GitBridgeKit)
+import GitBridgeKit
+#endif
+#if canImport(AIAgentKit)
+import AIAgentKit
+#endif
 @testable import RollCode
 
 @Suite("RollCode Test Suite")

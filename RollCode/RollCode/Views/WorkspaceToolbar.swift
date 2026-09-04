@@ -1,4 +1,7 @@
 import SwiftUI
+#if canImport(AIAgentKit)
+import AIAgentKit
+#endif
 
 struct WorkspaceToolbarContent: ToolbarContent {
     @Environment(WorkspaceModel.self) private var workspace

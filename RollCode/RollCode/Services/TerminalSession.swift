@@ -1,5 +1,8 @@
 import Foundation
 import Observation
+#if canImport(AIAgentKit)
+import AIAgentKit
+#endif
 
 @Observable
 @MainActor
@@ -168,7 +171,7 @@ final class TerminalInstance: Identifiable {
 
 @Observable
 @MainActor
-final class TerminalSession {
+final class TerminalSession: TerminalCommandExecuting {
     var isVisible = true
     private(set) var tabs: [TerminalInstance] = []
     var activeTabID: UUID?

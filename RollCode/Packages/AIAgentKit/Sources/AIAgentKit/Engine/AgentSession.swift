@@ -1,8 +1,12 @@
 import Foundation
 import os
 import Observation
+#if canImport(GitBridgeKit)
+import GitBridgeKit
+#endif
 
 @Observable
+
 @MainActor
 final class AgentSession {
     private let logger = Logger(subsystem: "com.rollprojects.RollCode", category: "agent")
@@ -237,7 +241,7 @@ final class AgentSession {
         self.activeThread.model = currentModel
         self.activeThread.reasoningEffort = currentReasoningEffort.rawValue
         self.workspaceURL = workspaceURL.standardizedFileURL
-        self.initialChangedPaths = Set((try? GitDiffService.changedPaths(in: workspaceURL)) ?? [])
+        self.initialChangedPaths = Set((try? GitBridgeService.changedPaths(in: workspaceURL)) ?? [])
         saveCurrentThreads()
 
         let contextualPrompt = makeContextualPrompt(prompt, activeFileURL: activeFileURL)
@@ -380,7 +384,7 @@ final class AgentSession {
             let changedPaths: [String]
             if let workspaceURL {
                 let current = await Task.detached(priority: .utility) {
-                    (try? GitDiffService.changedPaths(in: workspaceURL)) ?? []
+                    (try? GitBridgeService.changedPaths(in: workspaceURL)) ?? []
                 }.value
                 changedPaths = current.filter { !self.initialChangedPaths.contains($0) }
             } else {
@@ -797,7 +801,7 @@ final class AgentSession {
         let changedPaths: [String]
         if let workspaceURL {
             let current = await Task.detached(priority: .utility) {
-                (try? GitDiffService.changedPaths(in: workspaceURL)) ?? []
+                (try? GitBridgeService.changedPaths(in: workspaceURL)) ?? []
             }.value
             changedPaths = current.filter { !self.initialChangedPaths.contains($0) }
         } else {
@@ -849,25 +853,5 @@ final class AgentSession {
         if resetThread {
             resetThreadState()
         }
-    }
-}
-
-enum GeminiExecutableLocator {
-    static func locate(environment: [String: String] = ProcessInfo.processInfo.environment) -> URL? {
-        var candidates = [
-            "/opt/homebrew/bin/gemini",
-            "/usr/local/bin/gemini"
-        ]
-        if let path = environment["PATH"] {
-            candidates += path.split(separator: ":").map { "\($0)/gemini" }
-        }
-
-        for path in candidates {
-            let standardized = URL(fileURLWithPath: path).standardizedFileURL
-            if FileManager.default.isExecutableFile(atPath: standardized.path) {
-                return standardized
-            }
-        }
-        return nil
     }
 }

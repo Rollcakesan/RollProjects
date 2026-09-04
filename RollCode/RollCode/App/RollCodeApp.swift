@@ -1,5 +1,8 @@
 import AppKit
 import SwiftUI
+#if canImport(AIAgentKit)
+import AIAgentKit
+#endif
 
 @main
 struct RollCodeApp: App {
