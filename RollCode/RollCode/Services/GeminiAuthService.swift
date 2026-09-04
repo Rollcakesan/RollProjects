@@ -64,6 +64,39 @@ final class GeminiAuthService {
         }
     }
 
+    func effectiveProjectID(for workspaceURL: URL?) -> String? {
+        let explicit = storedProjectID
+        if !explicit.isEmpty { return explicit }
+
+        if let envProject = ProcessInfo.processInfo.environment["GOOGLE_CLOUD_PROJECT"], !envProject.isEmpty {
+            return envProject
+        }
+
+        // Read ~/.gemini/projects.json
+        let projectsURL = geminiDirURL.appending(path: "projects.json")
+        guard FileManager.default.fileExists(atPath: projectsURL.path),
+              let data = try? Data(contentsOf: projectsURL),
+              let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let projects = json["projects"] as? [String: String] else {
+            return nil
+        }
+
+        if let workspacePath = workspaceURL?.standardizedFileURL.path {
+            if let matched = projects[workspacePath] {
+                return matched
+            }
+            // Check prefix matches
+            for (folder, proj) in projects where folder != "/" {
+                if workspacePath.hasPrefix(folder) {
+                    return proj
+                }
+            }
+        }
+
+        // Fallback to default project or first entry
+        return projects["/"] ?? projects.values.first
+    }
+
     func refresh() {
         guard isCLIAvailable() else {
             status = .cliNotInstalled

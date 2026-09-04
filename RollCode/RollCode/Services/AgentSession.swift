@@ -404,8 +404,7 @@ final class AgentSession {
             if !key.isEmpty {
                 env["GEMINI_API_KEY"] = key
             }
-            let project = geminiAuth.storedProjectID
-            if !project.isEmpty {
+            if let project = geminiAuth.effectiveProjectID(for: workspaceURL), !project.isEmpty {
                 env["GOOGLE_CLOUD_PROJECT"] = project
             }
         }

@@ -1106,6 +1106,42 @@ struct RollCodeTests {
         #expect(restored.uiFontScale == .large)
         #expect(restored.uiFontSize == 14.5)
     }
+
+    @Test("GeminiAuthService resolves effectiveProjectID from stored setting and projects.json")
+    @MainActor
+    func geminiAuthServiceResolvesProjectID() throws {
+        try withTemporaryDirectory { tempDir in
+            let geminiDir = tempDir.appending(path: ".gemini")
+            try FileManager.default.createDirectory(at: geminiDir, withIntermediateDirectories: true)
+            let projectsJSON = """
+            {
+              "projects": {
+                "/Users/test/ProjectA": "project-alpha",
+                "/": "project-default"
+              }
+            }
+            """
+            try projectsJSON.write(to: geminiDir.appending(path: "projects.json"), atomically: true, encoding: .utf8)
+
+            let suiteName = "RollCodeTest_Gemini_\(UUID().uuidString)"
+            let defaults = UserDefaults(suiteName: suiteName)!
+            defer { defaults.removePersistentDomain(forName: suiteName) }
+
+            let service = GeminiAuthService(geminiDirURL: geminiDir, defaults: defaults, isCLIAvailable: { true })
+            
+            // 1. Matches workspace path
+            let matched = service.effectiveProjectID(for: URL(fileURLWithPath: "/Users/test/ProjectA/src"))
+            #expect(matched == "project-alpha")
+
+            // 2. Fallbacks to default
+            let fallback = service.effectiveProjectID(for: URL(fileURLWithPath: "/Users/test/Other"))
+            #expect(fallback == "project-default")
+
+            // 3. Stored project takes precedence
+            service.storedProjectID = "explicit-project"
+            #expect(service.effectiveProjectID(for: URL(fileURLWithPath: "/Users/test/ProjectA")) == "explicit-project")
+        }
+    }
 }
 
 @MainActor
