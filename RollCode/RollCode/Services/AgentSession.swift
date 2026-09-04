@@ -147,11 +147,19 @@ final class AgentSession {
             logger.debug("Started \(self.selectedProvider.rawValue, privacy: .public) agent process")
             monitor(process, standardOutput: standardOutput, standardError: standardError)
 
+            let inputHandle = standardInput.fileHandleForWriting
             if selectedProvider == .codex {
-                try standardInput.fileHandleForWriting.write(contentsOf: Data(contextualPrompt.utf8))
-                try standardInput.fileHandleForWriting.close()
+                let promptData = Data(contextualPrompt.utf8)
+                Task.detached(priority: .userInitiated) {
+                    do {
+                        try inputHandle.write(contentsOf: promptData)
+                        try inputHandle.close()
+                    } catch {
+                        try? inputHandle.close()
+                    }
+                }
             } else {
-                try? standardInput.fileHandleForWriting.close()
+                try? inputHandle.close()
             }
         } catch {
             runState = .idle
@@ -346,6 +354,23 @@ final class AgentSession {
         if let activeFileURL {
             context += " The active editor file is \(activeFileURL.relativePath(from: workspaceURL))."
         }
+
+        // For Gemini (stateless CLI calls), inject past conversation history from the active thread
+        if selectedProvider == .gemini {
+            let pastMessages = activeThread.entries.compactMap { entry -> (role: String, text: String)? in
+                guard case .message(let msg) = entry, msg.role != .system else { return nil }
+                return (msg.role == .user ? "User" : "Assistant", msg.text)
+            }
+            let historySlice = pastMessages.suffix(6)
+            if !historySlice.isEmpty {
+                context += "\n\nConversation history so far:"
+                for item in historySlice {
+                    let truncatedText = item.text.count > 1000 ? String(item.text.prefix(1000)) + "…" : item.text
+                    context += "\n[\(item.role)]: \(truncatedText)"
+                }
+            }
+        }
+
         return "\(context)\n\nUser request:\n\(prompt)"
     }
 
@@ -409,9 +434,9 @@ final class AgentSession {
         }
 
         Task.detached(priority: .utility) { [weak self] in
-            process.waitUntilExit()
             await outputTask.value
             await errorTask.value
+            process.waitUntilExit()
             await self?.finish(process, exitCode: process.terminationStatus)
         }
     }
@@ -458,12 +483,22 @@ final class AgentSession {
         }
     }
 
+    nonisolated static func stripANSIEscapes(from text: String) -> String {
+        let pattern = #"\x1B\[[0-?]*[ -/]*[@-~]"#
+        guard let regex = try? NSRegularExpression(pattern: pattern) else { return text }
+        let range = NSRange(location: 0, length: (text as NSString).length)
+        return regex.stringByReplacingMatches(in: text, range: range, withTemplate: "")
+    }
+
     private func appendGeminiOutput(_ text: String) {
+        let cleanText = Self.stripANSIEscapes(from: text).trimmingCharacters(in: .newlines)
+        guard !cleanText.isEmpty else { return }
+
         if let last = entries.last, case .message(let message) = last, message.role == .assistant {
-            let updated = message.text + "\n" + text
+            let updated = message.text + "\n" + cleanText
             entries[entries.count - 1] = .message(AgentMessage(role: .assistant, text: updated, senderName: "GEMINI"))
         } else {
-            entries.append(.message(AgentMessage(role: .assistant, text: text, senderName: "GEMINI")))
+            entries.append(.message(AgentMessage(role: .assistant, text: cleanText, senderName: "GEMINI")))
         }
     }
 

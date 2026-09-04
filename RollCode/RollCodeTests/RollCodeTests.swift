@@ -1065,6 +1065,13 @@ struct RollCodeTests {
         #expect(blocks[1] == .code(language: "swift", code: "let answer = 42"))
         #expect(blocks[2] == .text("And conclusion."))
     }
+
+    @Test("AgentSession strips ANSI color escape codes cleanly")
+    func agentSessionStripsANSIEscapes() {
+        let raw = "\u{001B}[32mSuccess\u{001B}[0m: \u{001B}[1mUpdated 2 files\u{001B}[0m"
+        let stripped = AgentSession.stripANSIEscapes(from: raw)
+        #expect(stripped == "Success: Updated 2 files")
+    }
 }
 
 @MainActor
