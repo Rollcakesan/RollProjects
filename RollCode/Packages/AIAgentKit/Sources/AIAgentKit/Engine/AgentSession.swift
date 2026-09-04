@@ -263,7 +263,7 @@ final class AgentSession {
         workspaceURL: URL,
         activeFileURL: URL?
     ) {
-        let appServer = CodexAppServerService.shared
+        let appServer = CodexAppServerClient.shared
         let model = currentModel.isEmpty ? nil : currentModel
         let effort = currentReasoningEffort.rawValue
         let cwd = workspaceURL.path
@@ -433,7 +433,7 @@ final class AgentSession {
         case .appServerRunning(let threadId, let turnId):
             runState = .appServerStopping(threadId: threadId, turnId: turnId, resetThread: resetThread)
             Task { @MainActor in
-                try? await CodexAppServerService.shared.interruptTurn(threadId: threadId, turnId: turnId)
+                try? await CodexAppServerClient.shared.interruptTurn(threadId: threadId, turnId: turnId)
             }
         case .running(let process):
             guard process.isRunning else { return }

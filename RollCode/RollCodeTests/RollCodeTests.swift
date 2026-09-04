@@ -1264,10 +1264,10 @@ struct RollCodeTests {
         }
     }
 
-    @Test("CodexAppServerService JSONDictionary subscript and Sendable safety")
+    @Test("CodexAppServerClient JSONDictionary subscript and Sendable safety")
     @MainActor
     func codexAppServerServiceJSONDictionary() {
-        let dict = CodexAppServerService.JSONDictionary([
+        let dict = CodexAppServerClient.JSONDictionary([
             "status": "ok",
             "count": 42,
             "nested": ["name": "gpt-5.6-sol"]

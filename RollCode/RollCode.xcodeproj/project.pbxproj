@@ -18,7 +18,6 @@
 		C4020001A922B2F06EF834AD /* AgentModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = C4010001A922B2F06EF834AD /* AgentModels.swift */; };
 		C4020002A922B2F06EF834AD /* AgentSession.swift in Sources */ = {isa = PBXBuildFile; fileRef = C4010002A922B2F06EF834AD /* AgentSession.swift */; };
 		C4020003A922B2F06EF834AD /* CodexAppServerClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = C4010003A922B2F06EF834AD /* CodexAppServerClient.swift */; };
-		C4020004A922B2F06EF834AD /* CodexAppServerService.swift in Sources */ = {isa = PBXBuildFile; fileRef = C4010004A922B2F06EF834AD /* CodexAppServerService.swift */; };
 		C4020005A922B2F06EF834AD /* CodexAuthService.swift in Sources */ = {isa = PBXBuildFile; fileRef = C4010005A922B2F06EF834AD /* CodexAuthService.swift */; };
 		C4020006A922B2F06EF834AD /* CodexEventParser.swift in Sources */ = {isa = PBXBuildFile; fileRef = C4010006A922B2F06EF834AD /* CodexEventParser.swift */; };
 		C4020007A922B2F06EF834AD /* CodexModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = C4010007A922B2F06EF834AD /* CodexModels.swift */; };
@@ -90,7 +89,6 @@
 		C4010001A922B2F06EF834AD /* AgentModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Core/AgentModels.swift"; sourceTree = "<group>"; };
 		C4010002A922B2F06EF834AD /* AgentSession.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Engine/AgentSession.swift"; sourceTree = "<group>"; };
 		C4010003A922B2F06EF834AD /* CodexAppServerClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Providers/Codex/CodexAppServerClient.swift"; sourceTree = "<group>"; };
-		C4010004A922B2F06EF834AD /* CodexAppServerService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Providers/Codex/CodexAppServerService.swift"; sourceTree = "<group>"; };
 		C4010005A922B2F06EF834AD /* CodexAuthService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Providers/Codex/CodexAuthService.swift"; sourceTree = "<group>"; };
 		C4010006A922B2F06EF834AD /* CodexEventParser.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Providers/Codex/CodexEventParser.swift"; sourceTree = "<group>"; };
 		C4010007A922B2F06EF834AD /* CodexModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Providers/Codex/CodexModels.swift"; sourceTree = "<group>"; };
@@ -300,7 +298,6 @@
 				C4010001A922B2F06EF834AD /* AgentModels.swift */,
 				C4010002A922B2F06EF834AD /* AgentSession.swift */,
 				C4010003A922B2F06EF834AD /* CodexAppServerClient.swift */,
-				C4010004A922B2F06EF834AD /* CodexAppServerService.swift */,
 				C4010005A922B2F06EF834AD /* CodexAuthService.swift */,
 				C4010006A922B2F06EF834AD /* CodexEventParser.swift */,
 				C4010007A922B2F06EF834AD /* CodexModels.swift */,
@@ -424,7 +421,6 @@
 				C4020001A922B2F06EF834AD /* AgentModels.swift in Sources */,
 				C4020002A922B2F06EF834AD /* AgentSession.swift in Sources */,
 				C4020003A922B2F06EF834AD /* CodexAppServerClient.swift in Sources */,
-				C4020004A922B2F06EF834AD /* CodexAppServerService.swift in Sources */,
 				C4020005A922B2F06EF834AD /* CodexAuthService.swift in Sources */,
 				C4020006A922B2F06EF834AD /* CodexEventParser.swift in Sources */,
 				C4020007A922B2F06EF834AD /* CodexModels.swift in Sources */,

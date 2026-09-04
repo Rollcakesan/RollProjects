@@ -160,8 +160,16 @@ final class ModelCatalogService {
         }
 
         // Refresh Codex models
-        if let liveModels = try? await CodexAppServerService.shared.listModels(), !liveModels.isEmpty {
-            self.codexModels = liveModels
+        if let liveModels = try? await CodexAppServerClient.shared.listModels(), !liveModels.isEmpty {
+            self.codexModels = liveModels.map { m in
+                AIModelInfo(
+                    id: m.id,
+                    displayName: m.displayName,
+                    provider: .codex,
+                    speedTier: m.speedTier,
+                    supportsReasoningEffort: m.supportsReasoningEffort
+                )
+            }
         } else if let cached = loadCodexFromCache(), !cached.isEmpty {
             self.codexModels = cached
         } else if let openAIKey, !openAIKey.isEmpty {
