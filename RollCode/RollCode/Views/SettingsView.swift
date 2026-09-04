@@ -59,15 +59,15 @@ struct SettingsView: View {
                     Button("Reset") { workspace.resetZoom() }
                 }
 
-                HStack {
-                    Text("UI Font Size")
-                    Spacer()
-                    Text("\(Int(workspace.uiFontSize)) pt")
-                        .foregroundStyle(RollCodeTheme.secondaryText)
-                    Button("-") { workspace.zoomOutUI() }
-                    Button("+") { workspace.zoomInUI() }
-                    Button("Reset") { workspace.resetUIZoom() }
+                Picker("UI Font Size", selection: Binding(
+                    get: { workspace.uiFontScale },
+                    set: { workspace.setUIFontScale($0) }
+                )) {
+                    ForEach(WorkspaceModel.UIFontScale.allCases) { scale in
+                        Text(scale.displayName).tag(scale)
+                    }
                 }
+                .pickerStyle(.segmented)
             }
 
             Section("Startup & Workspace") {

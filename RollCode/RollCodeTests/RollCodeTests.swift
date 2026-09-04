@@ -1073,7 +1073,7 @@ struct RollCodeTests {
         #expect(stripped == "Success: Updated 2 files")
     }
 
-    @Test("WorkspaceModel manages and persists uiFontSize zoom levels")
+    @Test("WorkspaceModel manages and persists uiFontScale levels")
     @MainActor
     func workspaceModelManagesUIFontSize() {
         let suiteName = "RollCodeTest_UIFont_\(UUID().uuidString)"
@@ -1081,23 +1081,30 @@ struct RollCodeTests {
         defer { testDefaults.removePersistentDomain(forName: suiteName) }
 
         let workspace = WorkspaceModel(defaults: testDefaults)
-        #expect(workspace.uiFontSize == 12.0)
+        #expect(workspace.uiFontScale == .medium)
+        #expect(workspace.uiFontSize == 12.5)
 
         workspace.zoomInUI()
-        #expect(workspace.uiFontSize == 13.0)
+        #expect(workspace.uiFontScale == .large)
+        #expect(workspace.uiFontSize == 14.5)
 
-        workspace.setUIFontSize(25.0)
-        #expect(workspace.uiFontSize == 18.0)
+        workspace.zoomInUI()
+        #expect(workspace.uiFontScale == .large)
 
-        workspace.setUIFontSize(5.0)
-        #expect(workspace.uiFontSize == 10.0)
+        workspace.zoomOutUI()
+        #expect(workspace.uiFontScale == .medium)
+
+        workspace.zoomOutUI()
+        #expect(workspace.uiFontScale == .small)
+        #expect(workspace.uiFontSize == 11.0)
 
         workspace.resetUIZoom()
-        #expect(workspace.uiFontSize == 12.0)
+        #expect(workspace.uiFontScale == .medium)
 
-        workspace.setUIFontSize(14.0)
+        workspace.setUIFontScale(.large)
         let restored = WorkspaceModel(defaults: testDefaults)
-        #expect(restored.uiFontSize == 14.0)
+        #expect(restored.uiFontScale == .large)
+        #expect(restored.uiFontSize == 14.5)
     }
 }
 

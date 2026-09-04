@@ -27,8 +27,33 @@ final class WorkspaceModel {
     var externalConflict: ExternalConflict?
     var isSavingActiveDocumentAs = false
     private var savingDocumentID: UUID?
+    enum UIFontScale: String, CaseIterable, Identifiable {
+        case small = "small"
+        case medium = "medium"
+        case large = "large"
+
+        var id: String { rawValue }
+
+        var displayName: String {
+            switch self {
+            case .small: return "Small"
+            case .medium: return "Medium"
+            case .large: return "Large"
+            }
+        }
+
+        var fontSize: CGFloat {
+            switch self {
+            case .small: return 11.0
+            case .medium: return 12.5
+            case .large: return 14.5
+            }
+        }
+    }
+
     private(set) var fontSize: CGFloat
-    private(set) var uiFontSize: CGFloat
+    private(set) var uiFontScale: UIFontScale
+    var uiFontSize: CGFloat { uiFontScale.fontSize }
     private(set) var tabWidth: Int
     private(set) var restoresLastWorkspace: Bool
     private(set) var isLoadingTree = false
@@ -41,7 +66,8 @@ final class WorkspaceModel {
     private static let restoreLastWorkspaceKey = "RollCode.restoreLastWorkspace"
     private static let tabWidthKey = "RollCode.editorTabWidth"
     private static let fontSizeKey = "RollCode.editorFontSize"
-    private static let uiFontSizeKey = "RollCode.uiFontSize"
+    private static let uiFontScaleKey = "RollCode.uiFontScale"
+    private static let legacyUIFontSizeKey = "RollCode.uiFontSize"
 
     var lastWorkspacePath: String? {
         defaults.string(forKey: Self.lastWorkspacePathKey)
@@ -53,8 +79,24 @@ final class WorkspaceModel {
         self.tabWidth = [2, 4, 8].contains(savedTabWidth) ? savedTabWidth : 4
         let savedFontSize = defaults.double(forKey: Self.fontSizeKey)
         self.fontSize = savedFontSize >= 9 && savedFontSize <= 32 ? CGFloat(savedFontSize) : 12.5
-        let savedUIFontSize = defaults.double(forKey: Self.uiFontSizeKey)
-        self.uiFontSize = savedUIFontSize >= 10 && savedUIFontSize <= 18 ? CGFloat(savedUIFontSize) : 12.0
+        if let savedScaleString = defaults.string(forKey: Self.uiFontScaleKey),
+           let savedScale = UIFontScale(rawValue: savedScaleString) {
+            self.uiFontScale = savedScale
+        } else {
+            // Backward compatibility with legacy numeric uiFontSize
+            let legacySize = defaults.double(forKey: Self.legacyUIFontSizeKey)
+            if legacySize > 0 {
+                if legacySize <= 11.5 {
+                    self.uiFontScale = .small
+                } else if legacySize >= 13.5 {
+                    self.uiFontScale = .large
+                } else {
+                    self.uiFontScale = .medium
+                }
+            } else {
+                self.uiFontScale = .medium
+            }
+        }
         let userPrefersRestore = defaults.object(forKey: Self.restoreLastWorkspaceKey) as? Bool ?? true
         self.restoresLastWorkspace = userPrefersRestore
 
@@ -160,21 +202,39 @@ final class WorkspaceModel {
         defaults.set(Double(fontSize), forKey: Self.fontSizeKey)
     }
 
+    func setUIFontScale(_ scale: UIFontScale) {
+        uiFontScale = scale
+        defaults.set(scale.rawValue, forKey: Self.uiFontScaleKey)
+    }
+
     func zoomInUI() {
-        setUIFontSize(min(uiFontSize + 1, 18))
+        switch uiFontScale {
+        case .small: setUIFontScale(.medium)
+        case .medium: setUIFontScale(.large)
+        case .large: break
+        }
     }
 
     func zoomOutUI() {
-        setUIFontSize(max(uiFontSize - 1, 10))
+        switch uiFontScale {
+        case .large: setUIFontScale(.medium)
+        case .medium: setUIFontScale(.small)
+        case .small: break
+        }
     }
 
     func resetUIZoom() {
-        setUIFontSize(12.0)
+        setUIFontScale(.medium)
     }
 
     func setUIFontSize(_ size: CGFloat) {
-        uiFontSize = min(max(size, 10), 18)
-        defaults.set(Double(uiFontSize), forKey: Self.uiFontSizeKey)
+        if size <= 11.5 {
+            setUIFontScale(.small)
+        } else if size >= 13.5 {
+            setUIFontScale(.large)
+        } else {
+            setUIFontScale(.medium)
+        }
     }
 
     func quickOpenFiles(matching query: String) -> [FileNode] {
