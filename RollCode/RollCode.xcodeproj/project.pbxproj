@@ -71,6 +71,12 @@
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
+		D0010001A922B2F06EF834AD /* README.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; name = README.md; path = "../../README.md"; sourceTree = "<group>"; };
+		D0010002A922B2F06EF834AD /* Package.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = Package.swift; path = "../../Package.swift"; sourceTree = "<group>"; };
+		D0020001A922B2F06EF834AD /* README.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; name = README.md; path = "../../README.md"; sourceTree = "<group>"; };
+		D0020002A922B2F06EF834AD /* Package.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = Package.swift; path = "../../Package.swift"; sourceTree = "<group>"; };
+		D0030001A922B2F06EF834AD /* README.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; name = README.md; path = "../../README.md"; sourceTree = "<group>"; };
+		D0030002A922B2F06EF834AD /* Package.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = Package.swift; path = "../../Package.swift"; sourceTree = "<group>"; };
 		C4010088A922B2F06EF834AD /* URL+RelativePath.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Core/URL+RelativePath.swift"; sourceTree = "<group>"; };
 		C4010000A922B2F06EF834AD /* AgentMessageRowView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "UI/AgentMessageRowView.swift"; sourceTree = "<group>"; };
 		C4010001A922B2F06EF834AD /* AgentModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Core/AgentModels.swift"; sourceTree = "<group>"; };
@@ -198,6 +204,8 @@
 		C2010005A922B2F06EF834AD /* GitBridgeKit */ = {
 			isa = PBXGroup;
 			children = (
+				D0020001A922B2F06EF834AD /* README.md */,
+				D0020002A922B2F06EF834AD /* Package.swift */,
 				C2010001A922B2F06EF834AD /* GitBridgeModels.swift */,
 				C2010002A922B2F06EF834AD /* GitBridgeClient.swift */,
 			);
@@ -207,6 +215,8 @@
 		C3010009A922B2F06EF834AD /* LSPClientKit */ = {
 			isa = PBXGroup;
 			children = (
+				D0030001A922B2F06EF834AD /* README.md */,
+				D0030002A922B2F06EF834AD /* Package.swift */,
 				C3010001A922B2F06EF834AD /* LSPModels.swift */,
 				C3010002A922B2F06EF834AD /* LSPServerConfig.swift */,
 				C3010003A922B2F06EF834AD /* LSPClient.swift */,
@@ -264,6 +274,8 @@
 		C40100FFA922B2F06EF834AD /* AIAgentKit */ = {
 			isa = PBXGroup;
 			children = (
+				D0010001A922B2F06EF834AD /* README.md */,
+				D0010002A922B2F06EF834AD /* Package.swift */,
 				C4010088A922B2F06EF834AD /* URL+RelativePath.swift */,
 				C4010000A922B2F06EF834AD /* AgentMessageRowView.swift */,
 				C4010001A922B2F06EF834AD /* AgentModels.swift */,
