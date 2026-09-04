@@ -1,18 +1,7 @@
 import Foundation
 
-struct ResolvedLanguageServer: Hashable, Sendable {
-    let identifier: String
-    let executablePath: String
-    let arguments: [String]
-    let languageId: String
-
-    var processIdentifier: String {
-        ([identifier, executablePath] + arguments).joined(separator: "\u{0}")
-    }
-}
-
-enum LanguageServerConfig {
-    static func processEnvironment() -> [String: String] {
+public enum LanguageServerConfig {
+    public static func processEnvironment() -> [String: String] {
         var environment = ProcessInfo.processInfo.environment
         let home = FileManager.default.homeDirectoryForCurrentUser.path
         var paths = (environment["PATH"] ?? "").split(separator: ":").map(String.init)
@@ -33,7 +22,7 @@ enum LanguageServerConfig {
         return environment
     }
 
-    static func resolve(for language: CodeLanguage, documentURL: URL? = nil) -> ResolvedLanguageServer? {
+    public static func resolve(for language: LSPDocumentLanguage, documentURL: URL? = nil) -> ResolvedLanguageServer? {
         let fileManager = FileManager.default
         let home = fileManager.homeDirectoryForCurrentUser.path
 
@@ -116,7 +105,7 @@ enum LanguageServerConfig {
         return nil
     }
 
-    static func languageIdentifier(for language: CodeLanguage, documentURL: URL? = nil) -> String {
+    public static func languageIdentifier(for language: LSPDocumentLanguage, documentURL: URL? = nil) -> String {
         guard language == .cFamily else {
             switch language {
             case .javascript: return "javascript"

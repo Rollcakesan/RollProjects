@@ -940,19 +940,19 @@ struct RollCodeTests {
 
     @Test("LanguageServerConfig resolves available language servers")
     func languageServerConfigResolves() throws {
-        let swiftServer = LanguageServerConfig.resolve(for: .swift)
+        let swiftServer = LanguageServerConfig.resolve(for: CodeLanguage.swift)
         #expect(swiftServer != nil)
         #expect(swiftServer?.languageId == "swift")
 
-        let markdownServer = LanguageServerConfig.resolve(for: .markdown)
+        let markdownServer = LanguageServerConfig.resolve(for: CodeLanguage.markdown)
         #expect(markdownServer == nil)
 
         #expect(LanguageServerConfig.languageIdentifier(
-            for: .cFamily,
+            for: CodeLanguage.cFamily,
             documentURL: URL(fileURLWithPath: "/tmp/main.cpp")
         ) == "cpp")
         #expect(LanguageServerConfig.languageIdentifier(
-            for: .cFamily,
+            for: CodeLanguage.cFamily,
             documentURL: URL(fileURLWithPath: "/tmp/main.mm")
         ) == "objective-cpp")
     }
