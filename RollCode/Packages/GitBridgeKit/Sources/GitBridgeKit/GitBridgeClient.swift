@@ -39,7 +39,7 @@ public enum GitBridgeService {
     /// Computes added and modified line numbers from a unified diff text for editor gutter markers.
     public static func diffLineNumbers(for diff: String) -> (added: Set<Int>, modified: Set<Int>) {
         var added = Set<Int>()
-        var modified = Set<Int>()
+        let modified = Set<Int>()
         let lines = diff.components(separatedBy: .newlines)
         var currentNewLine = 0
 

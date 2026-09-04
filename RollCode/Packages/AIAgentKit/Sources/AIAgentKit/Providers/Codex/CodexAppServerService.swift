@@ -44,9 +44,7 @@ final class CodexAppServerService {
             model: model,
             effort: effort,
             onDelta: onDelta,
-            onUsage: { usage in
-                onUsage(AgentTokenUsage(inputTokens: usage.inputTokens, cachedTokens: usage.cachedTokens, outputTokens: usage.outputTokens))
-            },
+            onUsage: onUsage,
             onComplete: onComplete
         )
     }
@@ -58,16 +56,11 @@ final class CodexAppServerService {
     func listModels() async throws -> [AIModelInfo] {
         let models = try await client.listModels()
         return models.map { m in
-            let tier: ModelSpeedTier = switch m.speedTier {
-            case .fast: .fast
-            case .standard: .standard
-            case .deep: .deep
-            }
-            return AIModelInfo(
+            AIModelInfo(
                 id: m.id,
                 displayName: m.displayName,
                 provider: .codex,
-                speedTier: tier,
+                speedTier: m.speedTier,
                 supportsReasoningEffort: m.supportsReasoningEffort
             )
         }

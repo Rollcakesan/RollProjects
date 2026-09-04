@@ -1,14 +1,15 @@
 import Foundation
 import Observation
 
-enum ModelSpeedTier: String, CaseIterable, Identifiable, Sendable, Codable {
+public enum ModelSpeedTier: String, CaseIterable, Identifiable, Sendable, Codable {
     case fast = "Fast"
     case standard = "Standard"
     case deep = "Deep Thinking"
 
-    var id: String { rawValue }
+    public var id: String { rawValue }
 
-    var iconName: String {
+
+    public var iconName: String {
         switch self {
         case .fast: "bolt.fill"
         case .standard: "scalemass"
@@ -16,7 +17,7 @@ enum ModelSpeedTier: String, CaseIterable, Identifiable, Sendable, Codable {
         }
     }
 
-    var badgeEmoji: String {
+    public var badgeEmoji: String {
         switch self {
         case .fast: "⚡️"
         case .standard: "⚖️"

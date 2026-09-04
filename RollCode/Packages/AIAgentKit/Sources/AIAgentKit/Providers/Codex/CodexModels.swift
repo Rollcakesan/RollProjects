@@ -1,55 +1,11 @@
 import Foundation
 
-/// Token consumption metrics for an agent turn or thread.
-public struct CodexTokenUsage: Equatable, Sendable, Codable {
-    public var inputTokens: Int
-    public var cachedTokens: Int
-    public var outputTokens: Int
+/// Token consumption metrics for an agent turn or thread (typealias to AgentTokenUsage).
+public typealias CodexTokenUsage = AgentTokenUsage
 
-    public var totalTokens: Int {
-        inputTokens + outputTokens
-    }
+/// Speed and reasoning tier of an AI model (typealias to ModelSpeedTier).
+public typealias CodexModelSpeedTier = ModelSpeedTier
 
-    public init(inputTokens: Int = 0, cachedTokens: Int = 0, outputTokens: Int = 0) {
-        self.inputTokens = inputTokens
-        self.cachedTokens = cachedTokens
-        self.outputTokens = outputTokens
-    }
-
-    /// Formatted short description (e.g. "1.2k tok").
-    public var formattedTotal: String {
-        if totalTokens >= 1_000_000 {
-            return String(format: "%.1fM tok", Double(totalTokens) / 1_000_000.0)
-        } else if totalTokens >= 1_000 {
-            return String(format: "%.1fk tok", Double(totalTokens) / 1_000.0)
-        } else {
-            return "\(totalTokens) tok"
-        }
-    }
-}
-
-/// Speed and reasoning tier of an AI model.
-public enum CodexModelSpeedTier: String, CaseIterable, Sendable, Codable {
-    case fast = "Fast"
-    case standard = "Standard"
-    case deep = "Deep Thinking"
-
-    public var iconName: String {
-        switch self {
-        case .fast: "bolt.fill"
-        case .standard: "scalemass"
-        case .deep: "brain.head.profile"
-        }
-    }
-
-    public var badgeEmoji: String {
-        switch self {
-        case .fast: "⚡️"
-        case .standard: "⚖️"
-        case .deep: "🧠"
-        }
-    }
-}
 
 /// Metadata describing a model available on the Codex App Server.
 public struct CodexAppServerModel: Identifiable, Equatable, Sendable, Codable {

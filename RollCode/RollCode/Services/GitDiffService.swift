@@ -1,7 +1,7 @@
 import Foundation
 #if canImport(GitBridgeKit)
 import GitBridgeKit
-typealias GitDiffService = GitBridgeKit.GitBridgeService
+public typealias GitDiffService = GitBridgeKit.GitBridgeService
 #else
-typealias GitDiffService = GitBridgeService
+public typealias GitDiffService = GitBridgeService
 #endif
