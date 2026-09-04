@@ -159,7 +159,9 @@ final class ModelCatalogService {
         }
 
         // Refresh Codex models
-        if let cached = loadCodexFromCache(), !cached.isEmpty {
+        if let liveModels = try? await CodexAppServerService.shared.listModels(), !liveModels.isEmpty {
+            self.codexModels = liveModels
+        } else if let cached = loadCodexFromCache(), !cached.isEmpty {
             self.codexModels = cached
         } else if let openAIKey, !openAIKey.isEmpty {
             if let fetched = await fetchOpenAIModels(apiKey: openAIKey), !fetched.isEmpty {

@@ -1257,6 +1257,29 @@ struct RollCodeTests {
             #expect(agent.lastTurnDuration != nil)
         }
     }
+
+    @Test("CodexAppServerService JSONDictionary subscript and Sendable safety")
+    @MainActor
+    func codexAppServerServiceJSONDictionary() {
+        let dict = CodexAppServerService.JSONDictionary([
+            "status": "ok",
+            "count": 42,
+            "nested": ["name": "gpt-5.6-sol"]
+        ])
+        #expect(dict["status"] as? String == "ok")
+        #expect(dict["count"] as? Int == 42)
+        #expect((dict["nested"] as? [String: Any])?["name"] as? String == "gpt-5.6-sol")
+    }
+
+    @Test("AgentSession supports useAppServer flag and fallback")
+    @MainActor
+    func agentSessionSupportsUseAppServer() {
+        let sessionDefault = AgentSession(executableURL: nil, geminiExecutableURL: nil)
+        #expect(sessionDefault.useAppServer == true)
+
+        let sessionExplicitFalse = AgentSession(executableURL: nil, geminiExecutableURL: nil, useAppServer: false)
+        #expect(sessionExplicitFalse.useAppServer == false)
+    }
 }
 
 @MainActor

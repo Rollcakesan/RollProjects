@@ -35,6 +35,7 @@
 		8DBD4209F7CCD35BF417AE85 /* GitChangesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2C6F410620414229ED11ECD0 /* GitChangesView.swift */; };
 		A82B2722068CFA9987B1D958 /* AgentModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA646C471ED0C5A0E214CEA4 /* AgentModels.swift */; };
 		B1010010A922B2F06EF834AD /* ModelCatalogService.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1010011A922B2F06EF834AD /* ModelCatalogService.swift */; };
+		B1010020A922B2F06EF834AD /* CodexAppServerService.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1010021A922B2F06EF834AD /* CodexAppServerService.swift */; };
 		ABFEB9698D7F1107FCCE094A /* AgentPanelView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C9C767C9339F05FD8B88FF4D /* AgentPanelView.swift */; };
 		BA0A6FF1AC63E894958177DE /* WorkspaceModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 48D8E08B9D3380DF5FEF51D2 /* WorkspaceModel.swift */; };
 		D14EDE2AF7E1C44A04148482 /* EditorWorkspaceView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1BD7FA7D88687B1494C4B3D0 /* EditorWorkspaceView.swift */; };
@@ -89,6 +90,7 @@
 		A549CD233C56C9F84396A847 /* AgentSession.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AgentSession.swift; sourceTree = "<group>"; };
 		AA646C471ED0C5A0E214CEA4 /* AgentModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AgentModels.swift; sourceTree = "<group>"; };
 		B1010011A922B2F06EF834AD /* ModelCatalogService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModelCatalogService.swift; sourceTree = "<group>"; };
+		B1010021A922B2F06EF834AD /* CodexAppServerService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CodexAppServerService.swift; sourceTree = "<group>"; };
 		B2F8771B99C9BA40F3DC618D /* RollCodeApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RollCodeApp.swift; sourceTree = "<group>"; };
 		C1EF577A1E4C1B7B5F6D3124 /* WorkspaceSearch.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkspaceSearch.swift; sourceTree = "<group>"; };
 		C9C767C9339F05FD8B88FF4D /* AgentPanelView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AgentPanelView.swift; sourceTree = "<group>"; };
@@ -105,6 +107,7 @@
 			children = (
 				AA646C471ED0C5A0E214CEA4 /* AgentModels.swift */,
 				B1010011A922B2F06EF834AD /* ModelCatalogService.swift */,
+				B1010021A922B2F06EF834AD /* CodexAppServerService.swift */,
 				A549CD233C56C9F84396A847 /* AgentSession.swift */,
 				14E27D90A922B2F06EF834AD /* CodexAuthService.swift */,
 				B1010001A922B2F06EF834AD /* GeminiAuthService.swift */,
@@ -312,6 +315,7 @@
 			files = (
 				A82B2722068CFA9987B1D958 /* AgentModels.swift in Sources */,
 				B1010010A922B2F06EF834AD /* ModelCatalogService.swift in Sources */,
+				B1010020A922B2F06EF834AD /* CodexAppServerService.swift in Sources */,
 				ABFEB9698D7F1107FCCE094A /* AgentPanelView.swift in Sources */,
 				57558564A0CB286E9B5E4368 /* AgentSession.swift in Sources */,
 				D59906FAAE255735531190E5 /* CodeEditorView.swift in Sources */,

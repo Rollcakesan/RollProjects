@@ -10,11 +10,20 @@ final class AgentSession {
         case idle
         case running(Process)
         case stopping(Process, resetThread: Bool)
+        case appServerRunning(threadId: String, turnId: String)
+        case appServerStopping(threadId: String, turnId: String, resetThread: Bool)
 
         var process: Process? {
             switch self {
-            case .idle: nil
+            case .idle, .appServerRunning, .appServerStopping: nil
             case .running(let process), .stopping(let process, _): process
+            }
+        }
+
+        var isRunning: Bool {
+            switch self {
+            case .idle: false
+            case .running, .stopping, .appServerRunning, .appServerStopping: true
             }
         }
     }
@@ -155,25 +164,33 @@ final class AgentSession {
     @ObservationIgnored private var initialChangedPaths: Set<String> = []
     @ObservationIgnored private var turnStartTime: Date?
 
+    @ObservationIgnored let useAppServer: Bool
+
     init(
         executableURL: URL? = CodexExecutableLocator.locate(),
         geminiExecutableURL: URL? = GeminiExecutableLocator.locate(),
         auth: CodexAuthService = CodexAuthService(),
         geminiAuth: GeminiAuthService = GeminiAuthService(),
-        modelCatalog: ModelCatalogService = ModelCatalogService()
+        modelCatalog: ModelCatalogService = ModelCatalogService(),
+        useAppServer: Bool? = nil
     ) {
         self.executableURL = executableURL
         self.geminiExecutableURL = geminiExecutableURL
         self.auth = auth
         self.geminiAuth = geminiAuth
         self.modelCatalog = modelCatalog
+        if let useAppServer {
+            self.useAppServer = useAppServer
+        } else {
+            self.useAppServer = (executableURL == nil || executableURL == CodexExecutableLocator.locate())
+        }
     }
 
     var isAvailable: Bool { currentExecutableURL != nil }
     var currentExecutableURL: URL? {
         selectedProvider == .codex ? executableURL : geminiExecutableURL
     }
-    var isRunning: Bool { runState.process != nil }
+    var isRunning: Bool { runState.isRunning }
 
     func selectProvider(_ provider: AgentProvider) {
         guard selectedProvider != provider else { return }
@@ -201,7 +218,7 @@ final class AgentSession {
 
     func send(_ prompt: String, in workspaceURL: URL, activeFileURL: URL? = nil) {
         let prompt = prompt.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !prompt.isEmpty, !isRunning, let executableURL = currentExecutableURL else {
+        guard !prompt.isEmpty, !isRunning, currentExecutableURL != nil else {
             logger.debug("Ignoring agent request because it is empty, already running, or unavailable")
             return
         }
@@ -223,6 +240,87 @@ final class AgentSession {
         self.initialChangedPaths = Set((try? GitDiffService.changedPaths(in: workspaceURL)) ?? [])
         saveCurrentThreads()
 
+        let contextualPrompt = makeContextualPrompt(prompt, activeFileURL: activeFileURL)
+
+        if selectedProvider == .codex && useAppServer {
+            runCodexAppServerTurn(
+                prompt: contextualPrompt,
+                workspaceURL: workspaceURL,
+                activeFileURL: activeFileURL
+            )
+            return
+        }
+
+        runProcessTurn(prompt: contextualPrompt, workspaceURL: workspaceURL)
+    }
+
+    private func runCodexAppServerTurn(
+        prompt: String,
+        workspaceURL: URL,
+        activeFileURL: URL?
+    ) {
+        let appServer = CodexAppServerService.shared
+        let model = currentModel.isEmpty ? nil : currentModel
+        let effort = currentReasoningEffort.rawValue
+        let cwd = workspaceURL.path
+
+        Task { @MainActor [weak self] in
+            guard let self else { return }
+            do {
+                let threadId: String
+                if let existing = self.activeThread.codexThreadID, !existing.isEmpty {
+                    threadId = existing
+                } else {
+                    threadId = try await appServer.startThread(cwd: cwd, model: model)
+                    self.activeThread.codexThreadID = threadId
+                    self.activeThread.updatedAt = Date()
+                    self.saveCurrentThreads()
+                }
+
+                var messageAppended = false
+
+                let turnId = try await appServer.startTurn(
+                    threadId: threadId,
+                    prompt: prompt,
+                    model: model,
+                    effort: effort,
+                    onDelta: { [weak self] delta in
+                        guard let self else { return }
+                        if !messageAppended {
+                            self.entries.append(.message(AgentMessage(role: .assistant, text: delta)))
+                            messageAppended = true
+                        } else {
+                            if let last = self.entries.last, case .message(let msg) = last, msg.role == .assistant {
+                                let updated = AgentMessage(id: msg.id, role: .assistant, text: msg.text + delta)
+                                self.entries[self.entries.count - 1] = .message(updated)
+                            } else {
+                                self.entries.append(.message(AgentMessage(role: .assistant, text: delta)))
+                            }
+                        }
+                    },
+                    onUsage: { [weak self] usage in
+                        guard let self else { return }
+                        self.activeThread.inputTokens += usage.inputTokens
+                        self.activeThread.outputTokens += usage.outputTokens
+                        self.activeThread.cachedTokens += usage.cachedTokens
+                    },
+                    onComplete: { [weak self] success, errorMessage in
+                        guard let self else { return }
+                        let reset = if case .appServerStopping(_, _, let resetThread) = self.runState { resetThread } else { false }
+                        self.completeAppServerTurn(success: success, errorMessage: errorMessage, resetThread: reset)
+                    }
+                )
+
+                self.runState = .appServerRunning(threadId: threadId, turnId: turnId)
+            } catch {
+                self.logger.warning("Codex App Server failed (\(error.localizedDescription)), falling back to CLI execution")
+                self.runProcessTurn(prompt: prompt, workspaceURL: workspaceURL)
+            }
+        }
+    }
+
+    private func runProcessTurn(prompt: String, workspaceURL: URL) {
+        guard let executableURL = currentExecutableURL else { return }
         let process = Process()
         let standardOutput = Pipe()
         let standardError = Pipe()
@@ -230,14 +328,13 @@ final class AgentSession {
         process.executableURL = executableURL
         process.currentDirectoryURL = workspaceURL
 
-        let contextualPrompt = makeContextualPrompt(prompt, activeFileURL: activeFileURL)
         var environment = makeEnvironment()
 
         if selectedProvider == .codex {
             process.arguments = argumentsForCurrentThread()
             environment["CODEX_INTERNAL_ORIGINATOR_OVERRIDE"] = "rollcode"
         } else {
-            var geminiArgs = ["-p", contextualPrompt, "-y"]
+            var geminiArgs = ["-p", prompt, "-y"]
             let model = currentModel
             if !model.isEmpty {
                 geminiArgs = ["-m", model] + geminiArgs
@@ -258,7 +355,7 @@ final class AgentSession {
 
             let inputHandle = standardInput.fileHandleForWriting
             if selectedProvider == .codex {
-                let promptData = Data(contextualPrompt.utf8)
+                let promptData = Data(prompt.utf8)
                 Task.detached(priority: .userInitiated) {
                     do {
                         try inputHandle.write(contentsOf: promptData)
@@ -277,18 +374,74 @@ final class AgentSession {
         }
     }
 
+    private func completeAppServerTurn(success: Bool, errorMessage: String?, resetThread: Bool) {
+        Task { @MainActor [weak self] in
+            guard let self else { return }
+            let changedPaths: [String]
+            if let workspaceURL {
+                let current = await Task.detached(priority: .utility) {
+                    (try? GitDiffService.changedPaths(in: workspaceURL)) ?? []
+                }.value
+                changedPaths = current.filter { !self.initialChangedPaths.contains($0) }
+            } else {
+                changedPaths = []
+            }
+
+            if let turnStartTime {
+                activeThread.lastDurationSeconds = Date().timeIntervalSince(turnStartTime)
+            }
+            turnStartTime = nil
+
+            let stopped = if case .appServerStopping = runState { true } else { false }
+            runState = .idle
+
+            mergeChangedFiles(changedPaths)
+
+            if stopped {
+                entries.append(.message(AgentMessage(role: .system, text: "Agent stopped.")))
+            } else if !success {
+                let detail = (errorMessage ?? errorBuffer).trimmingCharacters(in: .whitespacesAndNewlines)
+                let lower = detail.lowercased()
+                let message: String
+                if lower.contains("unauthorized") || lower.contains("login") || lower.contains("authentication") {
+                    auth.refresh()
+                    message = "Codex authentication required. Please click 'Log In' or run 'codex login' in the terminal.\n(\(detail))"
+                } else {
+                    message = detail.isEmpty ? "Codex turn finished with an error." : detail
+                }
+                entries.append(.message(AgentMessage(role: .system, text: message)))
+            }
+
+            onRunCompleted?()
+            saveCurrentThreads()
+            if resetThread {
+                resetThreadState()
+            }
+        }
+    }
+
     func stop() {
         stop(resetThread: false)
     }
 
     private func stop(resetThread: Bool) {
-        guard let process = runState.process, process.isRunning else { return }
-        runState = .stopping(process, resetThread: resetThread)
-        process.interrupt()
-        Task { @MainActor [weak self, weak process] in
-            try? await Task.sleep(nanoseconds: 1_000_000_000)
-            guard let self, self.runState.process === process, process?.isRunning == true else { return }
-            process?.terminate()
+        switch runState {
+        case .appServerRunning(let threadId, let turnId):
+            runState = .appServerStopping(threadId: threadId, turnId: turnId, resetThread: resetThread)
+            Task { @MainActor in
+                try? await CodexAppServerService.shared.interruptTurn(threadId: threadId, turnId: turnId)
+            }
+        case .running(let process):
+            guard process.isRunning else { return }
+            runState = .stopping(process, resetThread: resetThread)
+            process.interrupt()
+            Task { @MainActor [weak self, weak process] in
+                try? await Task.sleep(nanoseconds: 1_000_000_000)
+                guard let self, self.runState.process === process, process?.isRunning == true else { return }
+                process?.terminate()
+            }
+        case .idle, .stopping, .appServerStopping:
+            break
         }
     }
 
@@ -666,7 +819,7 @@ final class AgentSession {
         case .running:
             stopped = false
             resetThread = false
-        case .idle:
+        case .idle, .appServerRunning, .appServerStopping:
             return
         }
         runState = .idle
