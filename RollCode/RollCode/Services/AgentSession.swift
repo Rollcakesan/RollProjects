@@ -484,10 +484,7 @@ final class AgentSession {
     }
 
     nonisolated static func stripANSIEscapes(from text: String) -> String {
-        let pattern = #"\x1B\[[0-?]*[ -/]*[@-~]"#
-        guard let regex = try? NSRegularExpression(pattern: pattern) else { return text }
-        let range = NSRange(location: 0, length: (text as NSString).length)
-        return regex.stringByReplacingMatches(in: text, range: range, withTemplate: "")
+        ANSIEscapeCleaner.stripEscapes(from: text)
     }
 
     private func appendGeminiOutput(_ text: String) {

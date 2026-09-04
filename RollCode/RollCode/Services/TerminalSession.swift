@@ -271,11 +271,7 @@ final class TerminalSession {
 
 @MainActor
 private enum TerminalOutputCleaner {
-    private static let controlSequence = #/\u{001B}(?:\[[0-?]*[ -/]*[@-~]|\][^\u{0007}]*(?:\u{0007}|\u{001B}\\))/#
-
     static func clean(_ text: String) -> String {
-        text.replacing(controlSequence, with: "")
-            .replacing("\r\n", with: "\n")
-            .replacing("\r", with: "")
+        ANSIEscapeCleaner.clean(text)
     }
 }
