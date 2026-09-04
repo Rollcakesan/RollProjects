@@ -1,30 +1,27 @@
 import Foundation
 import Observation
-#if canImport(AIAgentKit)
-import AIAgentKit
-#endif
 
 @Observable
 @MainActor
-final class TerminalInstance: Identifiable {
-    let id: UUID
-    var title: String
-    var output: String = ""
-    private(set) var isRunning: Bool = false
-    private(set) var workingDirectory: URL?
+public final class TerminalInstance: Identifiable {
+    public let id: UUID
+    public var title: String
+    public var output: String = ""
+    public private(set) var isRunning: Bool = false
+    public private(set) var workingDirectory: URL?
 
     @ObservationIgnored private var process: Process?
     @ObservationIgnored private var inputPipe: Pipe?
     @ObservationIgnored private var commandHistory: [String] = []
     @ObservationIgnored private var historyIndex: Int?
 
-    init(id: UUID = UUID(), title: String = "zsh", workingDirectory: URL? = nil) {
+    public init(id: UUID = UUID(), title: String = "zsh", workingDirectory: URL? = nil) {
         self.id = id
         self.title = title
         self.workingDirectory = workingDirectory
     }
 
-    func start(in directory: URL) {
+    public func start(in directory: URL) {
         stop()
         workingDirectory = directory
         output = "RollCode Terminal (\(title)) — \(directory.path)\n"
@@ -56,7 +53,7 @@ final class TerminalInstance: Identifiable {
             guard !data.isEmpty else { return }
             let text = String(decoding: data, as: UTF8.self)
             Task { @MainActor [weak self] in
-                self?.appendOutput(TerminalOutputCleaner.clean(text))
+                self?.appendOutput(ANSIEscapeCleaner.clean(text))
             }
         }
 
@@ -82,7 +79,7 @@ final class TerminalInstance: Identifiable {
         }
     }
 
-    func send(_ command: String) {
+    public func send(_ command: String) {
         let command = command.trimmingCharacters(in: .newlines)
         guard !command.isEmpty else { return }
         remember(command)
@@ -95,7 +92,7 @@ final class TerminalInstance: Identifiable {
         }
     }
 
-    func interrupt() {
+    public func interrupt() {
         guard isRunning, let process else {
             appendOutput("\n[Shell is not running]\n")
             return
@@ -103,18 +100,18 @@ final class TerminalInstance: Identifiable {
         process.interrupt()
     }
 
-    func clear() {
+    public func clear() {
         output = ""
     }
 
-    func previousCommand() -> String {
+    public func previousCommand() -> String {
         guard !commandHistory.isEmpty else { return "" }
         let nextIndex = max((historyIndex ?? commandHistory.count) - 1, 0)
         historyIndex = nextIndex
         return commandHistory[nextIndex]
     }
 
-    func nextCommand() -> String {
+    public func nextCommand() -> String {
         guard let historyIndex else { return "" }
         let nextIndex = historyIndex + 1
         guard nextIndex < commandHistory.count else {
@@ -125,11 +122,11 @@ final class TerminalInstance: Identifiable {
         return commandHistory[nextIndex]
     }
 
-    func restart() {
+    public func restart() {
         start(in: workingDirectory ?? FileManager.default.homeDirectoryForCurrentUser)
     }
 
-    func stop() {
+    public func stop() {
         process?.terminate()
         process = nil
         inputPipe = nil
@@ -171,39 +168,39 @@ final class TerminalInstance: Identifiable {
 
 @Observable
 @MainActor
-final class TerminalSession: TerminalCommandExecuting {
-    var isVisible = true
-    private(set) var tabs: [TerminalInstance] = []
-    var activeTabID: UUID?
+public final class TerminalSession: TerminalCommandExecuting {
+    public var isVisible = true
+    public private(set) var tabs: [TerminalInstance] = []
+    public var activeTabID: UUID?
 
-    var activeTab: TerminalInstance? {
+    public var activeTab: TerminalInstance? {
         if let activeTabID, let found = tabs.first(where: { $0.id == activeTabID }) {
             return found
         }
         return tabs.first
     }
 
-    var output: String {
+    public var output: String {
         get { activeTab?.output ?? "" }
         set { activeTab?.output = newValue }
     }
 
-    var isRunning: Bool {
+    public var isRunning: Bool {
         activeTab?.isRunning ?? false
     }
 
-    var workingDirectory: URL? {
+    public var workingDirectory: URL? {
         activeTab?.workingDirectory
     }
 
-    init() {
+    public init() {
         let initial = TerminalInstance(title: "Terminal 1")
         tabs = [initial]
         activeTabID = initial.id
     }
 
     @discardableResult
-    func createTab(in directory: URL? = nil, title: String? = nil) -> TerminalInstance {
+    public func createTab(in directory: URL? = nil, title: String? = nil) -> TerminalInstance {
         let dir = directory ?? workingDirectory ?? FileManager.default.homeDirectoryForCurrentUser
         let tabNumber = tabs.count + 1
         let newTab = TerminalInstance(title: title ?? "Terminal \(tabNumber)", workingDirectory: dir)
@@ -213,7 +210,7 @@ final class TerminalSession: TerminalCommandExecuting {
         return newTab
     }
 
-    func closeTab(id: UUID) {
+    public func closeTab(id: UUID) {
         guard tabs.count > 1 else {
             activeTab?.restart()
             return
@@ -228,12 +225,12 @@ final class TerminalSession: TerminalCommandExecuting {
         }
     }
 
-    func selectTab(id: UUID) {
+    public func selectTab(id: UUID) {
         guard tabs.contains(where: { $0.id == id }) else { return }
         activeTabID = id
     }
 
-    func start(in directory: URL) {
+    public func start(in directory: URL) {
         if let active = activeTab {
             active.start(in: directory)
         } else {
@@ -241,40 +238,33 @@ final class TerminalSession: TerminalCommandExecuting {
         }
     }
 
-    func send(_ command: String) {
+    public func send(_ command: String) {
         activeTab?.send(command)
     }
 
-    func interrupt() {
+    public func interrupt() {
         activeTab?.interrupt()
     }
 
-    func clear() {
+    public func clear() {
         activeTab?.clear()
     }
 
-    func restart() {
+    public func restart() {
         activeTab?.restart()
     }
 
-    func stop() {
+    public func stop() {
         for tab in tabs {
             tab.stop()
         }
     }
 
-    func previousCommand() -> String {
+    public func previousCommand() -> String {
         activeTab?.previousCommand() ?? ""
     }
 
-    func nextCommand() -> String {
+    public func nextCommand() -> String {
         activeTab?.nextCommand() ?? ""
-    }
-}
-
-@MainActor
-private enum TerminalOutputCleaner {
-    static func clean(_ text: String) -> String {
-        ANSIEscapeCleaner.clean(text)
     }
 }

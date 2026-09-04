@@ -1,7 +1,7 @@
 import Foundation
 
-enum QuickOpenMatcher {
-    static func score(query: String, candidate: String) -> Int? {
+public enum QuickOpenMatcher {
+    public static func score(query: String, candidate: String) -> Int? {
         let queryCharacters = Array(query.lowercased())
         guard !queryCharacters.isEmpty else { return 0 }
 

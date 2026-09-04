@@ -1,22 +1,30 @@
 import Foundation
 
-struct FileNode: Identifiable, Hashable, Sendable {
-    let url: URL
-    let isDirectory: Bool
-    var children: [FileNode]?
+/// Represents a node in the hierarchical file tree.
+public struct FileNode: Identifiable, Hashable, Sendable {
+    public let url: URL
+    public let isDirectory: Bool
+    public var children: [FileNode]?
 
-    var id: URL { url }
-    var name: String { url.lastPathComponent }
-    var iconName: String {
+    public var id: URL { url }
+    public var name: String { url.lastPathComponent }
+
+    public var iconName: String {
         if isDirectory { return "folder.fill" }
-        return CodeLanguage(url: url).systemImageName
+        return FileNode.systemIcon(for: url)
     }
 
-    static let ignoredDirectoryNames: Set<String> = [
+    public static let ignoredDirectoryNames: Set<String> = [
         ".git", ".build", ".swiftpm", "DerivedData", "node_modules", "Pods"
     ]
 
-    static func buildTree(at url: URL, fileManager: FileManager = .default) -> FileNode {
+    public init(url: URL, isDirectory: Bool, children: [FileNode]? = nil) {
+        self.url = url
+        self.isDirectory = isDirectory
+        self.children = children
+    }
+
+    public static func buildTree(at url: URL, fileManager: FileManager = .default) -> FileNode {
         let keys: Set<URLResourceKey> = [.isDirectoryKey, .isSymbolicLinkKey, .isHiddenKey]
         let childURLs = (try? fileManager.contentsOfDirectory(
             at: url,
@@ -44,8 +52,8 @@ struct FileNode: Identifiable, Hashable, Sendable {
         return FileNode(url: url, isDirectory: true, children: nodes)
     }
 
-    func matchingFiles(_ query: String) -> [FileNode] {
-        let normalized = query.trimmed
+    public func matchingFiles(_ query: String) -> [FileNode] {
+        let normalized = query.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !normalized.isEmpty else { return [] }
 
         var matches: [FileNode] = []
@@ -58,13 +66,30 @@ struct FileNode: Identifiable, Hashable, Sendable {
         return matches
     }
 
-    var flattenedFiles: [FileNode] {
+    public var flattenedFiles: [FileNode] {
         if !isDirectory { return [self] }
         return (children ?? []).flatMap(\.flattenedFiles)
     }
+
+    public static func systemIcon(for url: URL) -> String {
+        let ext = url.pathExtension.lowercased()
+        let filename = url.lastPathComponent.lowercased()
+        if filename == "dockerfile" || filename.hasPrefix(".zsh") || filename.hasPrefix(".bash") {
+            return "terminal"
+        }
+        switch ext {
+        case "swift": return "swift"
+        case "json", "jsonc": return "curlybraces"
+        case "sh", "zsh", "bash": return "terminal"
+        case "md", "markdown": return "text.document"
+        case "c", "h", "cc", "cpp", "cxx", "hpp", "m", "mm": return "c.square"
+        case "html", "htm", "css", "scss", "sass": return "globe"
+        default: return "doc.text"
+        }
+    }
 }
 
-extension String {
+public extension String {
     var trimmed: String {
         trimmingCharacters(in: .whitespacesAndNewlines)
     }

@@ -266,7 +266,8 @@ private struct EditorDocumentView: View {
     }
 
     private func performGoToLine() {
-        guard let line = Int(targetLine.trimmed), line > 0 else { return }
+        let trimmed = targetLine.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard let line = Int(trimmed), line > 0 else { return }
         workspace.editorNavigationRequest = EditorNavigationRequest(line: line)
         showsGoToLine = false
         targetLine = ""

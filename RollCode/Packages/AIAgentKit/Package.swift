@@ -13,13 +13,15 @@ let package = Package(
         ),
     ],
     dependencies: [
-        .package(path: "../GitBridgeKit")
+        .package(path: "../GitBridgeKit"),
+        .package(path: "../TerminalCoreKit"),
     ],
     targets: [
         .target(
             name: "AIAgentKit",
             dependencies: [
-                .product(name: "GitBridgeKit", package: "GitBridgeKit")
+                .product(name: "GitBridgeKit", package: "GitBridgeKit"),
+                .product(name: "TerminalCoreKit", package: "TerminalCoreKit"),
             ],
             path: "Sources/AIAgentKit"
         ),

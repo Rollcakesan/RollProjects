@@ -2,13 +2,13 @@ import Foundation
 import os
 
 @MainActor
-final class FileWatcherService {
+public final class FileWatcherService {
     private let logger = Logger(subsystem: "com.rollprojects.RollCode", category: "filesystem")
     nonisolated(unsafe) private var eventStream: FSEventStreamRef?
-    private let url: URL
+    public let url: URL
     private let onChange: @MainActor () -> Void
 
-    init(url: URL, onChange: @escaping @MainActor () -> Void) {
+    public init(url: URL, onChange: @escaping @MainActor () -> Void) {
         self.url = url
         self.onChange = onChange
         startWatching()
@@ -18,7 +18,7 @@ final class FileWatcherService {
         stopWatching()
     }
 
-    func startWatching() {
+    public func startWatching() {
         stopWatching()
 
         let pathsToWatch = [url.path] as CFArray
@@ -36,7 +36,7 @@ final class FileWatcherService {
         let flags = UInt32(kFSEventStreamCreateFlagUseCFTypes | kFSEventStreamCreateFlagFileEvents | kFSEventStreamCreateFlagNoDefer)
         guard let stream = FSEventStreamCreate(
             kCFAllocatorDefault,
-            { (_, clientInfo, numEvents, eventPaths, eventFlags, _) in
+            { (_, clientInfo, _, _, _, _) in
                 guard let clientInfo else { return }
                 let watcher = Unmanaged<FileWatcherService>.fromOpaque(clientInfo).takeUnretainedValue()
                 Task { @MainActor in
@@ -59,7 +59,7 @@ final class FileWatcherService {
         logger.debug("Started file watcher")
     }
 
-    nonisolated func stopWatching() {
+    nonisolated public func stopWatching() {
         if let stream = eventStream {
             FSEventStreamStop(stream)
             FSEventStreamInvalidate(stream)
