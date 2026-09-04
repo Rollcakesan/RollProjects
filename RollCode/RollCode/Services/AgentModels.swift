@@ -151,6 +151,30 @@ enum AgentProvider: String, CaseIterable, Identifiable, Sendable, Codable {
     }
 }
 
+struct AgentTokenUsage: Equatable, Sendable, Codable {
+    var inputTokens: Int
+    var cachedTokens: Int
+    var outputTokens: Int
+
+    var totalTokens: Int {
+        inputTokens + outputTokens
+    }
+
+    static func parse(from description: String) -> AgentTokenUsage? {
+        let inputMatch = description.firstMatch(of: #/(\d+)\s+input/#)
+        let cachedMatch = description.firstMatch(of: #/(\d+)\s+cached/#)
+        let outputMatch = description.firstMatch(of: #/(\d+)\s+output/#)
+
+        guard inputMatch != nil || outputMatch != nil else { return nil }
+
+        let input = inputMatch.flatMap { Int($0.output.1) } ?? 0
+        let cached = cachedMatch.flatMap { Int($0.output.1) } ?? 0
+        let output = outputMatch.flatMap { Int($0.output.1) } ?? 0
+
+        return AgentTokenUsage(inputTokens: input, cachedTokens: cached, outputTokens: output)
+    }
+}
+
 struct AgentThread: Identifiable, Equatable, Sendable, Codable {
     let id: UUID
     var provider: AgentProvider
@@ -158,6 +182,12 @@ struct AgentThread: Identifiable, Equatable, Sendable, Codable {
     var title: String
     var updatedAt: Date
     var entries: [AgentEntry]
+    var model: String?
+    var reasoningEffort: String?
+    var inputTokens: Int
+    var outputTokens: Int
+    var cachedTokens: Int
+    var lastDurationSeconds: Double?
 
     init(
         id: UUID = UUID(),
@@ -165,7 +195,13 @@ struct AgentThread: Identifiable, Equatable, Sendable, Codable {
         codexThreadID: String? = nil,
         title: String = "New Thread",
         updatedAt: Date = Date(),
-        entries: [AgentEntry] = []
+        entries: [AgentEntry] = [],
+        model: String? = nil,
+        reasoningEffort: String? = nil,
+        inputTokens: Int = 0,
+        outputTokens: Int = 0,
+        cachedTokens: Int = 0,
+        lastDurationSeconds: Double? = nil
     ) {
         self.id = id
         self.provider = provider
@@ -173,6 +209,33 @@ struct AgentThread: Identifiable, Equatable, Sendable, Codable {
         self.title = title
         self.updatedAt = updatedAt
         self.entries = entries
+        self.model = model
+        self.reasoningEffort = reasoningEffort
+        self.inputTokens = inputTokens
+        self.outputTokens = outputTokens
+        self.cachedTokens = cachedTokens
+        self.lastDurationSeconds = lastDurationSeconds
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case id, provider, codexThreadID, title, updatedAt, entries
+        case model, reasoningEffort, inputTokens, outputTokens, cachedTokens, lastDurationSeconds
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.id = try container.decode(UUID.self, forKey: .id)
+        self.provider = try container.decode(AgentProvider.self, forKey: .provider)
+        self.codexThreadID = try container.decodeIfPresent(String.self, forKey: .codexThreadID)
+        self.title = try container.decode(String.self, forKey: .title)
+        self.updatedAt = try container.decode(Date.self, forKey: .updatedAt)
+        self.entries = try container.decode([AgentEntry].self, forKey: .entries)
+        self.model = try container.decodeIfPresent(String.self, forKey: .model)
+        self.reasoningEffort = try container.decodeIfPresent(String.self, forKey: .reasoningEffort)
+        self.inputTokens = try container.decodeIfPresent(Int.self, forKey: .inputTokens) ?? 0
+        self.outputTokens = try container.decodeIfPresent(Int.self, forKey: .outputTokens) ?? 0
+        self.cachedTokens = try container.decodeIfPresent(Int.self, forKey: .cachedTokens) ?? 0
+        self.lastDurationSeconds = try container.decodeIfPresent(Double.self, forKey: .lastDurationSeconds)
     }
 }
 

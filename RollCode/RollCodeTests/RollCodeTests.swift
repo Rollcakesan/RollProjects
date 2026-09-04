@@ -1142,6 +1142,111 @@ struct RollCodeTests {
             #expect(service.effectiveProjectID(for: URL(fileURLWithPath: "/Users/test/ProjectA")) == "explicit-project")
         }
     }
+
+    @Test("ModelCatalogService parses Gemini API JSON and assigns speed tiers")
+    func modelCatalogServiceParsesGeminiModels() throws {
+        let json = """
+        {
+          "models": [
+            {
+              "name": "models/gemini-2.5-flash",
+              "displayName": "Gemini 2.5 Flash",
+              "supportedGenerationMethods": ["generateContent", "countTokens"]
+            },
+            {
+              "name": "models/gemini-2.5-pro",
+              "displayName": "Gemini 2.5 Pro",
+              "supportedGenerationMethods": ["generateContent"]
+            },
+            {
+              "name": "models/text-embedding-004",
+              "displayName": "Embedding",
+              "supportedGenerationMethods": ["embedContent"]
+            }
+          ]
+        }
+        """.data(using: .utf8)!
+
+        let parsed = try #require(ModelCatalogService.parseGeminiModels(data: json))
+        #expect(parsed.count == 2)
+        #expect(parsed[0].id == "gemini-2.5-pro")
+        #expect(parsed[0].speedTier == .deep)
+        #expect(parsed[1].id == "gemini-2.5-flash")
+        #expect(parsed[1].speedTier == .fast)
+    }
+
+    @Test("ModelCatalogService parses Codex cache JSON with reasoning support")
+    func modelCatalogServiceParsesCodexCache() throws {
+        let json = """
+        {
+          "models": [
+            {
+              "slug": "gpt-5.6-sol",
+              "display_name": "GPT-5.6-Sol",
+              "supported_reasoning_efforts": ["low", "medium", "high"]
+            },
+            {
+              "slug": "gpt-5.4-mini",
+              "display_name": "GPT-5.4-Mini"
+            }
+          ]
+        }
+        """.data(using: .utf8)!
+
+        let parsed = try #require(ModelCatalogService.parseCodexCache(data: json))
+        #expect(parsed.count == 2)
+        #expect(parsed[0].id == "gpt-5.6-sol")
+        #expect(parsed[0].supportsReasoningEffort)
+        #expect(parsed[0].speedTier == .deep)
+        #expect(parsed[1].id == "gpt-5.4-mini")
+        #expect(parsed[1].speedTier == .fast)
+    }
+
+    @Test("AgentTokenUsage parses token descriptions accurately")
+    func agentTokenUsageParsesDescriptions() throws {
+        let usage1 = try #require(AgentTokenUsage.parse(from: "20 input · 10 cached · 5 output"))
+        #expect(usage1.inputTokens == 20)
+        #expect(usage1.cachedTokens == 10)
+        #expect(usage1.outputTokens == 5)
+        #expect(usage1.totalTokens == 25)
+
+        let usage2 = AgentTokenUsage.parse(from: "invalid string")
+        #expect(usage2 == nil)
+    }
+
+    @Test("AgentSession manages model selection, reasoning effort, and tracks token usage")
+    @MainActor
+    func agentSessionManagesModelAndTracksTokens() async throws {
+        try await withTemporaryDirectory { root in
+            let executable = root.appendingPathComponent("fake-agent")
+            let script = """
+            #!/bin/zsh
+            printf '%s\\n' '{"type":"thread.started","thread_id":"fake-thread"}'
+            printf '%s\\n' '{"type":"turn.completed","usage":{"input_tokens":50,"cached_input_tokens":15,"output_tokens":25}}'
+            """
+            try script.write(to: executable, atomically: true, encoding: .utf8)
+            try FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: executable.path)
+
+            let agent = AgentSession(executableURL: executable)
+            agent.setModel("gpt-5.6-sol")
+            agent.setReasoningEffort(.high)
+
+            #expect(agent.currentModel == "gpt-5.6-sol")
+            #expect(agent.currentReasoningEffort == .high)
+
+            agent.send("Hello", in: root)
+            for _ in 0..<40 where agent.isRunning {
+                try await Task.sleep(nanoseconds: 50_000_000)
+            }
+
+            #expect(!agent.isRunning)
+            #expect(agent.activeThread.inputTokens == 50)
+            #expect(agent.activeThread.outputTokens == 25)
+            #expect(agent.activeThread.cachedTokens == 15)
+            #expect(agent.totalTokens == 75)
+            #expect(agent.lastTurnDuration != nil)
+        }
+    }
 }
 
 @MainActor

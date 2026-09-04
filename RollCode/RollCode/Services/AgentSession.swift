@@ -54,24 +54,119 @@ final class AgentSession {
 
     let auth: CodexAuthService
     let geminiAuth: GeminiAuthService
+    let modelCatalog: ModelCatalogService
     @ObservationIgnored let executableURL: URL?
     @ObservationIgnored let geminiExecutableURL: URL?
     var onRunCompleted: (@MainActor @Sendable () -> Void)?
 
+    static let codexModelDefaultsKey = "RollCode_SelectedCodexModel"
+    static let geminiModelDefaultsKey = "RollCode_SelectedGeminiModel"
+    static let reasoningEffortDefaultsKey = "RollCode_SelectedReasoningEffort"
+
+    var selectedCodexModel: String {
+        get {
+            let saved = UserDefaults.standard.string(forKey: Self.codexModelDefaultsKey)
+            if let saved, !saved.isEmpty { return saved }
+            return modelCatalog.defaultModelID(for: .codex)
+        }
+        set {
+            UserDefaults.standard.set(newValue, forKey: Self.codexModelDefaultsKey)
+        }
+    }
+
+    var selectedGeminiModel: String {
+        get {
+            let saved = UserDefaults.standard.string(forKey: Self.geminiModelDefaultsKey)
+            if let saved, !saved.isEmpty { return saved }
+            return modelCatalog.defaultModelID(for: .gemini)
+        }
+        set {
+            UserDefaults.standard.set(newValue, forKey: Self.geminiModelDefaultsKey)
+        }
+    }
+
+    var selectedReasoningEffort: ReasoningEffort {
+        get {
+            if let raw = UserDefaults.standard.string(forKey: Self.reasoningEffortDefaultsKey),
+               let effort = ReasoningEffort(rawValue: raw) {
+                return effort
+            }
+            return .medium
+        }
+        set {
+            UserDefaults.standard.set(newValue.rawValue, forKey: Self.reasoningEffortDefaultsKey)
+        }
+    }
+
+    var currentModel: String {
+        get {
+            if let threadModel = activeThread.model, !threadModel.isEmpty {
+                return threadModel
+            }
+            return selectedProvider == .codex ? selectedCodexModel : selectedGeminiModel
+        }
+        set {
+            setModel(newValue)
+        }
+    }
+
+    var currentReasoningEffort: ReasoningEffort {
+        get {
+            if let r = activeThread.reasoningEffort, let effort = ReasoningEffort(rawValue: r) {
+                return effort
+            }
+            return selectedReasoningEffort
+        }
+        set {
+            setReasoningEffort(newValue)
+        }
+    }
+
+    var lastTurnDuration: Double? {
+        activeThread.lastDurationSeconds
+    }
+
+    var totalTokens: Int {
+        activeThread.inputTokens + activeThread.outputTokens
+    }
+
+    func setModel(_ modelID: String) {
+        if selectedProvider == .codex {
+            selectedCodexModel = modelID
+        } else {
+            selectedGeminiModel = modelID
+        }
+        activeThread.model = modelID
+        saveCurrentThreads()
+    }
+
+    func setReasoningEffort(_ effort: ReasoningEffort) {
+        selectedReasoningEffort = effort
+        activeThread.reasoningEffort = effort.rawValue
+        saveCurrentThreads()
+    }
+
+    func refreshModelCatalog() async {
+        await modelCatalog.refreshModels(geminiKey: geminiAuth.storedAPIKey)
+    }
+
     @ObservationIgnored private var errorBuffer = ""
     @ObservationIgnored private var workspaceURL: URL?
     @ObservationIgnored private var initialChangedPaths: Set<String> = []
+    @ObservationIgnored private var turnStartTime: Date?
 
     init(
         executableURL: URL? = CodexExecutableLocator.locate(),
         geminiExecutableURL: URL? = GeminiExecutableLocator.locate(),
         auth: CodexAuthService = CodexAuthService(),
-        geminiAuth: GeminiAuthService = GeminiAuthService()
+        geminiAuth: GeminiAuthService = GeminiAuthService(),
+        modelCatalog: ModelCatalogService = ModelCatalogService()
     ) {
         self.executableURL = executableURL
         self.geminiExecutableURL = geminiExecutableURL
         self.auth = auth
         self.geminiAuth = geminiAuth
+        self.modelCatalog = modelCatalog
     }
 
     var isAvailable: Bool { currentExecutableURL != nil }
@@ -95,6 +190,12 @@ final class AgentSession {
             geminiLatestThread = activeThread
         }
         activeThread = (new == .codex) ? codexLatestThread : geminiLatestThread
+        if activeThread.model == nil {
+            activeThread.model = (new == .codex) ? selectedCodexModel : selectedGeminiModel
+        }
+        if activeThread.reasoningEffort == nil {
+            activeThread.reasoningEffort = selectedReasoningEffort.rawValue
+        }
         errorBuffer = ""
     }
 
@@ -115,6 +216,9 @@ final class AgentSession {
         }
         entries.append(.message(AgentMessage(role: .user, text: prompt)))
         errorBuffer = ""
+        self.turnStartTime = Date()
+        self.activeThread.model = currentModel
+        self.activeThread.reasoningEffort = currentReasoningEffort.rawValue
         self.workspaceURL = workspaceURL.standardizedFileURL
         self.initialChangedPaths = Set((try? GitDiffService.changedPaths(in: workspaceURL)) ?? [])
         saveCurrentThreads()
@@ -133,7 +237,12 @@ final class AgentSession {
             process.arguments = argumentsForCurrentThread()
             environment["CODEX_INTERNAL_ORIGINATOR_OVERRIDE"] = "rollcode"
         } else {
-            process.arguments = ["-p", contextualPrompt, "-y"]
+            var geminiArgs = ["-p", contextualPrompt, "-y"]
+            let model = currentModel
+            if !model.isEmpty {
+                geminiArgs = ["-m", model] + geminiArgs
+            }
+            process.arguments = geminiArgs
         }
         process.environment = environment
 
@@ -199,6 +308,16 @@ final class AgentSession {
         archiveCurrentThreadIfNeeded()
         activeThread = thread
         selectedProvider = thread.provider
+        if let m = thread.model, !m.isEmpty {
+            if thread.provider == .codex {
+                selectedCodexModel = m
+            } else {
+                selectedGeminiModel = m
+            }
+        }
+        if let r = thread.reasoningEffort, let effort = ReasoningEffort(rawValue: r) {
+            selectedReasoningEffort = effort
+        }
         errorBuffer = ""
         saveCurrentThreads()
     }
@@ -319,7 +438,11 @@ final class AgentSession {
 
     private func resetThreadState() {
         archiveCurrentThreadIfNeeded()
-        activeThread = AgentThread(provider: selectedProvider)
+        activeThread = AgentThread(
+            provider: selectedProvider,
+            model: selectedProvider == .codex ? selectedCodexModel : selectedGeminiModel,
+            reasoningEffort: selectedReasoningEffort.rawValue
+        )
         errorBuffer = ""
         saveCurrentThreads()
     }
@@ -342,6 +465,14 @@ final class AgentSession {
             "--skip-git-repo-check",
             "--config", "approval_policy=\"never\""
         ]
+        let model = currentModel
+        if !model.isEmpty {
+            arguments += ["-m", model]
+        }
+        let info = modelCatalog.findModel(id: model, provider: .codex)
+        if info?.supportsReasoningEffort == true || model.hasPrefix("o") || model.hasPrefix("gpt-5") {
+            arguments += ["-c", "model_reasoning_effort=\"\(currentReasoningEffort.rawValue)\""]
+        }
         if let threadID {
             arguments += ["resume", threadID]
         }
@@ -452,6 +583,11 @@ final class AgentSession {
             mergeChangedFiles(changedFiles)
         case .usage(let description):
             upsert(.usage(description))
+            if let parsed = AgentTokenUsage.parse(from: description) {
+                activeThread.inputTokens += parsed.inputTokens
+                activeThread.outputTokens += parsed.outputTokens
+                activeThread.cachedTokens += parsed.cachedTokens
+            }
         case .error(let message):
             entries.append(.message(AgentMessage(role: .system, text: message)))
         }
@@ -515,6 +651,11 @@ final class AgentSession {
             changedPaths = []
         }
         guard runState.process === process else { return }
+
+        if let turnStartTime {
+            activeThread.lastDurationSeconds = Date().timeIntervalSince(turnStartTime)
+        }
+        turnStartTime = nil
 
         let stopped: Bool
         let resetThread: Bool

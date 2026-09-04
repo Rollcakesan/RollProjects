@@ -29,12 +29,17 @@ struct AgentPanelView: View {
             agent.auth.refresh()
             agent.geminiAuth.refresh()
             agent.loadPastCodexSessions()
+            Task {
+                await agent.refreshModelCatalog()
+            }
         }
     }
 
     private var header: some View {
-        HStack(spacing: 8) {
+        HStack(spacing: 6) {
             providerToggle
+            Divider().frame(height: 12).overlay(RollCodeTheme.divider)
+            modelSelectorMenu
             Divider().frame(height: 12).overlay(RollCodeTheme.divider)
             threadSwitcherMenu
 
@@ -66,6 +71,85 @@ struct AgentPanelView: View {
         .padding(.horizontal, 10)
         .frame(height: 34)
         .background(RollCodeTheme.sidebarBackground)
+    }
+
+    private var modelSelectorMenu: some View {
+        let currentID = agent.currentModel
+        let currentInfo = agent.modelCatalog.findModel(id: currentID, provider: agent.selectedProvider)
+        let tier = currentInfo?.speedTier ?? (currentID.contains("flash") || currentID.contains("mini") ? .fast : .standard)
+        let supportsReasoning = currentInfo?.supportsReasoningEffort == true || currentID.hasPrefix("o") || currentID.hasPrefix("gpt-5")
+        let availableModels = agent.modelCatalog.models(for: agent.selectedProvider)
+
+        return Menu {
+            Section("Select Model") {
+                ForEach(availableModels) { model in
+                    Button {
+                        agent.setModel(model.id)
+                    } label: {
+                        HStack {
+                            if model.id == currentID {
+                                Image(systemName: "checkmark")
+                            }
+                            Text("\(model.speedTier.badgeEmoji) \(model.displayName)")
+                        }
+                    }
+                }
+            }
+
+            if supportsReasoning && agent.selectedProvider == .codex {
+                Divider()
+                Menu {
+                    ForEach(ReasoningEffort.allCases) { effort in
+                        Button {
+                            agent.setReasoningEffort(effort)
+                        } label: {
+                            HStack {
+                                if agent.currentReasoningEffort == effort {
+                                    Image(systemName: "checkmark")
+                                }
+                                Text(effort.displayName)
+                            }
+                        }
+                    }
+                } label: {
+                    Label("Thinking Budget: \(agent.currentReasoningEffort.shortName)", systemImage: "brain")
+                }
+            }
+
+            Divider()
+            Button {
+                Task {
+                    await agent.refreshModelCatalog()
+                }
+            } label: {
+                Label(agent.modelCatalog.isRefreshing ? "Refreshing Models…" : "Refresh Models from API", systemImage: "arrow.clockwise")
+            }
+            .disabled(agent.modelCatalog.isRefreshing)
+        } label: {
+            HStack(spacing: 3) {
+                Text(tier.badgeEmoji)
+                    .font(.system(size: 9))
+                Text(currentInfo?.displayName ?? currentID)
+                    .font(.system(size: 10, weight: .medium))
+                    .foregroundStyle(RollCodeTheme.primaryText)
+                    .lineLimit(1)
+                if supportsReasoning && agent.selectedProvider == .codex {
+                    Text("(\(agent.currentReasoningEffort.shortName))")
+                        .font(.system(size: 8.5, weight: .regular, design: .monospaced))
+                        .foregroundStyle(RollCodeTheme.accent)
+                }
+                Image(systemName: "chevron.up.chevron.down")
+                    .font(.system(size: 7))
+                    .foregroundStyle(RollCodeTheme.secondaryText)
+            }
+            .padding(.horizontal, 5)
+            .padding(.vertical, 2.5)
+            .background(RollCodeTheme.windowBackground)
+            .clipShape(RoundedRectangle(cornerRadius: 4))
+        }
+        .menuStyle(.borderlessButton)
+        .fixedSize()
+        .help("Select model and thinking/speed mode")
     }
 
     private var providerToggle: some View {
@@ -517,9 +601,60 @@ struct AgentPanelView: View {
                 .disabled(!canSubmit)
                 .padding(.bottom, 4)
             }
-            .padding(9)
+            .padding(.horizontal, 9)
+            .padding(.top, 9)
+            .padding(.bottom, 5)
+
+            // Status bar with auth indicator, elapsed latency, and token metrics
+            HStack(spacing: 8) {
+                authBadge
+
+                Spacer()
+
+                if let duration = agent.lastTurnDuration {
+                    HStack(spacing: 3) {
+                        Image(systemName: "timer")
+                            .font(.system(size: 8.5))
+                        Text(String(format: "%.1fs", duration))
+                            .font(.system(size: 9, design: .monospaced))
+                    }
+                    .foregroundStyle(RollCodeTheme.secondaryText)
+                    .help("Last turn duration: \(String(format: "%.2f", duration))s")
+                }
+
+                if agent.totalTokens > 0 {
+                    tokenMetricsBadge
+                }
+            }
+            .padding(.horizontal, 10)
+            .padding(.bottom, 6)
         }
         .background(RollCodeTheme.windowBackground)
+    }
+
+    private var tokenMetricsBadge: some View {
+        HStack(spacing: 3) {
+            Image(systemName: "number.circle")
+                .font(.system(size: 8.5))
+            Text(formattedTokenCount(agent.totalTokens))
+                .font(.system(size: 9, weight: .medium, design: .monospaced))
+        }
+        .padding(.horizontal, 5)
+        .padding(.vertical, 1.5)
+        .background(RollCodeTheme.elevatedBackground)
+        .clipShape(RoundedRectangle(cornerRadius: 3.5))
+        .foregroundStyle(RollCodeTheme.secondaryText)
+        .help("Session tokens: \(agent.activeThread.inputTokens) in / \(agent.activeThread.cachedTokens) cached / \(agent.activeThread.outputTokens) out")
+    }
+
+    private func formattedTokenCount(_ count: Int) -> String {
+        if count >= 1_000_000 {
+            return String(format: "%.1fM tok", Double(count) / 1_000_000.0)
+        } else if count >= 1_000 {
+            return String(format: "%.1fk tok", Double(count) / 1_000.0)
+        } else {
+            return "\(count) tok"
+        }
     }
 
     private func checkFileMention(in text: String) {

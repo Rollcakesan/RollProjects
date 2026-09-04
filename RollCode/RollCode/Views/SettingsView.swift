@@ -26,7 +26,7 @@ struct SettingsView: View {
                     Label("Gemini", systemImage: "diamond.fill")
                 }
         }
-        .frame(width: 520, height: 380)
+        .frame(width: 520, height: 440)
         .padding(20)
         .background(RollCodeTheme.windowBackground)
         .onAppear {
@@ -136,6 +136,43 @@ struct SettingsView: View {
                 .buttonStyle(.borderedProminent)
                 .controlSize(.regular)
             }
+
+            Section("Model & Thinking Preferences") {
+                Picker("Default Model", selection: Binding(
+                    get: { agent.selectedCodexModel },
+                    set: { agent.selectedCodexModel = $0 }
+                )) {
+                    ForEach(agent.modelCatalog.models(for: .codex)) { model in
+                        Text("\(model.speedTier.badgeEmoji) \(model.displayName)").tag(model.id)
+                    }
+                }
+
+                Picker("Reasoning Effort (Thinking)", selection: Binding(
+                    get: { agent.selectedReasoningEffort },
+                    set: { agent.selectedReasoningEffort = $0 }
+                )) {
+                    ForEach(ReasoningEffort.allCases) { effort in
+                        Text(effort.displayName).tag(effort)
+                    }
+                }
+
+                HStack {
+                    Spacer()
+                    Button {
+                        Task { await agent.refreshModelCatalog() }
+                    } label: {
+                        HStack(spacing: 4) {
+                            if agent.modelCatalog.isRefreshing {
+                                ProgressView().controlSize(.mini)
+                            } else {
+                                Image(systemName: "arrow.clockwise")
+                            }
+                            Text("Fetch Latest Models")
+                        }
+                    }
+                    .controlSize(.small)
+                }
+            }
         }
         .formStyle(.grouped)
     }
@@ -207,6 +244,7 @@ struct SettingsView: View {
                         agent.geminiAuth.storedAPIKey = geminiKeyInput
                         agent.geminiAuth.storedProjectID = geminiProjectInput
                         showingKeySaved = true
+                        Task { await agent.refreshModelCatalog() }
                     }
                     .buttonStyle(.bordered)
 
@@ -215,6 +253,34 @@ struct SettingsView: View {
                             .font(.system(size: 11))
                             .foregroundStyle(Color.green)
                     }
+                }
+            }
+
+            Section("Model Preferences") {
+                Picker("Default Model", selection: Binding(
+                    get: { agent.selectedGeminiModel },
+                    set: { agent.selectedGeminiModel = $0 }
+                )) {
+                    ForEach(agent.modelCatalog.models(for: .gemini)) { model in
+                        Text("\(model.speedTier.badgeEmoji) \(model.displayName)").tag(model.id)
+                    }
+                }
+
+                HStack {
+                    Spacer()
+                    Button {
+                        Task { await agent.refreshModelCatalog() }
+                    } label: {
+                        HStack(spacing: 4) {
+                            if agent.modelCatalog.isRefreshing {
+                                ProgressView().controlSize(.mini)
+                            } else {
+                                Image(systemName: "arrow.clockwise")
+                            }
+                            Text("Fetch Latest Models")
+                        }
+                    }
+                    .controlSize(.small)
                 }
             }
         }
