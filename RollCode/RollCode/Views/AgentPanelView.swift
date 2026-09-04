@@ -264,92 +264,111 @@ struct AgentPanelView: View {
     }
 
     private var conversation: some View {
-        ScrollView {
-            LazyVStack(alignment: .leading, spacing: 10) {
-                if agent.selectedProvider == .codex && agent.auth.status == .unauthenticated {
-                    HStack(spacing: 8) {
-                        Image(systemName: "person.badge.key.fill")
-                            .foregroundStyle(RollCodeTheme.accent)
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text("Codex Login")
-                                .font(.system(size: 11, weight: .medium))
-                                .foregroundStyle(RollCodeTheme.primaryText)
-                            Text("Log in with your ChatGPT account to use Codex without an API key.")
-                                .font(.system(size: 10))
-                                .foregroundStyle(RollCodeTheme.secondaryText)
-                        }
-                        Spacer()
-                        Button("Log In") {
-                            agent.auth.requestLogin(in: terminal)
-                        }
-                        .buttonStyle(.borderedProminent)
-                        .controlSize(.small)
-                    }
-                    .padding(8)
-                    .background(RollCodeTheme.elevatedBackground)
-                    .clipShape(RoundedRectangle(cornerRadius: 6))
-                } else if agent.selectedProvider == .gemini && agent.geminiAuth.status == .unauthenticated {
-                    HStack(spacing: 8) {
-                        Image(systemName: "person.badge.key.fill")
-                            .foregroundStyle(Color.blue)
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text("Gemini Login")
-                                .font(.system(size: 11, weight: .medium))
-                                .foregroundStyle(RollCodeTheme.primaryText)
-                            Text("Log in with Google via browser, or enter an API key in Settings (⌘,).")
-                                .font(.system(size: 10))
-                                .foregroundStyle(RollCodeTheme.secondaryText)
-                        }
-                        Spacer()
-                        if agent.geminiAuth.isLoggingIn {
-                            HStack(spacing: 4) {
-                                ProgressView().controlSize(.small)
-                                Text("Waiting…")
+        ScrollViewReader { proxy in
+            ScrollView {
+                LazyVStack(alignment: .leading, spacing: 10) {
+                    if agent.selectedProvider == .codex && agent.auth.status == .unauthenticated {
+                        HStack(spacing: 8) {
+                            Image(systemName: "person.badge.key.fill")
+                                .foregroundStyle(RollCodeTheme.accent)
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text("Codex Login")
+                                    .font(.system(size: 11, weight: .medium))
+                                    .foregroundStyle(RollCodeTheme.primaryText)
+                                Text("Log in with your ChatGPT account to use Codex without an API key.")
                                     .font(.system(size: 10))
                                     .foregroundStyle(RollCodeTheme.secondaryText)
                             }
-                        } else {
-                            Button("Log In with Google") {
-                                agent.geminiAuth.loginWithBrowser()
+                            Spacer()
+                            Button("Log In") {
+                                agent.auth.requestLogin(in: terminal)
                             }
                             .buttonStyle(.borderedProminent)
                             .controlSize(.small)
                         }
+                        .padding(8)
+                        .background(RollCodeTheme.elevatedBackground)
+                        .clipShape(RoundedRectangle(cornerRadius: 6))
+                    } else if agent.selectedProvider == .gemini && agent.geminiAuth.status == .unauthenticated {
+                        HStack(spacing: 8) {
+                            Image(systemName: "person.badge.key.fill")
+                                .foregroundStyle(Color.blue)
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text("Gemini Login")
+                                    .font(.system(size: 11, weight: .medium))
+                                    .foregroundStyle(RollCodeTheme.primaryText)
+                                Text("Log in with Google via browser, or enter an API key in Settings (⌘,).")
+                                    .font(.system(size: 10))
+                                    .foregroundStyle(RollCodeTheme.secondaryText)
+                            }
+                            Spacer()
+                            if agent.geminiAuth.isLoggingIn {
+                                HStack(spacing: 4) {
+                                    ProgressView().controlSize(.small)
+                                    Text("Waiting…")
+                                        .font(.system(size: 10))
+                                        .foregroundStyle(RollCodeTheme.secondaryText)
+                                }
+                            } else {
+                                Button("Log In with Google") {
+                                    agent.geminiAuth.loginWithBrowser()
+                                }
+                                .buttonStyle(.borderedProminent)
+                                .controlSize(.small)
+                            }
+                        }
+                        .padding(8)
+                        .background(RollCodeTheme.elevatedBackground)
+                        .clipShape(RoundedRectangle(cornerRadius: 6))
                     }
-                    .padding(8)
-                    .background(RollCodeTheme.elevatedBackground)
-                    .clipShape(RoundedRectangle(cornerRadius: 6))
-                }
 
-                if agent.entries.isEmpty {
-                    VStack(alignment: .leading, spacing: 7) {
-                        Text("What should I change?")
-                            .font(.system(size: 15, weight: .medium))
-                            .foregroundStyle(RollCodeTheme.primaryText)
-                        Text("\(agent.selectedProvider.rawValue) can inspect the workspace, edit files, and run tests. Changes are applied automatically.")
-                            .font(.system(size: 11))
-                            .foregroundStyle(RollCodeTheme.secondaryText)
-                            .fixedSize(horizontal: false, vertical: true)
+                    if agent.entries.isEmpty {
+                        VStack(alignment: .leading, spacing: 7) {
+                            Text("What should I change?")
+                                .font(.system(size: 15, weight: .medium))
+                                .foregroundStyle(RollCodeTheme.primaryText)
+                            Text("\(agent.selectedProvider.rawValue) can inspect the workspace, edit files, and run tests. Changes are applied automatically.")
+                                .font(.system(size: 11))
+                                .foregroundStyle(RollCodeTheme.secondaryText)
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
+                        .padding(.top, 8)
                     }
-                    .padding(.top, 8)
-                }
 
-                ForEach(agent.entries) { entry in
-                    entryView(entry)
-                }
-
-                if agent.isRunning {
-                    HStack(spacing: 6) {
-                        ProgressView().controlSize(.small)
-                        Text("\(agent.selectedProvider.rawValue) is working…")
-                            .font(.system(size: 10))
-                            .foregroundStyle(RollCodeTheme.secondaryText)
+                    ForEach(agent.entries) { entry in
+                        entryView(entry)
                     }
+
+                    if agent.isRunning {
+                        HStack(spacing: 6) {
+                            ProgressView().controlSize(.small)
+                            Text("\(agent.selectedProvider.rawValue) is working…")
+                                .font(.system(size: 10))
+                                .foregroundStyle(RollCodeTheme.secondaryText)
+                        }
+                    }
+
+                    Color.clear
+                        .frame(height: 1)
+                        .id("bottom_anchor")
+                }
+                .padding(10)
+            }
+            .defaultScrollAnchor(.bottom)
+            .onChange(of: agent.entries.count) {
+                withAnimation(.easeOut(duration: 0.2)) {
+                    proxy.scrollTo("bottom_anchor", anchor: .bottom)
                 }
             }
-            .padding(10)
+            .onChange(of: agent.isRunning) {
+                withAnimation(.easeOut(duration: 0.2)) {
+                    proxy.scrollTo("bottom_anchor", anchor: .bottom)
+                }
+            }
+            .onAppear {
+                proxy.scrollTo("bottom_anchor", anchor: .bottom)
+            }
         }
-        .defaultScrollAnchor(.bottom)
     }
 
     @ViewBuilder
@@ -466,15 +485,29 @@ struct AgentPanelView: View {
             }
 
             HStack(alignment: .bottom, spacing: 7) {
-                TextField("Ask \(agent.selectedProvider.rawValue) to change this project… (use @file to reference)", text: $prompt, axis: .vertical)
-                    .textFieldStyle(.plain)
-                    .font(.system(size: 11))
-                    .lineLimit(2...6)
-                    .focused($promptFocused)
-                    .onChange(of: prompt) { _, newPrompt in
-                        checkFileMention(in: newPrompt)
+                ZStack(alignment: .topLeading) {
+                    if prompt.isEmpty {
+                        Text("Ask \(agent.selectedProvider.rawValue) to change this project… (Shift+Return for newline, use @file)")
+                            .font(.system(size: 11))
+                            .foregroundStyle(RollCodeTheme.secondaryText.opacity(0.55))
+                            .padding(.top, 4)
+                            .padding(.leading, 4)
+                            .allowsHitTesting(false)
                     }
-                    .onSubmit(submit)
+                    AgentPromptInputView(
+                        text: $prompt,
+                        onSubmit: submit,
+                        onTextChange: { newPrompt in
+                            checkFileMention(in: newPrompt)
+                        }
+                    )
+                    .frame(minHeight: 28, maxHeight: 110)
+                }
+                .padding(4)
+                .background(RollCodeTheme.windowBackground)
+                .clipShape(RoundedRectangle(cornerRadius: 6))
+                .overlay(RoundedRectangle(cornerRadius: 6).stroke(RollCodeTheme.divider))
+
                 Button(action: submit) {
                     Image(systemName: "arrow.up.circle.fill")
                         .font(.system(size: 20))
@@ -482,6 +515,7 @@ struct AgentPanelView: View {
                 }
                 .buttonStyle(.plain)
                 .disabled(!canSubmit)
+                .padding(.bottom, 4)
             }
             .padding(9)
         }
@@ -585,11 +619,28 @@ private struct AgentMessageView: View {
             Text(message.displayTitle)
                 .font(.system(size: 9, weight: .bold))
                 .foregroundStyle(roleColor)
-            Text(message.text)
-                .font(.system(size: 11))
-                .foregroundStyle(RollCodeTheme.primaryText)
-                .textSelection(.enabled)
-                .fixedSize(horizontal: false, vertical: true)
+
+            let blocks = MarkdownBlockParser.parse(from: message.text)
+            ForEach(blocks) { block in
+                switch block {
+                case .text(let content):
+                    if let attributed = try? AttributedString(markdown: content, options: .init(interpretedSyntax: .inlineOnlyPreservingWhitespace)) {
+                        Text(attributed)
+                            .font(.system(size: 11))
+                            .foregroundStyle(RollCodeTheme.primaryText)
+                            .textSelection(.enabled)
+                            .fixedSize(horizontal: false, vertical: true)
+                    } else {
+                        Text(content)
+                            .font(.system(size: 11))
+                            .foregroundStyle(RollCodeTheme.primaryText)
+                            .textSelection(.enabled)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                case .code(let language, let code):
+                    MarkdownCodeBlockView(language: language, code: code)
+                }
+            }
         }
         .padding(8)
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -654,4 +705,206 @@ private struct AgentActivityView: View {
         case .failed: return Color.red.opacity(0.85)
         }
     }
+}
+
+// MARK: - Markdown Support
+
+enum MarkdownBlock: Identifiable, Equatable {
+    case text(String)
+    case code(language: String?, code: String)
+
+    var id: String {
+        switch self {
+        case .text(let t): return "text_\(t.hashValue)"
+        case .code(let lang, let c): return "code_\(lang ?? "")_\(c.hashValue)"
+        }
+    }
+}
+
+enum MarkdownBlockParser {
+    static func parse(from text: String) -> [MarkdownBlock] {
+        var blocks: [MarkdownBlock] = []
+        let lines = text.components(separatedBy: "\n")
+        var currentTextLines: [String] = []
+        var currentCodeLines: [String] = []
+        var currentLanguage: String? = nil
+        var inCodeBlock = false
+
+        for line in lines {
+            let trimmed = line.trimmingCharacters(in: .whitespaces)
+            if trimmed.hasPrefix("```") {
+                if inCodeBlock {
+                    // Close code block
+                    blocks.append(.code(language: currentLanguage, code: currentCodeLines.joined(separator: "\n")))
+                    currentCodeLines.removeAll()
+                    currentLanguage = nil
+                    inCodeBlock = false
+                } else {
+                    // Open code block
+                    if !currentTextLines.isEmpty {
+                        let textBlock = currentTextLines.joined(separator: "\n").trimmingCharacters(in: .whitespacesAndNewlines)
+                        if !textBlock.isEmpty {
+                            blocks.append(.text(textBlock))
+                        }
+                        currentTextLines.removeAll()
+                    }
+                    let lang = String(trimmed.dropFirst(3)).trimmingCharacters(in: .whitespaces)
+                    currentLanguage = lang.isEmpty ? nil : lang
+                    inCodeBlock = true
+                }
+            } else if inCodeBlock {
+                currentCodeLines.append(line)
+            } else {
+                currentTextLines.append(line)
+            }
+        }
+
+        if inCodeBlock && !currentCodeLines.isEmpty {
+            blocks.append(.code(language: currentLanguage, code: currentCodeLines.joined(separator: "\n")))
+        } else if !currentTextLines.isEmpty {
+            let remaining = currentTextLines.joined(separator: "\n").trimmingCharacters(in: .whitespacesAndNewlines)
+            if !remaining.isEmpty {
+                blocks.append(.text(remaining))
+            }
+        }
+
+        return blocks
+    }
+}
+
+private struct MarkdownCodeBlockView: View {
+    let language: String?
+    let code: String
+    @State private var isCopied = false
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            HStack {
+                Text((language ?? "code").uppercased())
+                    .font(.system(size: 8.5, weight: .bold, design: .monospaced))
+                    .foregroundStyle(RollCodeTheme.secondaryText)
+                Spacer()
+                Button {
+                    NSPasteboard.general.clearContents()
+                    NSPasteboard.general.setString(code, forType: .string)
+                    isCopied = true
+                    Task {
+                        try? await Task.sleep(for: .seconds(2))
+                        isCopied = false
+                    }
+                } label: {
+                    HStack(spacing: 3) {
+                        Image(systemName: isCopied ? "checkmark" : "doc.on.doc")
+                            .font(.system(size: 9))
+                        Text(isCopied ? "Copied" : "Copy")
+                            .font(.system(size: 9, weight: .medium))
+                    }
+                    .foregroundStyle(isCopied ? Color.green : RollCodeTheme.secondaryText)
+                }
+                .buttonStyle(.plain)
+            }
+            .padding(.horizontal, 8)
+            .padding(.vertical, 4)
+            .background(RollCodeTheme.elevatedBackground.opacity(0.8))
+
+            Divider().overlay(RollCodeTheme.divider)
+
+            ScrollView(.horizontal, showsIndicators: false) {
+                Text(code)
+                    .font(.system(size: 10.5, design: .monospaced))
+                    .foregroundStyle(RollCodeTheme.primaryText)
+                    .textSelection(.enabled)
+                    .padding(8)
+            }
+        }
+        .background(RollCodeTheme.editorBackground)
+        .clipShape(RoundedRectangle(cornerRadius: 5))
+        .overlay(RoundedRectangle(cornerRadius: 5).stroke(RollCodeTheme.divider))
+        .padding(.vertical, 2)
+    }
+}
+
+// MARK: - Prompt Input (Shift+Return for newline, Return for submit)
+
+private struct AgentPromptInputView: NSViewRepresentable {
+    @Binding var text: String
+    var onSubmit: () -> Void
+    var onTextChange: ((String) -> Void)? = nil
+
+    func makeCoordinator() -> Coordinator {
+        Coordinator(self)
+    }
+
+    func makeNSView(context: Context) -> NSScrollView {
+        let scrollView = NSScrollView()
+        scrollView.drawsBackground = false
+        scrollView.borderType = .noBorder
+        scrollView.hasVerticalScroller = true
+        scrollView.hasHorizontalScroller = false
+        scrollView.autohidesScrollers = true
+
+        let textView = PromptTextView()
+        textView.delegate = context.coordinator
+        textView.isRichText = false
+        textView.font = .systemFont(ofSize: 11)
+        textView.textColor = RollCodeTheme.nsForeground
+        textView.backgroundColor = .clear
+        textView.drawsBackground = false
+        textView.isVerticallyResizable = true
+        textView.isHorizontallyResizable = false
+        textView.textContainer?.widthTracksTextView = true
+        textView.textContainer?.lineFragmentPadding = 2
+        textView.string = text
+        textView.onSubmit = onSubmit
+
+        scrollView.documentView = textView
+        context.coordinator.textView = textView
+        return scrollView
+    }
+
+    func updateNSView(_ nsView: NSScrollView, context: Context) {
+        guard let textView = nsView.documentView as? PromptTextView else { return }
+        if textView.string != text {
+            textView.string = text
+        }
+        textView.onSubmit = onSubmit
+    }
+
+    final class Coordinator: NSObject, NSTextViewDelegate {
+        var parent: AgentPromptInputView
+        weak var textView: PromptTextView?
+
+        init(_ parent: AgentPromptInputView) {
+            self.parent = parent
+        }
+
+        func textDidChange(_ notification: Notification) {
+            guard let tv = textView else { return }
+            let newText = tv.string
+            parent.text = newText
+            parent.onTextChange?(newText)
+        }
+
+        func textView(_ textView: NSTextView, doCommandBy commandSelector: Selector) -> Bool {
+            if commandSelector == #selector(NSResponder.insertNewline(_:)) {
+                // If IME is currently composing/converting text, don't submit; let IME confirm
+                if textView.hasMarkedText() {
+                    return false
+                }
+                // Shift + Return: insert newline
+                if let currentEvent = NSApp.currentEvent, currentEvent.modifierFlags.contains(.shift) {
+                    textView.insertNewlineIgnoringFieldEditor(nil)
+                    return true
+                }
+                // Plain Return: trigger submit
+                parent.onSubmit()
+                return true
+            }
+            return false
+        }
+    }
+}
+
+private final class PromptTextView: NSTextView {
+    var onSubmit: (() -> Void)?
 }

@@ -1049,6 +1049,22 @@ struct RollCodeTests {
         )
         #expect(matches.contains(where: { $0.insertText == "title" }))
     }
+
+    @Test("MarkdownBlockParser extracts code blocks and plain text correctly")
+    func markdownBlockParserExtractsBlocks() {
+        let text = """
+        Here is an explanation:
+        ```swift
+        let answer = 42
+        ```
+        And conclusion.
+        """
+        let blocks = MarkdownBlockParser.parse(from: text)
+        #expect(blocks.count == 3)
+        #expect(blocks[0] == .text("Here is an explanation:"))
+        #expect(blocks[1] == .code(language: "swift", code: "let answer = 42"))
+        #expect(blocks[2] == .text("And conclusion."))
+    }
 }
 
 @MainActor
