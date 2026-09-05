@@ -33,17 +33,48 @@ final class AgentSession {
     }
 
     var isVisible = true
-    var selectedProvider: AgentProvider = .codex {
-        didSet {
-            guard selectedProvider != oldValue else { return }
-            handleProviderChanged(from: oldValue, to: selectedProvider)
+    nonisolated static let providerDefaultsKey = "RollCode_SelectedAIProvider"
+    private(set) var selectedProvider: AgentProvider = .codex
+
+    struct ProviderChannelState: Equatable, Sendable {
+        let provider: AgentProvider
+        var activeThread: AgentThread
+        var threads: [AgentThread] = []
+        var selectedModel: String
+        var reasoningEffort: ReasoningEffort
+    }
+
+    private var codexChannel: ProviderChannelState
+    private var geminiChannel: ProviderChannelState
+
+    private var currentChannel: ProviderChannelState {
+        get {
+            selectedProvider == .codex ? codexChannel : geminiChannel
+        }
+        set {
+            if selectedProvider == .codex {
+                codexChannel = newValue
+            } else {
+                geminiChannel = newValue
+            }
         }
     }
 
-    private(set) var threads: [AgentThread] = []
-    private(set) var activeThread = AgentThread(provider: .codex)
-    private var codexLatestThread = AgentThread(provider: .codex)
-    private var geminiLatestThread = AgentThread(provider: .gemini)
+    var threads: [AgentThread] {
+        codexChannel.threads + geminiChannel.threads
+    }
+
+    var activeThread: AgentThread {
+        get { currentChannel.activeThread }
+        set {
+            if selectedProvider == .codex {
+                codexChannel.activeThread = newValue
+            } else {
+                geminiChannel.activeThread = newValue
+            }
+        }
+    }
+
     private(set) var pastCodexSessions: [CodexSessionSummary] = []
     private var runState = RunState.idle
 
@@ -68,6 +99,7 @@ final class AgentSession {
     let auth: CodexAuthService
     let geminiAuth: GeminiAuthService
     let modelCatalog: ModelCatalogService
+    @ObservationIgnored private let defaults: UserDefaults
     @ObservationIgnored let executableURL: URL?
     @ObservationIgnored let geminiExecutableURL: URL?
     var onRunCompleted: (@MainActor @Sendable () -> Void)?
@@ -78,57 +110,64 @@ final class AgentSession {
 
     var selectedCodexModel: String {
         get {
-            let saved = UserDefaults.standard.string(forKey: Self.codexModelDefaultsKey)
+            let saved = defaults.string(forKey: Self.codexModelDefaultsKey)
             if let saved, !saved.isEmpty { return saved }
             return modelCatalog.defaultModelID(for: .codex)
         }
         set {
-            UserDefaults.standard.set(newValue, forKey: Self.codexModelDefaultsKey)
+            defaults.set(newValue, forKey: Self.codexModelDefaultsKey)
+            codexChannel.selectedModel = newValue
         }
     }
 
     var selectedGeminiModel: String {
         get {
-            let saved = UserDefaults.standard.string(forKey: Self.geminiModelDefaultsKey)
+            let saved = defaults.string(forKey: Self.geminiModelDefaultsKey)
             if let saved, !saved.isEmpty { return saved }
             return modelCatalog.defaultModelID(for: .gemini)
         }
         set {
-            UserDefaults.standard.set(newValue, forKey: Self.geminiModelDefaultsKey)
+            defaults.set(newValue, forKey: Self.geminiModelDefaultsKey)
+            geminiChannel.selectedModel = newValue
         }
     }
 
     var selectedReasoningEffort: ReasoningEffort {
         get {
-            if let raw = UserDefaults.standard.string(forKey: Self.reasoningEffortDefaultsKey),
+            if let raw = defaults.string(forKey: Self.reasoningEffortDefaultsKey),
                let effort = ReasoningEffort(rawValue: raw) {
                 return effort
             }
             return .medium
         }
         set {
-            UserDefaults.standard.set(newValue.rawValue, forKey: Self.reasoningEffortDefaultsKey)
+            defaults.set(newValue.rawValue, forKey: Self.reasoningEffortDefaultsKey)
+            codexChannel.reasoningEffort = newValue
         }
     }
 
     var currentModel: String {
         get {
-            if let threadModel = activeThread.model, !threadModel.isEmpty {
-                return threadModel
+            if let m = currentChannel.activeThread.model, !m.isEmpty {
+                return m
             }
-            return selectedProvider == .codex ? selectedCodexModel : selectedGeminiModel
+            return currentChannel.selectedModel
         }
         set {
             setModel(newValue)
         }
     }
 
+    func threads(for provider: AgentProvider) -> [AgentThread] {
+        provider == .codex ? codexChannel.threads : geminiChannel.threads
+    }
+
     var currentReasoningEffort: ReasoningEffort {
         get {
-            if let r = activeThread.reasoningEffort, let effort = ReasoningEffort(rawValue: r) {
+            if let r = currentChannel.activeThread.reasoningEffort, let effort = ReasoningEffort(rawValue: r) {
                 return effort
             }
-            return selectedReasoningEffort
+            return currentChannel.reasoningEffort
         }
         set {
             setReasoningEffort(newValue)
@@ -145,28 +184,42 @@ final class AgentSession {
 
     func setModel(_ modelID: String) {
         if selectedProvider == .codex {
+            codexChannel.selectedModel = modelID
+            codexChannel.activeThread.model = modelID
             selectedCodexModel = modelID
         } else {
+            geminiChannel.selectedModel = modelID
+            geminiChannel.activeThread.model = modelID
             selectedGeminiModel = modelID
         }
-        activeThread.model = modelID
         saveCurrentThreads()
     }
 
     func setReasoningEffort(_ effort: ReasoningEffort) {
-        selectedReasoningEffort = effort
-        activeThread.reasoningEffort = effort.rawValue
+        if selectedProvider == .codex {
+            codexChannel.reasoningEffort = effort
+            codexChannel.activeThread.reasoningEffort = effort.rawValue
+            selectedReasoningEffort = effort
+        } else {
+            geminiChannel.reasoningEffort = effort
+            geminiChannel.activeThread.reasoningEffort = effort.rawValue
+        }
         saveCurrentThreads()
     }
 
     func refreshModelCatalog() async {
-        await modelCatalog.refreshModels(geminiKey: geminiAuth.storedAPIKey)
+        let oauthToken = await geminiAuth.validOAuthAccessToken()
+        await modelCatalog.refreshModels(
+            geminiKey: geminiAuth.storedAPIKey,
+            geminiOAuthToken: oauthToken
+        )
     }
 
     @ObservationIgnored private var errorBuffer = ""
     @ObservationIgnored private var workspaceURL: URL?
     @ObservationIgnored private var initialChangedPaths: Set<String> = []
     @ObservationIgnored private var turnStartTime: Date?
+    private var activeTurnThreadID: UUID?
 
     @ObservationIgnored let useAppServer: Bool
 
@@ -176,17 +229,51 @@ final class AgentSession {
         auth: CodexAuthService = CodexAuthService(),
         geminiAuth: GeminiAuthService = GeminiAuthService(),
         modelCatalog: ModelCatalogService = ModelCatalogService(),
-        useAppServer: Bool? = nil
+        defaults: UserDefaults = .standard,
+        useAppServer: Bool? = nil,
+        initialProvider: AgentProvider? = nil
     ) {
         self.executableURL = executableURL
         self.geminiExecutableURL = geminiExecutableURL
         self.auth = auth
         self.geminiAuth = geminiAuth
         self.modelCatalog = modelCatalog
+        self.defaults = defaults
         if let useAppServer {
             self.useAppServer = useAppServer
         } else {
             self.useAppServer = (executableURL == nil || executableURL == CodexExecutableLocator.locate())
+        }
+        let restoredProvider = defaults.string(forKey: Self.providerDefaultsKey)
+            .flatMap(AgentProvider.init(rawValue:))
+        self.selectedProvider = initialProvider ?? restoredProvider ?? .codex
+
+        let codexSaved = defaults.string(forKey: Self.codexModelDefaultsKey)
+        let codexDefault = (codexSaved?.isEmpty == false) ? codexSaved! : modelCatalog.defaultModelID(for: .codex)
+
+        let geminiSaved = defaults.string(forKey: Self.geminiModelDefaultsKey)
+        let geminiDefault = (geminiSaved?.isEmpty == false) ? geminiSaved! : modelCatalog.defaultModelID(for: .gemini)
+
+        let initialEffort: ReasoningEffort = defaults.string(forKey: Self.reasoningEffortDefaultsKey)
+            .flatMap(ReasoningEffort.init(rawValue:)) ?? .medium
+
+        self.codexChannel = ProviderChannelState(
+            provider: .codex,
+            activeThread: AgentThread(provider: .codex, model: codexDefault, reasoningEffort: initialEffort.rawValue),
+            threads: [],
+            selectedModel: codexDefault,
+            reasoningEffort: initialEffort
+        )
+        self.geminiChannel = ProviderChannelState(
+            provider: .gemini,
+            activeThread: AgentThread(provider: .gemini, model: geminiDefault),
+            threads: [],
+            selectedModel: geminiDefault,
+            reasoningEffort: .medium
+        )
+
+        Task { [weak self] in
+            await self?.refreshModelCatalog()
         }
     }
 
@@ -194,30 +281,15 @@ final class AgentSession {
     var currentExecutableURL: URL? {
         selectedProvider == .codex ? executableURL : geminiExecutableURL
     }
-    var isRunning: Bool { runState.isRunning }
+    var isRunning: Bool { activeTurnThreadID != nil || runState.isRunning }
 
     func selectProvider(_ provider: AgentProvider) {
-        guard selectedProvider != provider else { return }
+        guard selectedProvider != provider, !isRunning else { return }
+        archiveCurrentThreadIfNeeded()
         selectedProvider = provider
-    }
-
-    private func handleProviderChanged(from old: AgentProvider, to new: AgentProvider) {
-        if isRunning {
-            stop(resetThread: false)
-        }
-        if old == .codex {
-            codexLatestThread = activeThread
-        } else {
-            geminiLatestThread = activeThread
-        }
-        activeThread = (new == .codex) ? codexLatestThread : geminiLatestThread
-        if activeThread.model == nil {
-            activeThread.model = (new == .codex) ? selectedCodexModel : selectedGeminiModel
-        }
-        if activeThread.reasoningEffort == nil {
-            activeThread.reasoningEffort = selectedReasoningEffort.rawValue
-        }
+        defaults.set(provider.rawValue, forKey: Self.providerDefaultsKey)
         errorBuffer = ""
+        saveCurrentThreads()
     }
 
     func send(_ prompt: String, in workspaceURL: URL, activeFileURL: URL? = nil) {
@@ -236,6 +308,7 @@ final class AgentSession {
             return true
         }
         entries.append(.message(AgentMessage(role: .user, text: prompt)))
+        activeTurnThreadID = activeThread.id
         errorBuffer = ""
         self.turnStartTime = Date()
         self.activeThread.model = currentModel
@@ -270,12 +343,14 @@ final class AgentSession {
 
         Task { @MainActor [weak self] in
             guard let self else { return }
+            guard self.activeTurnThreadID == self.activeThread.id else { return }
             do {
                 let threadId: String
                 if let existing = self.activeThread.codexThreadID, !existing.isEmpty {
                     threadId = existing
                 } else {
                     threadId = try await appServer.startThread(cwd: cwd, model: model)
+                    guard self.activeTurnThreadID == self.activeThread.id else { return }
                     self.activeThread.codexThreadID = threadId
                     self.activeThread.updatedAt = Date()
                     self.saveCurrentThreads()
@@ -289,21 +364,21 @@ final class AgentSession {
                     model: model,
                     effort: effort,
                     onDelta: { [weak self] delta in
-                        guard let self else { return }
+                        guard let self, self.activeTurnThreadID == self.activeThread.id else { return }
                         if !messageAppended {
-                            self.entries.append(.message(AgentMessage(role: .assistant, text: delta)))
+                            self.entries.append(.message(AgentMessage(role: .assistant, text: delta, senderName: "CODEX")))
                             messageAppended = true
                         } else {
                             if let last = self.entries.last, case .message(let msg) = last, msg.role == .assistant {
-                                let updated = AgentMessage(id: msg.id, role: .assistant, text: msg.text + delta)
+                                let updated = AgentMessage(id: msg.id, role: .assistant, text: msg.text + delta, senderName: "CODEX")
                                 self.entries[self.entries.count - 1] = .message(updated)
                             } else {
-                                self.entries.append(.message(AgentMessage(role: .assistant, text: delta)))
+                                self.entries.append(.message(AgentMessage(role: .assistant, text: delta, senderName: "CODEX")))
                             }
                         }
                     },
                     onUsage: { [weak self] usage in
-                        guard let self else { return }
+                        guard let self, self.activeTurnThreadID == self.activeThread.id else { return }
                         self.activeThread.inputTokens += usage.inputTokens
                         self.activeThread.outputTokens += usage.outputTokens
                         self.activeThread.cachedTokens += usage.cachedTokens
@@ -315,8 +390,13 @@ final class AgentSession {
                     }
                 )
 
-                self.runState = .appServerRunning(threadId: threadId, turnId: turnId)
+                if self.activeTurnThreadID == self.activeThread.id {
+                    self.runState = .appServerRunning(threadId: threadId, turnId: turnId)
+                } else {
+                    try? await appServer.interruptTurn(threadId: threadId, turnId: turnId)
+                }
             } catch {
+                guard self.activeTurnThreadID == self.activeThread.id else { return }
                 self.logger.warning("Codex App Server failed (\(error.localizedDescription)), falling back to CLI execution")
                 self.runProcessTurn(prompt: prompt, workspaceURL: workspaceURL)
             }
@@ -373,6 +453,7 @@ final class AgentSession {
             }
         } catch {
             runState = .idle
+            activeTurnThreadID = nil
             logger.error("Could not start \(self.selectedProvider.rawValue, privacy: .public) agent: \(error.localizedDescription, privacy: .private)")
             entries.append(.message(AgentMessage(role: .system, text: "Could not start \(selectedProvider.rawValue): \(error.localizedDescription)")))
         }
@@ -381,6 +462,11 @@ final class AgentSession {
     private func completeAppServerTurn(success: Bool, errorMessage: String?, resetThread: Bool) {
         Task { @MainActor [weak self] in
             guard let self else { return }
+            guard activeTurnThreadID == activeThread.id else {
+                runState = .idle
+                activeTurnThreadID = nil
+                return
+            }
             let changedPaths: [String]
             if let workspaceURL {
                 let current = await Task.detached(priority: .utility) {
@@ -398,6 +484,7 @@ final class AgentSession {
 
             let stopped = if case .appServerStopping = runState { true } else { false }
             runState = .idle
+            activeTurnThreadID = nil
 
             mergeChangedFiles(changedPaths)
 
@@ -444,7 +531,14 @@ final class AgentSession {
                 guard let self, self.runState.process === process, process?.isRunning == true else { return }
                 process?.terminate()
             }
-        case .idle, .stopping, .appServerStopping:
+        case .idle:
+            guard activeTurnThreadID != nil else { return }
+            activeTurnThreadID = nil
+            turnStartTime = nil
+            if resetThread {
+                resetThreadState()
+            }
+        case .stopping, .appServerStopping:
             break
         }
     }
@@ -458,52 +552,63 @@ final class AgentSession {
     }
 
     func switchToThread(_ thread: AgentThread) {
-        guard thread.id != activeThread.id else { return }
-        if isRunning {
-            stop(resetThread: false)
-        }
+        guard thread.id != activeThread.id, !isRunning else { return }
         archiveCurrentThreadIfNeeded()
-        activeThread = thread
         selectedProvider = thread.provider
-        if let m = thread.model, !m.isEmpty {
-            if thread.provider == .codex {
+        defaults.set(thread.provider.rawValue, forKey: Self.providerDefaultsKey)
+        if thread.provider == .codex {
+            codexChannel.activeThread = thread
+            if let m = thread.model, !m.isEmpty {
                 selectedCodexModel = m
-            } else {
+            }
+            if let r = thread.reasoningEffort, let effort = ReasoningEffort(rawValue: r) {
+                selectedReasoningEffort = effort
+            }
+        } else {
+            geminiChannel.activeThread = thread
+            if let m = thread.model, !m.isEmpty {
                 selectedGeminiModel = m
             }
-        }
-        if let r = thread.reasoningEffort, let effort = ReasoningEffort(rawValue: r) {
-            selectedReasoningEffort = effort
         }
         errorBuffer = ""
         saveCurrentThreads()
     }
 
     func deleteThread(id: UUID) {
-        threads.removeAll { $0.id == id }
-        if activeThread.id == id {
-            if let first = threads.first {
-                activeThread = first
-                selectedProvider = first.provider
-            } else {
-                activeThread = AgentThread(provider: selectedProvider)
-            }
-            errorBuffer = ""
+        guard !isRunning || activeThread.id != id else { return }
+        codexChannel.threads.removeAll { $0.id == id }
+        geminiChannel.threads.removeAll { $0.id == id }
+
+        if codexChannel.activeThread.id == id {
+            codexChannel.activeThread = codexChannel.threads.first ?? AgentThread(
+                provider: .codex,
+                model: codexChannel.selectedModel,
+                reasoningEffort: codexChannel.reasoningEffort.rawValue
+            )
         }
+        if geminiChannel.activeThread.id == id {
+            geminiChannel.activeThread = geminiChannel.threads.first ?? AgentThread(
+                provider: .gemini,
+                model: geminiChannel.selectedModel
+            )
+        }
+        errorBuffer = ""
         saveCurrentThreads()
     }
 
     func resumePastCodexSession(_ session: CodexSessionSummary) {
-        if isRunning {
-            stop(resetThread: false)
-        }
+        guard !isRunning else { return }
         archiveCurrentThreadIfNeeded()
         selectedProvider = .codex
-        activeThread = AgentThread(
+        defaults.set(AgentProvider.codex.rawValue, forKey: Self.providerDefaultsKey)
+        codexChannel.activeThread = AgentThread(
+            provider: .codex,
             codexThreadID: session.id,
             title: session.displayTitle,
             updatedAt: session.updatedAt ?? Date(),
-            entries: [.message(AgentMessage(role: .system, text: "Resumed Codex session: \(session.displayTitle)"))]
+            entries: [.message(AgentMessage(role: .system, text: "Resumed Codex session: \(session.displayTitle)"))],
+            model: codexChannel.selectedModel,
+            reasoningEffort: codexChannel.reasoningEffort.rawValue
         )
         errorBuffer = ""
         saveCurrentThreads()
@@ -553,6 +658,7 @@ final class AgentSession {
     }
 
     func loadThreads(for workspaceURL: URL) {
+        guard !isRunning else { return }
         if self.workspaceURL != nil && self.workspaceURL != workspaceURL.standardizedFileURL {
             saveCurrentThreads()
         }
@@ -569,16 +675,31 @@ final class AgentSession {
             return
         }
 
-        self.threads = loadedThreads
-        if let first = loadedThreads.first {
-            self.activeThread = first
-            self.selectedProvider = first.provider
-            if first.provider == .codex {
-                self.codexLatestThread = first
-            } else {
-                self.geminiLatestThread = first
-            }
+        let codexThreads = loadedThreads.filter { $0.provider == .codex }
+        let geminiThreads = loadedThreads.filter { $0.provider == .gemini }
+
+        codexChannel.threads = codexThreads
+        geminiChannel.threads = geminiThreads
+
+        if let firstCodex = codexThreads.first {
+            codexChannel.activeThread = firstCodex
+        } else {
+            codexChannel.activeThread = AgentThread(
+                provider: .codex,
+                model: codexChannel.selectedModel,
+                reasoningEffort: codexChannel.reasoningEffort.rawValue
+            )
         }
+
+        if let firstGemini = geminiThreads.first {
+            geminiChannel.activeThread = firstGemini
+        } else {
+            geminiChannel.activeThread = AgentThread(
+                provider: .gemini,
+                model: geminiChannel.selectedModel
+            )
+        }
+
         errorBuffer = ""
     }
 
@@ -589,27 +710,43 @@ final class AgentSession {
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.prettyPrinted]
         encoder.dateEncodingStrategy = .iso8601
-        guard let data = try? encoder.encode(threads) else { return }
+        let allThreads = codexChannel.threads + geminiChannel.threads
+        guard let data = try? encoder.encode(allThreads) else { return }
         try? data.write(to: fileURL, options: .atomic)
     }
 
     private func resetThreadState() {
         archiveCurrentThreadIfNeeded()
-        activeThread = AgentThread(
-            provider: selectedProvider,
-            model: selectedProvider == .codex ? selectedCodexModel : selectedGeminiModel,
-            reasoningEffort: selectedReasoningEffort.rawValue
-        )
+        if selectedProvider == .codex {
+            codexChannel.activeThread = AgentThread(
+                provider: .codex,
+                model: codexChannel.selectedModel,
+                reasoningEffort: codexChannel.reasoningEffort.rawValue
+            )
+        } else {
+            geminiChannel.activeThread = AgentThread(
+                provider: .gemini,
+                model: geminiChannel.selectedModel
+            )
+        }
         errorBuffer = ""
         saveCurrentThreads()
     }
 
     private func archiveCurrentThreadIfNeeded() {
         guard !activeThread.entries.isEmpty || activeThread.codexThreadID != nil else { return }
-        if let index = threads.firstIndex(where: { $0.id == activeThread.id }) {
-            threads[index] = activeThread
+        if selectedProvider == .codex {
+            if let index = codexChannel.threads.firstIndex(where: { $0.id == activeThread.id }) {
+                codexChannel.threads[index] = activeThread
+            } else {
+                codexChannel.threads.insert(activeThread, at: 0)
+            }
         } else {
-            threads.insert(activeThread, at: 0)
+            if let index = geminiChannel.threads.firstIndex(where: { $0.id == activeThread.id }) {
+                geminiChannel.threads[index] = activeThread
+            } else {
+                geminiChannel.threads.insert(activeThread, at: 0)
+            }
         }
     }
 
@@ -729,7 +866,7 @@ final class AgentSession {
     }
 
     private func consume(_ event: CodexEvent?) {
-        guard let event else { return }
+        guard let event, activeTurnThreadID == activeThread.id else { return }
         switch event {
         case .threadStarted(let threadID):
             self.threadID = threadID
@@ -769,6 +906,7 @@ final class AgentSession {
     }
 
     private func appendStandardError(_ text: String) {
+        guard activeTurnThreadID == activeThread.id else { return }
         errorBuffer += text
         if errorBuffer.count > 20_000 {
             errorBuffer = String(errorBuffer.suffix(20_000))
@@ -780,6 +918,7 @@ final class AgentSession {
     }
 
     private func appendGeminiOutput(_ text: String) {
+        guard activeTurnThreadID == activeThread.id else { return }
         let cleanText = Self.stripANSIEscapes(from: text).trimmingCharacters(in: .newlines)
         guard !cleanText.isEmpty else { return }
 
@@ -798,6 +937,11 @@ final class AgentSession {
 
     private func finish(_ process: Process, exitCode: Int32) async {
         guard runState.process === process else { return }
+        guard activeTurnThreadID == activeThread.id else {
+            runState = .idle
+            activeTurnThreadID = nil
+            return
+        }
         let changedPaths: [String]
         if let workspaceURL {
             let current = await Task.detached(priority: .utility) {
@@ -827,6 +971,7 @@ final class AgentSession {
             return
         }
         runState = .idle
+        activeTurnThreadID = nil
 
         logger.debug("\(self.selectedProvider.rawValue, privacy: .public) agent finished with exit code \(exitCode, privacy: .public)")
 

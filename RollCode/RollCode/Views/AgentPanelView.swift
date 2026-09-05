@@ -11,6 +11,7 @@ struct AgentPanelView: View {
     @State private var codexPromptDraft = ""
     @State private var geminiPromptDraft = ""
     @State private var fileMentionQuery: String?
+    @State private var sentMessageScrollTarget: AgentEntry.ID?
     @FocusState private var promptFocused: Bool
 
     var body: some View {
@@ -174,6 +175,7 @@ struct AgentPanelView: View {
                     .clipShape(RoundedRectangle(cornerRadius: 3.5))
                 }
                 .buttonStyle(.plain)
+                .disabled(agent.isRunning)
                 .help("Switch to \(provider.rawValue)'s latest thread")
             }
         }
@@ -183,7 +185,7 @@ struct AgentPanelView: View {
     }
 
     private func selectProvider(_ provider: AgentProvider) {
-        guard provider != agent.selectedProvider else { return }
+        guard provider != agent.selectedProvider, !agent.isRunning else { return }
         if agent.selectedProvider == .codex {
             codexPromptDraft = prompt
         } else {
@@ -194,7 +196,9 @@ struct AgentPanelView: View {
     }
 
     private var threadSwitcherMenu: some View {
-        Menu {
+        let currentProviderThreads = agent.threads(for: agent.selectedProvider)
+
+        return Menu {
             Button {
                 withAnimation {
                     agent.newThread()
@@ -202,13 +206,13 @@ struct AgentPanelView: View {
                 }
                 promptFocused = true
             } label: {
-                Label("New Thread", systemImage: "plus")
+                Label("New \(agent.selectedProvider.rawValue) Thread", systemImage: "plus")
             }
 
-            if !agent.threads.isEmpty {
+            if !currentProviderThreads.isEmpty {
                 Divider()
-                Section("Current Sessions") {
-                    ForEach(agent.threads) { thread in
+                Section("\(agent.selectedProvider.rawValue) Sessions") {
+                    ForEach(currentProviderThreads) { thread in
                         Button {
                             withAnimation {
                                 agent.switchToThread(thread)
@@ -226,7 +230,7 @@ struct AgentPanelView: View {
                 }
             }
 
-            if !agent.pastCodexSessions.isEmpty {
+            if agent.selectedProvider == .codex && !agent.pastCodexSessions.isEmpty {
                 Divider()
                 Section("Past Codex Sessions") {
                     ForEach(agent.pastCodexSessions) { session in
@@ -260,6 +264,7 @@ struct AgentPanelView: View {
             .clipShape(RoundedRectangle(cornerRadius: 4))
         }
         .menuStyle(.borderlessButton)
+        .disabled(agent.isRunning)
         .fixedSize()
     }
 
@@ -351,109 +356,138 @@ struct AgentPanelView: View {
     }
 
     private var conversation: some View {
-        ScrollViewReader { proxy in
-            ScrollView {
-                LazyVStack(alignment: .leading, spacing: 10) {
-                    if agent.selectedProvider == .codex && agent.auth.status == .unauthenticated {
-                        HStack(spacing: 8) {
-                            Image(systemName: "person.badge.key.fill")
-                                .foregroundStyle(RollCodeTheme.accent)
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text("Codex Login")
-                                    .font(.system(size: 11, weight: .medium))
-                                    .foregroundStyle(RollCodeTheme.primaryText)
-                                Text("Log in with your ChatGPT account to use Codex without an API key.")
-                                    .font(.system(size: 10))
-                                    .foregroundStyle(RollCodeTheme.secondaryText)
-                            }
-                            Spacer()
-                            Button("Log In") {
-                                agent.auth.requestLogin(in: terminal)
-                            }
-                            .buttonStyle(.borderedProminent)
-                            .controlSize(.small)
-                        }
-                        .padding(8)
-                        .background(RollCodeTheme.elevatedBackground)
-                        .clipShape(RoundedRectangle(cornerRadius: 6))
-                    } else if agent.selectedProvider == .gemini && agent.geminiAuth.status == .unauthenticated {
-                        HStack(spacing: 8) {
-                            Image(systemName: "person.badge.key.fill")
-                                .foregroundStyle(Color.blue)
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text("Gemini Login")
-                                    .font(.system(size: 11, weight: .medium))
-                                    .foregroundStyle(RollCodeTheme.primaryText)
-                                Text("Log in with Google via browser, or enter an API key in Settings (⌘,).")
-                                    .font(.system(size: 10))
-                                    .foregroundStyle(RollCodeTheme.secondaryText)
-                            }
-                            Spacer()
-                            if agent.geminiAuth.isLoggingIn {
-                                HStack(spacing: 4) {
-                                    ProgressView().controlSize(.small)
-                                    Text("Waiting…")
+        GeometryReader { geometry in
+            ScrollViewReader { proxy in
+                ScrollView {
+                    LazyVStack(alignment: .leading, spacing: 10) {
+                        if agent.selectedProvider == .codex && agent.auth.status == .unauthenticated {
+                            HStack(spacing: 8) {
+                                Image(systemName: "person.badge.key.fill")
+                                    .foregroundStyle(RollCodeTheme.accent)
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text("Codex Login")
+                                        .font(.system(size: 11, weight: .medium))
+                                        .foregroundStyle(RollCodeTheme.primaryText)
+                                    Text("Log in with your ChatGPT account to use Codex without an API key.")
                                         .font(.system(size: 10))
                                         .foregroundStyle(RollCodeTheme.secondaryText)
                                 }
-                            } else {
-                                Button("Log In with Google") {
-                                    agent.geminiAuth.loginWithBrowser()
+                                Spacer()
+                                Button("Log In") {
+                                    agent.auth.requestLogin(in: terminal)
                                 }
                                 .buttonStyle(.borderedProminent)
                                 .controlSize(.small)
                             }
+                            .padding(8)
+                            .background(RollCodeTheme.elevatedBackground)
+                            .clipShape(RoundedRectangle(cornerRadius: 6))
+                        } else if agent.selectedProvider == .gemini && agent.geminiAuth.status == .unauthenticated {
+                            HStack(spacing: 8) {
+                                Image(systemName: "person.badge.key.fill")
+                                    .foregroundStyle(Color.blue)
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text("Gemini Login")
+                                        .font(.system(size: 11, weight: .medium))
+                                        .foregroundStyle(RollCodeTheme.primaryText)
+                                    Text("Log in with Google via browser, or enter an API key in Settings (⌘,).")
+                                        .font(.system(size: 10))
+                                        .foregroundStyle(RollCodeTheme.secondaryText)
+                                }
+                                Spacer()
+                                if agent.geminiAuth.isLoggingIn {
+                                    HStack(spacing: 4) {
+                                        ProgressView().controlSize(.small)
+                                        Text("Waiting…")
+                                            .font(.system(size: 10))
+                                            .foregroundStyle(RollCodeTheme.secondaryText)
+                                    }
+                                } else {
+                                    Button("Log In with Google") {
+                                        agent.geminiAuth.loginWithBrowser()
+                                    }
+                                    .buttonStyle(.borderedProminent)
+                                    .controlSize(.small)
+                                }
+                            }
+                            .padding(8)
+                            .background(RollCodeTheme.elevatedBackground)
+                            .clipShape(RoundedRectangle(cornerRadius: 6))
                         }
-                        .padding(8)
-                        .background(RollCodeTheme.elevatedBackground)
-                        .clipShape(RoundedRectangle(cornerRadius: 6))
-                    }
 
-                    if agent.entries.isEmpty {
-                        VStack(alignment: .leading, spacing: 7) {
-                            Text("What should I change?")
-                                .font(.system(size: 15, weight: .medium))
-                                .foregroundStyle(RollCodeTheme.primaryText)
-                            Text("\(agent.selectedProvider.rawValue) can inspect the workspace, edit files, and run tests. Changes are applied automatically.")
-                                .font(.system(size: 11))
-                                .foregroundStyle(RollCodeTheme.secondaryText)
-                                .fixedSize(horizontal: false, vertical: true)
+                        if agent.entries.isEmpty {
+                            VStack(alignment: .leading, spacing: 7) {
+                                Text("What should I change?")
+                                    .font(.system(size: 15, weight: .medium))
+                                    .foregroundStyle(RollCodeTheme.primaryText)
+                                Text("\(agent.selectedProvider.rawValue) can inspect the workspace, edit files, and run tests. Changes are applied automatically.")
+                                    .font(.system(size: 11))
+                                    .foregroundStyle(RollCodeTheme.secondaryText)
+                                    .fixedSize(horizontal: false, vertical: true)
+                            }
+                            .padding(.top, 8)
                         }
-                        .padding(.top, 8)
-                    }
 
-                    ForEach(agent.entries) { entry in
-                        entryView(entry)
-                    }
-
-                    if agent.isRunning {
-                        HStack(spacing: 6) {
-                            ProgressView().controlSize(.small)
-                            Text("\(agent.selectedProvider.rawValue) is working…")
-                                .font(.system(size: 10))
-                                .foregroundStyle(RollCodeTheme.secondaryText)
+                        ForEach(agent.entries) { entry in
+                            entryView(entry)
+                                .id(entry.id)
                         }
-                    }
 
-                    Color.clear
-                        .frame(height: 1)
-                        .id("bottom_anchor")
+                        if agent.isRunning {
+                            HStack(spacing: 6) {
+                                ProgressView().controlSize(.small)
+                                Text("\(agent.selectedProvider.rawValue) is working…")
+                                    .font(.system(size: 10))
+                                    .foregroundStyle(RollCodeTheme.secondaryText)
+                            }
+                        }
+
+                        if sentMessageScrollTarget != nil && agent.isRunning {
+                            Color.clear
+                                .frame(height: geometry.size.height)
+                                .accessibilityHidden(true)
+                        }
+
+                        Color.clear
+                            .frame(height: 1)
+                            .id("bottom_anchor")
+                    }
+                    .padding(10)
                 }
-                .padding(10)
-            }
-            .defaultScrollAnchor(.bottom)
-            .onChange(of: agent.entries.count) {
-                withAnimation(.easeOut(duration: 0.2)) {
+                .defaultScrollAnchor(.bottom)
+                .onChange(of: sentMessageScrollTarget) { _, target in
+                    guard let target else { return }
+                    scrollToSentMessage(target, using: proxy)
+                }
+                .onChange(of: agent.entries.count) {
+                    guard sentMessageScrollTarget == nil else { return }
+                    withAnimation(.easeOut(duration: 0.2)) {
+                        proxy.scrollTo("bottom_anchor", anchor: .bottom)
+                    }
+                }
+                .onChange(of: agent.isRunning) { _, isRunning in
+                    if isRunning, let target = sentMessageScrollTarget {
+                        scrollToSentMessage(target, using: proxy)
+                    } else if !isRunning {
+                        sentMessageScrollTarget = nil
+                    }
+                }
+                .onChange(of: agent.activeThread.id) {
+                    sentMessageScrollTarget = nil
+                    proxy.scrollTo("bottom_anchor", anchor: .bottom)
+                }
+                .onAppear {
                     proxy.scrollTo("bottom_anchor", anchor: .bottom)
                 }
             }
-            .onChange(of: agent.isRunning) {
-                withAnimation(.easeOut(duration: 0.2)) {
-                    proxy.scrollTo("bottom_anchor", anchor: .bottom)
-                }
-            }
-            .onAppear {
-                proxy.scrollTo("bottom_anchor", anchor: .bottom)
+        }
+    }
+
+    private func scrollToSentMessage(_ target: AgentEntry.ID, using proxy: ScrollViewProxy) {
+        Task { @MainActor in
+            await Task.yield()
+            withAnimation(.easeOut(duration: 0.2)) {
+                proxy.scrollTo(target, anchor: .top)
             }
         }
     }
@@ -716,6 +750,9 @@ struct AgentPanelView: View {
         }
 
         agent.send(request, in: rootURL, activeFileURL: workspace.activeDocument?.url)
+        if case .message(let message) = agent.entries.last, message.role == .user {
+            sentMessageScrollTarget = .message(message.id)
+        }
     }
 
     private func openChangedFile(_ path: String) {

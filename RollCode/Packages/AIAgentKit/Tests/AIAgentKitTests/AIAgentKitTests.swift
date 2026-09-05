@@ -118,4 +118,51 @@ struct AIAgentKitTests {
         #expect(dict["count"] as? Int == 42)
         #expect((dict["nested"] as? [String: Any])?["name"] as? String == "gpt-5.6-sol")
     }
+
+    @Test("GeminiAuthService reads and returns unexpired OAuth access token")
+    @MainActor
+    func geminiAuthServiceReturnsValidOAuthToken() async throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+
+        let credsURL = root.appending(path: "oauth_creds.json")
+        let futureExpiry = (Date().timeIntervalSince1970 + 3600) * 1000
+        let payload = """
+        {
+          "access_token": "mock-access-token-123",
+          "refresh_token": "mock-refresh-token",
+          "expiry_date": \(futureExpiry)
+        }
+        """
+        try payload.write(to: credsURL, atomically: true, encoding: .utf8)
+
+        let service = GeminiAuthService(geminiDirURL: root, isCLIAvailable: { true })
+        let token = await service.validOAuthAccessToken()
+        #expect(token == "mock-access-token-123")
+    }
+
+    @Test("ModelCatalogService parses Vertex AI Gemini models and sorts latest model highest")
+    @MainActor
+    func modelCatalogServiceVertexGeminiParsing() throws {
+        let json = """
+        {
+          "publisherModels": [
+            { "name": "publishers/google/models/gemini-2.5-flash" },
+            { "name": "publishers/google/models/gemini-3.8-flash" },
+            { "name": "publishers/google/models/gemini-3.1-pro-preview" },
+            { "name": "publishers/google/models/gemini-embedding-001" }
+          ]
+        }
+        """.data(using: .utf8)!
+
+        let parsed = try #require(ModelCatalogService.parseVertexGeminiModels(data: json))
+        #expect(parsed.count == 3)
+        #expect(parsed[0].id == "gemini-3.8-flash")
+        #expect(parsed[0].speedTier == .fast)
+        #expect(parsed[1].id == "gemini-3.1-pro-preview")
+        #expect(parsed[1].speedTier == .deep)
+        #expect(parsed[2].id == "gemini-2.5-flash")
+        #expect(parsed[2].speedTier == .fast)
+    }
 }

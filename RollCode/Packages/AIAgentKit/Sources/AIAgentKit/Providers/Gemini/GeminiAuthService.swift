@@ -121,6 +121,57 @@ final class GeminiAuthService {
         status = .unauthenticated
     }
 
+    struct OAuthCredentialsFile: Codable, Sendable {
+        let access_token: String?
+        let refresh_token: String?
+        let expiry_date: Double?
+        let scope: String?
+        let token_type: String?
+    }
+
+    func validOAuthAccessToken() async -> String? {
+        let credsURL = geminiDirURL.appending(path: "oauth_creds.json")
+        if FileManager.default.fileExists(atPath: credsURL.path),
+           let data = try? Data(contentsOf: credsURL),
+           let creds = try? JSONDecoder().decode(OAuthCredentialsFile.self, from: data) {
+            let now = Date().timeIntervalSince1970 * 1000
+            if let expiry = creds.expiry_date, expiry > (now + 60_000), let token = creds.access_token, !token.isEmpty {
+                return token
+            }
+            if let token = creds.access_token, !token.isEmpty {
+                return token
+            }
+        }
+
+        return await fetchGCloudAccessToken()
+    }
+
+    private func fetchGCloudAccessToken() async -> String? {
+        await withCheckedContinuation { continuation in
+            DispatchQueue.global(qos: .userInitiated).async {
+                let process = Process()
+                process.executableURL = URL(fileURLWithPath: "/usr/bin/env")
+                process.arguments = ["gcloud", "auth", "print-access-token"]
+                let pipe = Pipe()
+                process.standardOutput = pipe
+                process.standardError = Pipe()
+                do {
+                    try process.run()
+                    process.waitUntilExit()
+                    if process.terminationStatus == 0 {
+                        let data = pipe.fileHandleForReading.readDataToEndOfFile()
+                        let token = String(data: data, encoding: .utf8)?.trimmingCharacters(in: .whitespacesAndNewlines)
+                        if let token, !token.isEmpty {
+                            continuation.resume(returning: token)
+                            return
+                        }
+                    }
+                } catch {}
+                continuation.resume(returning: nil)
+            }
+        }
+    }
+
     func loginWithBrowser() {
         guard !isLoggingIn else { return }
         guard let corePath = Self.findGeminiCorePath() else {

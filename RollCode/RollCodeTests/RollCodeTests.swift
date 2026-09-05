@@ -87,7 +87,7 @@ struct RollCodeTests {
             try script.write(to: executable, atomically: true, encoding: .utf8)
             try FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: executable.path)
 
-            let agent = AgentSession(executableURL: executable)
+            let agent = AgentSession(executableURL: executable, defaults: testAgentDefaults())
             agent.send("Do the work", in: root)
             for _ in 0..<40 where agent.isRunning {
                 try await Task.sleep(nanoseconds: 50_000_000)
@@ -735,7 +735,7 @@ struct RollCodeTests {
     @Test("AgentSession toggles between latest Codex and Gemini threads independently")
     @MainActor
     func agentSessionTogglesBetweenProviders() throws {
-        let session = AgentSession(executableURL: nil, geminiExecutableURL: nil)
+        let session = AgentSession(executableURL: nil, geminiExecutableURL: nil, defaults: testAgentDefaults())
         #expect(session.selectedProvider == .codex)
 
         session.entries = [.message(AgentMessage(role: .user, text: "Codex prompt"))]
@@ -763,6 +763,114 @@ struct RollCodeTests {
             #expect(msg.text == "Gemini prompt")
         } else {
             Issue.record("Expected Gemini message")
+        }
+    }
+
+    @Test("AgentSession switches to the exact thread across providers")
+    @MainActor
+    func agentSessionSwitchesToExactCrossProviderThread() throws {
+        let session = AgentSession(executableURL: nil, geminiExecutableURL: nil, defaults: testAgentDefaults())
+        session.entries = [.message(AgentMessage(role: .user, text: "Codex thread"))]
+        let codexThread = session.activeThread
+
+        session.selectProvider(.gemini)
+        session.entries = [.message(AgentMessage(role: .user, text: "Gemini thread"))]
+        let geminiThread = session.activeThread
+
+        session.switchToThread(codexThread)
+        #expect(session.activeThread.id == codexThread.id)
+        #expect(session.activeThread.provider == .codex)
+        #expect(session.selectedProvider == .codex)
+        #expect(session.entries == codexThread.entries)
+
+        session.switchToThread(geminiThread)
+        #expect(session.activeThread.id == geminiThread.id)
+        #expect(session.activeThread.provider == .gemini)
+        #expect(session.selectedProvider == .gemini)
+        #expect(session.entries == geminiThread.entries)
+    }
+
+    @Test("AgentSession rejects provider and thread switches while a turn is running")
+    @MainActor
+    func agentSessionRejectsSwitchesDuringTurn() async throws {
+        try await withTemporaryDirectory { root in
+            let executable = root.appendingPathComponent("slow-agent")
+            let script = """
+            #!/bin/zsh
+            sleep 0.3
+            printf '%s\\n' '{"type":"item.completed","item":{"id":"message","type":"agent_message","text":"Codex result"}}'
+            """
+            try script.write(to: executable, atomically: true, encoding: .utf8)
+            try FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: executable.path)
+
+            let session = AgentSession(
+                executableURL: executable,
+                geminiExecutableURL: executable,
+                defaults: testAgentDefaults(),
+                useAppServer: false
+            )
+            session.send("Codex request", in: root)
+            let runningThreadID = session.activeThread.id
+            let otherThread = AgentThread(provider: .gemini)
+
+            #expect(session.isRunning)
+            session.selectProvider(.gemini)
+            session.switchToThread(otherThread)
+            #expect(session.selectedProvider == .codex)
+            #expect(session.activeThread.id == runningThreadID)
+
+            for _ in 0..<40 where session.isRunning {
+                try await Task.sleep(nanoseconds: 50_000_000)
+            }
+
+            #expect(!session.isRunning)
+            #expect(session.selectedProvider == .codex)
+            #expect(session.entries.contains { entry in
+                guard case .message(let message) = entry else { return false }
+                return message.senderName == "CODEX" && message.text == "Codex result"
+            })
+
+            session.selectProvider(.gemini)
+            #expect(session.selectedProvider == .gemini)
+        }
+    }
+
+    @Test("AgentSession restores Codex and Gemini conversations independently")
+    @MainActor
+    func agentSessionRestoresProviderThreadsIndependently() throws {
+        try withTemporaryDirectory { root in
+            let defaults = testAgentDefaults()
+            let firstSession = AgentSession(
+                executableURL: nil,
+                geminiExecutableURL: nil,
+                defaults: defaults
+            )
+            firstSession.loadThreads(for: root)
+            firstSession.entries = [.message(AgentMessage(role: .user, text: "Saved Codex conversation"))]
+            firstSession.selectProvider(.gemini)
+            firstSession.entries = [.message(AgentMessage(role: .user, text: "Saved Gemini conversation"))]
+            firstSession.saveCurrentThreads()
+
+            let restoredSession = AgentSession(
+                executableURL: nil,
+                geminiExecutableURL: nil,
+                defaults: defaults
+            )
+            restoredSession.loadThreads(for: root)
+
+            #expect(restoredSession.selectedProvider == .gemini)
+            #expect(restoredSession.activeThread.provider == .gemini)
+            #expect(restoredSession.entries.contains { entry in
+                guard case .message(let message) = entry else { return false }
+                return message.text == "Saved Gemini conversation"
+            })
+
+            restoredSession.selectProvider(.codex)
+            #expect(restoredSession.activeThread.provider == .codex)
+            #expect(restoredSession.entries.contains { entry in
+                guard case .message(let message) = entry else { return false }
+                return message.text == "Saved Codex conversation"
+            })
         }
     }
 
@@ -1191,6 +1299,46 @@ struct RollCodeTests {
         #expect(parsed[1].speedTier == .fast)
     }
 
+    @Test("ModelCatalogService parses Vertex AI publisher models JSON, filters non-chat, and ranks gemini-3.8-flash highest")
+    func modelCatalogServiceParsesVertexGeminiModels() throws {
+        let json = """
+        {
+          "publisherModels": [
+            {
+              "name": "publishers/google/models/gemini-2.5-flash",
+              "versionId": "default"
+            },
+            {
+              "name": "publishers/google/models/gemini-3.8-flash",
+              "versionId": "default"
+            },
+            {
+              "name": "publishers/google/models/gemini-2.5-pro",
+              "versionId": "default"
+            },
+            {
+              "name": "publishers/google/models/gemini-embedding-001",
+              "versionId": "default"
+            },
+            {
+              "name": "publishers/google/models/gemini-2.5-pro-tts",
+              "versionId": "default"
+            }
+          ]
+        }
+        """.data(using: .utf8)!
+
+        let parsed = try #require(ModelCatalogService.parseVertexGeminiModels(data: json))
+        #expect(parsed.count == 3)
+        #expect(parsed[0].id == "gemini-3.8-flash")
+        #expect(parsed[0].speedTier == .fast)
+        #expect(parsed[0].displayName == "Gemini 3.8 Flash")
+        #expect(parsed[1].id == "gemini-2.5-pro")
+        #expect(parsed[1].speedTier == .deep)
+        #expect(parsed[2].id == "gemini-2.5-flash")
+        #expect(parsed[2].speedTier == .fast)
+    }
+
     @Test("ModelCatalogService parses Codex cache JSON with reasoning support")
     func modelCatalogServiceParsesCodexCache() throws {
         let json = """
@@ -1243,7 +1391,7 @@ struct RollCodeTests {
             try script.write(to: executable, atomically: true, encoding: .utf8)
             try FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: executable.path)
 
-            let agent = AgentSession(executableURL: executable)
+            let agent = AgentSession(executableURL: executable, defaults: testAgentDefaults())
             agent.setModel("gpt-5.6-sol")
             agent.setReasoningEffort(.high)
 
@@ -1301,6 +1449,13 @@ private func withTemporaryDirectory<T>(_ operation: (URL) throws -> T) throws ->
     try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
     defer { try? FileManager.default.removeItem(at: root) }
     return try operation(root)
+}
+
+private func testAgentDefaults(provider: AgentProvider = .codex) -> UserDefaults {
+    let suiteName = "TestAgentDefaults_\(UUID().uuidString)"
+    let defaults = UserDefaults(suiteName: suiteName)!
+    defaults.set(provider.rawValue, forKey: AgentSession.providerDefaultsKey)
+    return defaults
 }
 
 private func runGit(_ arguments: [String], in directory: URL) throws {

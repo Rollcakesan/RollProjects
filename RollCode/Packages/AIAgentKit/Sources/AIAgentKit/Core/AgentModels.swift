@@ -9,7 +9,7 @@ public struct AgentMessage: Identifiable, Equatable, Sendable, Codable {
         public var title: String {
             switch self {
             case .user: "YOU"
-            case .assistant: "CODEX"
+            case .assistant: "ASSISTANT"
             case .system: "ROLLCODE"
             }
         }

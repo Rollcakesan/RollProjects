@@ -88,6 +88,7 @@ final class ModelCatalogService {
 
     private let codexCacheURL: URL
     private let codexConfigURL: URL
+    private let geminiCacheURL: URL
     private let session: URLSession
 
     static let defaultCodexFallback = [
@@ -111,10 +112,12 @@ final class ModelCatalogService {
     init(
         codexCacheURL: URL = FileManager.default.homeDirectoryForCurrentUser.appending(path: ".codex/models_cache.json"),
         codexConfigURL: URL = FileManager.default.homeDirectoryForCurrentUser.appending(path: ".codex/config.toml"),
+        geminiCacheURL: URL = FileManager.default.homeDirectoryForCurrentUser.appending(path: ".gemini/models_cache.json"),
         session: URLSession = .shared
     ) {
         self.codexCacheURL = codexCacheURL
         self.codexConfigURL = codexConfigURL
+        self.geminiCacheURL = geminiCacheURL
         self.session = session
         loadInitialCatalogs()
     }
@@ -136,7 +139,7 @@ final class ModelCatalogService {
             }
             return codexModels.first?.id ?? "gpt-5.6-sol"
         case .gemini:
-            return "gemini-2.5-pro"
+            return geminiModels.first?.id ?? "gemini-3.8-flash"
         }
     }
 
@@ -148,11 +151,15 @@ final class ModelCatalogService {
             self.codexModels = Self.defaultCodexFallback
         }
 
-        // Gemini initially defaults to the curated catalog
-        self.geminiModels = Self.defaultGeminiFallback
+        // Load Gemini from cache if available
+        if let cached = loadGeminiFromCache(), !cached.isEmpty {
+            self.geminiModels = cached
+        } else {
+            self.geminiModels = Self.defaultGeminiFallback
+        }
     }
 
-    func refreshModels(geminiKey: String? = nil, openAIKey: String? = nil) async {
+    func refreshModels(geminiKey: String? = nil, geminiOAuthToken: String? = nil, openAIKey: String? = nil) async {
         isRefreshing = true
         defer {
             isRefreshing = false
@@ -178,10 +185,16 @@ final class ModelCatalogService {
             }
         }
 
-        // Refresh Gemini models via API if key is available
+        // Refresh Gemini models via API or OAuth Vertex AI
         if let key = geminiKey, !key.isEmpty {
             if let fetched = await fetchGeminiModels(apiKey: key), !fetched.isEmpty {
                 self.geminiModels = fetched
+                saveGeminiToCache(fetched)
+            }
+        } else if let token = geminiOAuthToken, !token.isEmpty {
+            if let fetched = await fetchGeminiVertexModels(accessToken: token), !fetched.isEmpty {
+                self.geminiModels = fetched
+                saveGeminiToCache(fetched)
             }
         }
     }
@@ -248,6 +261,76 @@ final class ModelCatalogService {
         }
 
         // Sort Pro and Flash to the top
+        return results.sorted { m1, m2 in
+            let score1 = modelScore(m1.id)
+            let score2 = modelScore(m2.id)
+            if score1 != score2 { return score1 > score2 }
+            return m1.id > m2.id
+        }
+    }
+
+    func fetchGeminiVertexModels(accessToken: String) async -> [AIModelInfo]? {
+        let trimmedToken = accessToken.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmedToken.isEmpty,
+              let url = URL(string: "https://us-central1-aiplatform.googleapis.com/v1beta1/publishers/google/models?pageSize=200") else {
+            return nil
+        }
+
+        var request = URLRequest(url: url)
+        request.setValue("Bearer \(trimmedToken)", forHTTPHeaderField: "Authorization")
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+
+        do {
+            let (data, response) = try await session.data(for: request)
+            guard let httpResponse = response as? HTTPURLResponse, (200...299).contains(httpResponse.statusCode) else {
+                return nil
+            }
+            return Self.parseVertexGeminiModels(data: data)
+        } catch {
+            return nil
+        }
+    }
+
+    nonisolated static func parseVertexGeminiModels(data: Data) -> [AIModelInfo]? {
+        guard let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let modelsArray = json["publisherModels"] as? [[String: Any]] else {
+            return nil
+        }
+
+        var results: [AIModelInfo] = []
+        for item in modelsArray {
+            guard let rawName = item["name"] as? String, rawName.contains("gemini") else { continue }
+            let modelID = rawName.replacingOccurrences(of: "publishers/google/models/", with: "")
+
+            // Exclude embedding, audio-only tts, live translate, robotics, computer-use, image-only/audio-only
+            if modelID.contains("embedding") || modelID.contains("tts") || modelID.contains("robotics") ||
+               modelID.contains("transcribe") || modelID.contains("translate") || modelID.contains("computer-use") ||
+               modelID.contains("image") || modelID.contains("audio") {
+                continue
+            }
+
+            let tier: ModelSpeedTier
+            if modelID.contains("flash") {
+                tier = .fast
+            } else if modelID.contains("pro") {
+                tier = .deep
+            } else {
+                tier = .standard
+            }
+
+            let displayName = cleanGeminiDisplayName(from: modelID)
+
+            results.append(AIModelInfo(
+                id: modelID,
+                displayName: displayName,
+                provider: .gemini,
+                speedTier: tier,
+                supportsReasoningEffort: false
+            ))
+        }
+
+        guard !results.isEmpty else { return nil }
+
         return results.sorted { m1, m2 in
             let score1 = modelScore(m1.id)
             let score2 = modelScore(m2.id)
@@ -375,17 +458,51 @@ final class ModelCatalogService {
         return nil
     }
 
+    private func saveGeminiToCache(_ models: [AIModelInfo]) {
+        guard let data = try? JSONEncoder().encode(models) else { return }
+        let dir = geminiCacheURL.deletingLastPathComponent()
+        try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        try? data.write(to: geminiCacheURL)
+    }
+
+    private func loadGeminiFromCache() -> [AIModelInfo]? {
+        guard FileManager.default.fileExists(atPath: geminiCacheURL.path),
+              let data = try? Data(contentsOf: geminiCacheURL),
+              let models = try? JSONDecoder().decode([AIModelInfo].self, from: data) else {
+            return nil
+        }
+        return models
+    }
+
     nonisolated static func cleanGeminiDisplayName(from id: String) -> String {
         let parts = id.split(separator: "-").map { $0.capitalized }
         return parts.joined(separator: " ")
     }
 
     nonisolated static func modelScore(_ id: String) -> Int {
-        if id.contains("2.5-pro") { return 100 }
-        if id.contains("2.5-flash") { return 90 }
-        if id.contains("2.0-flash") { return 80 }
-        if id.contains("1.5-pro") { return 70 }
-        if id.contains("1.5-flash") { return 60 }
-        return 10
+        var vScore = 0
+        if let regex = try? NSRegularExpression(pattern: #"gemini-(\d+)(?:\.(\d+))?"#),
+           let match = regex.firstMatch(in: id, range: NSRange(id.startIndex..., in: id)) {
+            if let majorRange = Range(match.range(at: 1), in: id), let major = Int(id[majorRange]) {
+                vScore = major * 100
+            }
+            if match.numberOfRanges > 2, let minorRange = Range(match.range(at: 2), in: id), let minor = Int(id[minorRange]) {
+                vScore += minor * 10
+            }
+        }
+        var tierScore = 2
+        if id.contains("pro") {
+            tierScore = 5
+        } else if id.contains("flash") && !id.contains("lite") {
+            tierScore = 4
+        } else if id.contains("flash-lite") {
+            tierScore = 3
+        }
+
+        if id.contains("preview") {
+            vScore = max(0, vScore - 1)
+        }
+
+        return vScore * 10 + tierScore
     }
 }

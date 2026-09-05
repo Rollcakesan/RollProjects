@@ -118,6 +118,7 @@ struct SettingsView: View {
                         Text(provider.rawValue).tag(provider)
                     }
                 }
+                .disabled(agent.isRunning)
             }
         }
         .formStyle(.grouped)
