@@ -123,28 +123,15 @@ final class SuggestionOverlayController {
               prefixRange.location != NSNotFound else { return }
 
         let nsText = textView.string as NSString
-        let validRange = NSRange(
-            location: min(prefixRange.location, nsText.length),
-            length: min(prefixRange.length, max(0, nsText.length - prefixRange.location))
-        )
-        let glyphRange = layoutManager.glyphRange(forCharacterRange: validRange, actualCharacterRange: nil)
+        let validLoc = min(prefixRange.location, nsText.length)
+        let glyphRange = layoutManager.glyphRange(forCharacterRange: NSRange(location: validLoc, length: min(prefixRange.length, nsText.length - validLoc)), actualCharacterRange: nil)
         var rect = layoutManager.boundingRect(forGlyphRange: glyphRange, in: textContainer)
         rect.origin.x += textView.textContainerOrigin.x
         rect.origin.y += textView.textContainerOrigin.y
 
-        let screenRect = textView.convert(rect, to: nil)
-        let windowScreenRect = parentWindow.convertToScreen(screenRect)
-
-        let width: CGFloat = 320
-        let itemHeight: CGFloat = 22
-        let height: CGFloat = min(CGFloat(suggestions.count) * itemHeight + 10, 150)
-        let popupFrame = NSRect(
-            x: max(windowScreenRect.minX - 4, 10),
-            y: max(windowScreenRect.minY - height - 4, 10),
-            width: width,
-            height: height
-        )
-        window?.setFrame(popupFrame, display: true)
+        let windowScreenRect = parentWindow.convertToScreen(textView.convert(rect, to: nil))
+        let height = min(CGFloat(suggestions.count) * 22 + 10, 150)
+        window?.setFrame(NSRect(x: max(windowScreenRect.minX - 4, 10), y: max(windowScreenRect.minY - height - 4, 10), width: 320, height: height), display: true)
     }
 }
 

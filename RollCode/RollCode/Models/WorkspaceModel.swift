@@ -210,16 +210,6 @@ final class WorkspaceModel {
         setUIFontScale(.medium)
     }
 
-    func setUIFontSize(_ size: CGFloat) {
-        if size <= 13.0 {
-            setUIFontScale(.small)
-        } else if size >= 15.5 {
-            setUIFontScale(.large)
-        } else {
-            setUIFontScale(.medium)
-        }
-    }
-
     func quickOpenFiles(matching query: String) -> [FileNode] {
         let normalized = query.trimmed
         let files = workspaceFiles

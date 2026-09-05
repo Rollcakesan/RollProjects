@@ -77,13 +77,6 @@ struct ContentView: View {
                 workspace.checkForExternalChanges()
             }
         }
-        .task {
-            while !Task.isCancelled {
-                try? await Task.sleep(for: .seconds(2))
-                guard NSApp.isActive else { continue }
-                workspace.checkForExternalChanges()
-            }
-        }
     }
 }
 
