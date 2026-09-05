@@ -11,10 +11,31 @@ final class WorkspaceModel {
     var activeDocumentID: UUID?
     var fileFilter = ""
     var alertMessage: String?
-    var isQuickOpenPresented = false
-    var isWorkspaceSearchPresented = false
-    var isGitChangesPresented = false
-    var isShortcutCheatSheetPresented = false
+    enum WorkspaceSheet: String, Identifiable, Sendable {
+        case quickOpen
+        case workspaceSearch
+        case gitChanges
+        case shortcutCheatSheet
+
+        var id: String { rawValue }
+    }
+    var activeSheet: WorkspaceSheet?
+    var isQuickOpenPresented: Bool {
+        get { activeSheet == .quickOpen }
+        set { activeSheet = newValue ? .quickOpen : (activeSheet == .quickOpen ? nil : activeSheet) }
+    }
+    var isWorkspaceSearchPresented: Bool {
+        get { activeSheet == .workspaceSearch }
+        set { activeSheet = newValue ? .workspaceSearch : (activeSheet == .workspaceSearch ? nil : activeSheet) }
+    }
+    var isGitChangesPresented: Bool {
+        get { activeSheet == .gitChanges }
+        set { activeSheet = newValue ? .gitChanges : (activeSheet == .gitChanges ? nil : activeSheet) }
+    }
+    var isShortcutCheatSheetPresented: Bool {
+        get { activeSheet == .shortcutCheatSheet }
+        set { activeSheet = newValue ? .shortcutCheatSheet : (activeSheet == .shortcutCheatSheet ? nil : activeSheet) }
+    }
     var isFolderPickerPresented = false
     var editorNavigationRequest: EditorNavigationRequest?
     var renamingURL: URL?
@@ -182,7 +203,7 @@ final class WorkspaceModel {
             chooseFolder()
             return
         }
-        isQuickOpenPresented = true
+        activeSheet = .quickOpen
     }
 
     func presentWorkspaceSearch() {
@@ -190,7 +211,7 @@ final class WorkspaceModel {
             chooseFolder()
             return
         }
-        isWorkspaceSearchPresented = true
+        activeSheet = .workspaceSearch
     }
 
     func presentGitChanges() {
@@ -198,7 +219,7 @@ final class WorkspaceModel {
             chooseFolder()
             return
         }
-        isGitChangesPresented = true
+        activeSheet = .gitChanges
     }
 
     func setTabWidth(_ width: Int) {

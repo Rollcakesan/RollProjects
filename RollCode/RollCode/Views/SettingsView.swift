@@ -279,37 +279,22 @@ struct SettingsView: View {
                         Text("\(model.speedTier.badgeEmoji) \(model.displayName)").tag(model.id)
                     }
                 }
-
-                HStack {
-                    Spacer()
-                    Button {
-                        Task { await agent.refreshModelCatalog() }
-                    } label: {
-                        HStack(spacing: 4) {
-                            if agent.modelCatalog.isRefreshing {
-                                ProgressView().controlSize(.mini)
-                            } else {
-                                Image(systemName: "arrow.clockwise")
-                            }
-                            Text("Fetch Latest Models")
-                        }
-                    }
-                    .controlSize(.small)
-                }
             }
         }
         .formStyle(.grouped)
     }
 
     private var isCodexLoggedIn: Bool {
-        if case .loggedIn = agent.auth.status { return true }
-        if case .apiKey = agent.auth.status { return true }
-        return false
+        switch agent.auth.status {
+        case .loggedIn, .apiKey: return true
+        default: return false
+        }
     }
 
     private var isGeminiLoggedIn: Bool {
-        if case .loggedIn = agent.geminiAuth.status { return true }
-        if case .apiKey = agent.geminiAuth.status { return true }
-        return false
+        switch agent.geminiAuth.status {
+        case .loggedIn, .apiKey: return true
+        default: return false
+        }
     }
 }

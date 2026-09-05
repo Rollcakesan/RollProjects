@@ -173,41 +173,28 @@ struct CodeEditorView: NSViewRepresentable {
         }
 
         private func findMatchingBracketPair(at location: Int, in text: NSString) -> (NSRange, NSRange)? {
-            let pairs: [Character: Character] = ["(": ")", "[": "]", "{": "}"]
-            let reversePairs: [Character: Character] = [")": "(", "]": "[", "}": "{"]
+            let forward: [unichar: unichar] = [40: 41, 91: 93, 123: 125] // () [] {}
+            let backward: [unichar: unichar] = [41: 40, 93: 91, 125: 123]
 
-            var testLocations = [Int]()
-            if location > 0 { testLocations.append(location - 1) }
-            if location < text.length { testLocations.append(location) }
-
-            for loc in testLocations {
-                let charCode = text.character(at: loc)
-                guard let scalar = UnicodeScalar(charCode) else { continue }
-                let ch = Character(scalar)
-
-                if let closing = pairs[ch] {
+            for loc in [location > 0 ? location - 1 : nil, location < text.length ? location : nil].compactMap({ $0 }) {
+                let code = text.character(at: loc)
+                if let target = forward[code] {
                     var depth = 0
                     for i in (loc + 1)..<text.length {
-                        guard let s = UnicodeScalar(text.character(at: i)) else { continue }
-                        let c = Character(s)
-                        if c == ch { depth += 1 }
-                        else if c == closing {
-                            if depth == 0 {
-                                return (NSRange(location: loc, length: 1), NSRange(location: i, length: 1))
-                            }
+                        let c = text.character(at: i)
+                        if c == code { depth += 1 }
+                        else if c == target {
+                            if depth == 0 { return (NSRange(location: loc, length: 1), NSRange(location: i, length: 1)) }
                             depth -= 1
                         }
                     }
-                } else if let opening = reversePairs[ch] {
+                } else if let target = backward[code] {
                     var depth = 0
                     for i in stride(from: loc - 1, through: 0, by: -1) {
-                        guard let s = UnicodeScalar(text.character(at: i)) else { continue }
-                        let c = Character(s)
-                        if c == ch { depth += 1 }
-                        else if c == opening {
-                            if depth == 0 {
-                                return (NSRange(location: i, length: 1), NSRange(location: loc, length: 1))
-                            }
+                        let c = text.character(at: i)
+                        if c == code { depth += 1 }
+                        else if c == target {
+                            if depth == 0 { return (NSRange(location: i, length: 1), NSRange(location: loc, length: 1)) }
                             depth -= 1
                         }
                     }
@@ -613,34 +600,7 @@ final class LineNumberRulerView: NSRulerView {
             if NSLocationInRange(glyphIndex, visibleGlyphRange) {
                 let lineRect = layoutManager.lineFragmentRect(forGlyphAt: glyphIndex, effectiveRange: nil)
                 let y = lineRect.minY + textView.textContainerOrigin.y - visibleRect.minY
-
-                // Git diff gutter mark (leftmost 3pt line)
-                if isGitAdded {
-                    let markRect = NSRect(x: 1, y: y, width: 3, height: lineRect.height)
-                    NSColor.systemGreen.setFill()
-                    markRect.fill()
-                } else if isGitModified {
-                    let markRect = NSRect(x: 1, y: y, width: 3, height: lineRect.height)
-                    NSColor.systemBlue.setFill()
-                    markRect.fill()
-                }
-
-                if isError {
-                    let dotRect = NSRect(x: 6, y: y + 4, width: 5, height: 5)
-                    NSColor.systemRed.setFill()
-                    NSBezierPath(ovalIn: dotRect).fill()
-                }
-
-                let lineAttrs: [NSAttributedString.Key: Any] = isError ? [
-                    .font: NSFont.monospacedDigitSystemFont(ofSize: 10, weight: .bold),
-                    .foregroundColor: NSColor.systemRed
-                ] : attributes
-                let label = "\(lineNumber)" as NSString
-                let labelSize = label.size(withAttributes: lineAttrs)
-                label.draw(
-                    at: NSPoint(x: ruleThickness - labelSize.width - 8, y: y + 1),
-                    withAttributes: lineAttrs
-                )
+                drawLineAnnotations(y: y, height: lineRect.height, lineNumber: lineNumber, isError: isError, isGitAdded: isGitAdded, isGitModified: isGitModified, defaultAttrs: attributes)
             } else if glyphIndex > NSMaxRange(visibleGlyphRange) {
                 break
             }
@@ -649,36 +609,46 @@ final class LineNumberRulerView: NSRulerView {
         }
 
         if text.length == 0 || text.hasSuffix("\n") {
-            let isError = errorLines.contains(lineNumber)
-            let isGitAdded = gitAddedLines.contains(lineNumber)
-            let isGitModified = gitModifiedLines.contains(lineNumber)
             let lineRect = layoutManager.extraLineFragmentRect
             let y = lineRect.minY + textView.textContainerOrigin.y - visibleRect.minY
-
-            if isGitAdded {
-                let markRect = NSRect(x: 1, y: y, width: 3, height: max(lineRect.height, 16))
-                NSColor.systemGreen.setFill()
-                markRect.fill()
-            } else if isGitModified {
-                let markRect = NSRect(x: 1, y: y, width: 3, height: max(lineRect.height, 16))
-                NSColor.systemBlue.setFill()
-                markRect.fill()
-            }
-
-            if isError {
-                let dotRect = NSRect(x: 6, y: y + 4, width: 5, height: 5)
-                NSColor.systemRed.setFill()
-                NSBezierPath(ovalIn: dotRect).fill()
-            }
-
-            let lineAttrs: [NSAttributedString.Key: Any] = isError ? [
-                .font: NSFont.monospacedDigitSystemFont(ofSize: 10, weight: .bold),
-                .foregroundColor: NSColor.systemRed
-            ] : attributes
-            let label = "\(lineNumber)" as NSString
-            let labelSize = label.size(withAttributes: lineAttrs)
-            label.draw(at: NSPoint(x: ruleThickness - labelSize.width - 8, y: y + 1), withAttributes: lineAttrs)
+            drawLineAnnotations(
+                y: y,
+                height: max(lineRect.height, 16),
+                lineNumber: lineNumber,
+                isError: errorLines.contains(lineNumber),
+                isGitAdded: gitAddedLines.contains(lineNumber),
+                isGitModified: gitModifiedLines.contains(lineNumber),
+                defaultAttrs: attributes
+            )
         }
+    }
+
+    private func drawLineAnnotations(
+        y: CGFloat,
+        height: CGFloat,
+        lineNumber: Int,
+        isError: Bool,
+        isGitAdded: Bool,
+        isGitModified: Bool,
+        defaultAttrs: [NSAttributedString.Key: Any]
+    ) {
+        if isGitAdded {
+            NSColor.systemGreen.setFill()
+            NSRect(x: 1, y: y, width: 3, height: height).fill()
+        } else if isGitModified {
+            NSColor.systemBlue.setFill()
+            NSRect(x: 1, y: y, width: 3, height: height).fill()
+        }
+        if isError {
+            NSColor.systemRed.setFill()
+            NSBezierPath(ovalIn: NSRect(x: 6, y: y + 4, width: 5, height: 5)).fill()
+        }
+        let lineAttrs: [NSAttributedString.Key: Any] = isError ? [
+            .font: NSFont.monospacedDigitSystemFont(ofSize: 10, weight: .bold),
+            .foregroundColor: NSColor.systemRed
+        ] : defaultAttrs
+        let label = "\(lineNumber)" as NSString
+        label.draw(at: NSPoint(x: ruleThickness - label.size(withAttributes: lineAttrs).width - 8, y: y + 1), withAttributes: lineAttrs)
     }
 }
 

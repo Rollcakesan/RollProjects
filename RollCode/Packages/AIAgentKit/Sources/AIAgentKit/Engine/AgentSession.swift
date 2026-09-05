@@ -411,8 +411,11 @@ final class AgentSession {
                     },
                     onComplete: { [weak self] success, errorMessage in
                         guard let self else { return }
+                        let stopped = if case .appServerStopping = self.runState { true } else { false }
                         let reset = if case .appServerStopping(_, _, let resetThread) = self.runState { resetThread } else { false }
-                        self.completeAppServerTurn(targetThreadID: targetThreadID, success: success, errorMessage: errorMessage, resetThread: reset)
+                        Task { @MainActor [weak self] in
+                            await self?.finalizeTurn(targetThreadID: targetThreadID, stopped: stopped, success: success, errorMessage: errorMessage, resetThread: reset)
+                        }
                     }
                 )
 
@@ -482,52 +485,59 @@ final class AgentSession {
         }
     }
 
-    private func completeAppServerTurn(targetThreadID: UUID, success: Bool, errorMessage: String?, resetThread: Bool) {
-        Task { @MainActor [weak self] in
-            guard let self else { return }
-            let changedPaths: [String]
-            if let workspaceURL {
-                let current = await Task.detached(priority: .utility) {
-                    (try? GitBridgeService.changedPaths(in: workspaceURL)) ?? []
-                }.value
-                changedPaths = current.filter { !self.initialChangedPaths.contains($0) }
+    private func finalizeTurn(
+        targetThreadID: UUID,
+        stopped: Bool,
+        success: Bool,
+        errorMessage: String?,
+        resetThread: Bool
+    ) async {
+        let changedPaths: [String]
+        if let workspaceURL {
+            let current = await Task.detached(priority: .utility) {
+                (try? GitBridgeService.changedPaths(in: workspaceURL)) ?? []
+            }.value
+            changedPaths = current.filter { !self.initialChangedPaths.contains($0) }
+        } else {
+            changedPaths = []
+        }
+
+        if let turnStartTime {
+            mutateThread(id: targetThreadID) {
+                $0.lastDurationSeconds = Date().timeIntervalSince(turnStartTime)
+            }
+        }
+        turnStartTime = nil
+        runState = .idle
+        activeTurnThreadID = nil
+
+        mergeChangedFiles(changedPaths, targetThreadID: targetThreadID)
+
+        if stopped {
+            mutateThread(id: targetThreadID) {
+                $0.entries.append(.message(AgentMessage(role: .system, text: "Agent stopped.")))
+            }
+        } else if !success {
+            let detail = (errorMessage ?? errorBuffer).trimmingCharacters(in: .whitespacesAndNewlines)
+            let lower = detail.lowercased()
+            let message: String
+            if selectedProvider == .codex && (lower.contains("unauthorized") || lower.contains("login") || lower.contains("authentication")) {
+                auth.refresh()
+                message = "Codex authentication required. Please click 'Log In' or run 'codex login' in the terminal.\n(\(detail))"
+            } else if selectedProvider == .gemini && (lower.contains("google_cloud_project") || lower.contains("license") || lower.contains("valid license") || lower.contains("login")) {
+                message = "Gemini CLI authentication or project setup required:\n\(detail)\n\nTip: You can set GEMINI_API_KEY or configure a Google Cloud Project (GOOGLE_CLOUD_PROJECT)."
             } else {
-                changedPaths = []
+                message = detail.isEmpty ? "\(selectedProvider.rawValue) turn finished with an error." : detail
             }
-
-            if let turnStartTime {
-                self.mutateThread(id: targetThreadID) {
-                    $0.lastDurationSeconds = Date().timeIntervalSince(turnStartTime)
-                }
+            mutateThread(id: targetThreadID) {
+                $0.entries.append(.message(AgentMessage(role: .system, text: message)))
             }
-            turnStartTime = nil
+        }
 
-            let stopped = if case .appServerStopping = runState { true } else { false }
-            runState = .idle
-            activeTurnThreadID = nil
-
-            mergeChangedFiles(changedPaths, targetThreadID: targetThreadID)
-
-            if stopped {
-                entries.append(.message(AgentMessage(role: .system, text: "Agent stopped.")))
-            } else if !success {
-                let detail = (errorMessage ?? errorBuffer).trimmingCharacters(in: .whitespacesAndNewlines)
-                let lower = detail.lowercased()
-                let message: String
-                if lower.contains("unauthorized") || lower.contains("login") || lower.contains("authentication") {
-                    auth.refresh()
-                    message = "Codex authentication required. Please click 'Log In' or run 'codex login' in the terminal.\n(\(detail))"
-                } else {
-                    message = detail.isEmpty ? "Codex turn finished with an error." : detail
-                }
-                entries.append(.message(AgentMessage(role: .system, text: message)))
-            }
-
-            onRunCompleted?()
-            saveCurrentThreads()
-            if resetThread {
-                resetThreadState()
-            }
+        onRunCompleted?()
+        saveCurrentThreads()
+        if resetThread {
+            resetThreadState()
         }
     }
 
@@ -970,24 +980,6 @@ final class AgentSession {
 
     private func finish(_ process: Process, exitCode: Int32, targetThreadID: UUID) async {
         guard runState.process === process else { return }
-        let changedPaths: [String]
-        if let workspaceURL {
-            let current = await Task.detached(priority: .utility) {
-                (try? GitBridgeService.changedPaths(in: workspaceURL)) ?? []
-            }.value
-            changedPaths = current.filter { !self.initialChangedPaths.contains($0) }
-        } else {
-            changedPaths = []
-        }
-        guard runState.process === process else { return }
-
-        if let turnStartTime {
-            mutateThread(id: targetThreadID) {
-                $0.lastDurationSeconds = Date().timeIntervalSince(turnStartTime)
-            }
-        }
-        turnStartTime = nil
-
         let stopped: Bool
         let resetThread: Bool
         switch runState {
@@ -997,40 +989,16 @@ final class AgentSession {
         case .running:
             stopped = false
             resetThread = false
-        case .idle, .appServerRunning, .appServerStopping:
+        default:
             return
         }
-        runState = .idle
-        activeTurnThreadID = nil
-
         logger.debug("\(self.selectedProvider.rawValue, privacy: .public) agent finished with exit code \(exitCode, privacy: .public)")
-
-        mergeChangedFiles(changedPaths, targetThreadID: targetThreadID)
-
-        if stopped {
-            mutateThread(id: targetThreadID) {
-                $0.entries.append(.message(AgentMessage(role: .system, text: "Agent stopped.")))
-            }
-        } else if exitCode != 0 {
-            let detail = errorBuffer.trimmingCharacters(in: .whitespacesAndNewlines)
-            let lower = detail.lowercased()
-            let message: String
-            if selectedProvider == .codex && (lower.contains("unauthorized") || lower.contains("login") || lower.contains("authentication")) {
-                auth.refresh()
-                message = "Codex authentication required. Please click 'Log In' or run 'codex login' in the terminal.\n(\(detail))"
-            } else if selectedProvider == .gemini && (lower.contains("google_cloud_project") || lower.contains("license") || lower.contains("valid license") || lower.contains("login")) {
-                message = "Gemini CLI authentication or project setup required:\n\(detail)\n\nTip: You can set GEMINI_API_KEY or configure a Google Cloud Project (GOOGLE_CLOUD_PROJECT)."
-            } else {
-                message = detail.isEmpty ? "\(selectedProvider.rawValue) exited with code \(exitCode)." : detail
-            }
-            mutateThread(id: targetThreadID) {
-                $0.entries.append(.message(AgentMessage(role: .system, text: message)))
-            }
-        }
-        onRunCompleted?()
-        saveCurrentThreads()
-        if resetThread {
-            resetThreadState()
-        }
+        await finalizeTurn(
+            targetThreadID: targetThreadID,
+            stopped: stopped,
+            success: exitCode == 0,
+            errorMessage: exitCode != 0 ? errorBuffer : nil,
+            resetThread: resetThread
+        )
     }
 }

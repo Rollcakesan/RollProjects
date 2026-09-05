@@ -241,17 +241,17 @@ private struct WorkspaceModalsModifier: ViewModifier {
             } message: {
                 Text("Enter a name for the new \(workspace.creatingItemIsDirectory ? "folder" : "file").")
             }
-            .sheet(isPresented: $workspace.isQuickOpenPresented) {
-                QuickOpenView(isPresented: $workspace.isQuickOpenPresented)
-            }
-            .sheet(isPresented: $workspace.isWorkspaceSearchPresented) {
-                WorkspaceSearchView(isPresented: $workspace.isWorkspaceSearchPresented)
-            }
-            .sheet(isPresented: $workspace.isGitChangesPresented) {
-                GitChangesView(isPresented: $workspace.isGitChangesPresented)
-            }
-            .sheet(isPresented: $workspace.isShortcutCheatSheetPresented) {
-                ShortcutCheatSheetView()
+            .sheet(item: $workspace.activeSheet) { sheet in
+                switch sheet {
+                case .quickOpen:
+                    QuickOpenView(isPresented: $workspace.isQuickOpenPresented)
+                case .workspaceSearch:
+                    WorkspaceSearchView(isPresented: $workspace.isWorkspaceSearchPresented)
+                case .gitChanges:
+                    GitChangesView(isPresented: $workspace.isGitChangesPresented)
+                case .shortcutCheatSheet:
+                    ShortcutCheatSheetView()
+                }
             }
             .confirmationDialog(
                 "Save changes to \(workspace.unconfirmedClosingDocument?.name ?? "file")?",

@@ -133,10 +133,7 @@ final class ModelCatalogService {
     func defaultModelID(for provider: AgentProvider) -> String {
         switch provider {
         case .codex:
-            // Check ~/.codex/config.toml
-            if let configured = configuredCodexModel() {
-                return configured
-            }
+            if let configured = configuredCodexModel() { return configured }
             return codexModels.first?.id ?? "gpt-5.6-sol"
         case .gemini:
             return geminiModels.first?.id ?? "gemini-3.8-flash"
@@ -144,19 +141,8 @@ final class ModelCatalogService {
     }
 
     func loadInitialCatalogs() {
-        // Load Codex from cache if available
-        if let cached = loadCodexFromCache(), !cached.isEmpty {
-            self.codexModels = cached
-        } else {
-            self.codexModels = Self.defaultCodexFallback
-        }
-
-        // Load Gemini from cache if available
-        if let cached = loadGeminiFromCache(), !cached.isEmpty {
-            self.geminiModels = cached
-        } else {
-            self.geminiModels = Self.defaultGeminiFallback
-        }
+        self.codexModels = loadCodexFromCache() ?? Self.defaultCodexFallback
+        self.geminiModels = Self.defaultGeminiFallback
     }
 
     func refreshModels(geminiKey: String? = nil, geminiOAuthToken: String? = nil, openAIKey: String? = nil) async {
@@ -166,7 +152,6 @@ final class ModelCatalogService {
             lastRefreshedAt = Date()
         }
 
-        // Refresh Codex models
         if let liveModels = try? await CodexAppServerClient.shared.listModels(), !liveModels.isEmpty {
             self.codexModels = liveModels.map { m in
                 AIModelInfo(
@@ -179,41 +164,6 @@ final class ModelCatalogService {
             }
         } else if let cached = loadCodexFromCache(), !cached.isEmpty {
             self.codexModels = cached
-        } else if let openAIKey, !openAIKey.isEmpty {
-            if let fetched = await fetchOpenAIModels(apiKey: openAIKey), !fetched.isEmpty {
-                self.codexModels = fetched
-            }
-        }
-
-        // Refresh Gemini models via API or OAuth Vertex AI
-        if let key = geminiKey, !key.isEmpty {
-            if let fetched = await fetchGeminiModels(apiKey: key), !fetched.isEmpty {
-                self.geminiModels = fetched
-                saveGeminiToCache(fetched)
-            }
-        } else if let token = geminiOAuthToken, !token.isEmpty {
-            if let fetched = await fetchGeminiVertexModels(accessToken: token), !fetched.isEmpty {
-                self.geminiModels = fetched
-                saveGeminiToCache(fetched)
-            }
-        }
-    }
-
-    func fetchGeminiModels(apiKey: String) async -> [AIModelInfo]? {
-        let trimmedKey = apiKey.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmedKey.isEmpty,
-              let url = URL(string: "https://generativelanguage.googleapis.com/v1beta/models?key=\(trimmedKey)") else {
-            return nil
-        }
-
-        do {
-            let (data, response) = try await session.data(from: url)
-            guard let httpResponse = response as? HTTPURLResponse, (200...299).contains(httpResponse.statusCode) else {
-                return nil
-            }
-            return Self.parseGeminiModels(data: data)
-        } catch {
-            return nil
         }
     }
 
@@ -269,60 +219,23 @@ final class ModelCatalogService {
         }
     }
 
-    func fetchGeminiVertexModels(accessToken: String) async -> [AIModelInfo]? {
-        let trimmedToken = accessToken.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmedToken.isEmpty,
-              let url = URL(string: "https://us-central1-aiplatform.googleapis.com/v1beta1/publishers/google/models?pageSize=200") else {
-            return nil
-        }
-
-        var request = URLRequest(url: url)
-        request.setValue("Bearer \(trimmedToken)", forHTTPHeaderField: "Authorization")
-        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-
-        do {
-            let (data, response) = try await session.data(for: request)
-            guard let httpResponse = response as? HTTPURLResponse, (200...299).contains(httpResponse.statusCode) else {
-                return nil
-            }
-            return Self.parseVertexGeminiModels(data: data)
-        } catch {
-            return nil
-        }
-    }
-
     nonisolated static func parseVertexGeminiModels(data: Data) -> [AIModelInfo]? {
         guard let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-              let modelsArray = json["publisherModels"] as? [[String: Any]] else {
-            return nil
-        }
+              let modelsArray = json["publisherModels"] as? [[String: Any]] else { return nil }
 
         var results: [AIModelInfo] = []
         for item in modelsArray {
             guard let rawName = item["name"] as? String, rawName.contains("gemini") else { continue }
             let modelID = rawName.replacingOccurrences(of: "publishers/google/models/", with: "")
 
-            // Exclude embedding, audio-only tts, live translate, robotics, computer-use, image-only/audio-only
             if modelID.contains("embedding") || modelID.contains("tts") || modelID.contains("robotics") ||
                modelID.contains("transcribe") || modelID.contains("translate") || modelID.contains("computer-use") ||
-               modelID.contains("image") || modelID.contains("audio") {
-                continue
-            }
+               modelID.contains("image") || modelID.contains("audio") { continue }
 
-            let tier: ModelSpeedTier
-            if modelID.contains("flash") {
-                tier = .fast
-            } else if modelID.contains("pro") {
-                tier = .deep
-            } else {
-                tier = .standard
-            }
-
-            let displayName = cleanGeminiDisplayName(from: modelID)
-
+            let tier: ModelSpeedTier = modelID.contains("flash") ? .fast : (modelID.contains("pro") ? .deep : .standard)
             results.append(AIModelInfo(
                 id: modelID,
-                displayName: displayName,
+                displayName: cleanGeminiDisplayName(from: modelID),
                 provider: .gemini,
                 speedTier: tier,
                 supportsReasoningEffort: false
@@ -330,83 +243,22 @@ final class ModelCatalogService {
         }
 
         guard !results.isEmpty else { return nil }
-
         return results.sorted { m1, m2 in
             let score1 = modelScore(m1.id)
             let score2 = modelScore(m2.id)
-            if score1 != score2 { return score1 > score2 }
-            return m1.id > m2.id
+            return score1 != score2 ? score1 > score2 : m1.id > m2.id
         }
-    }
-
-    func fetchOpenAIModels(apiKey: String) async -> [AIModelInfo]? {
-        guard let url = URL(string: "https://api.openai.com/v1/models") else { return nil }
-        var request = URLRequest(url: url)
-        request.setValue("Bearer \(apiKey.trimmingCharacters(in: .whitespacesAndNewlines))", forHTTPHeaderField: "Authorization")
-
-        do {
-            let (data, response) = try await session.data(for: request)
-            guard let httpResponse = response as? HTTPURLResponse, (200...299).contains(httpResponse.statusCode) else {
-                return nil
-            }
-            return Self.parseOpenAIModels(data: data)
-        } catch {
-            return nil
-        }
-    }
-
-    nonisolated static func parseOpenAIModels(data: Data) -> [AIModelInfo]? {
-        guard let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-              let dataArray = json["data"] as? [[String: Any]] else {
-            return nil
-        }
-
-        var results: [AIModelInfo] = []
-        for item in dataArray {
-            guard let id = item["id"] as? String else { continue }
-            // Filter relevant code/chat models
-            if !(id.hasPrefix("gpt-") || id.hasPrefix("o1") || id.hasPrefix("o3") || id.hasPrefix("o4") || id.hasPrefix("codex")) {
-                continue
-            }
-            if id.contains("instruct") || id.contains("audio") || id.contains("realtime") || id.contains("embedding") || id.contains("moderation") {
-                continue
-            }
-
-            let tier: ModelSpeedTier
-            if id.contains("mini") || id.contains("flash") {
-                tier = .fast
-            } else if id.hasPrefix("o1") || id.hasPrefix("o3") || id.contains("sol") || id.contains("terra") {
-                tier = .deep
-            } else {
-                tier = .standard
-            }
-
-            let reasoning = id.hasPrefix("o1") || id.hasPrefix("o3") || id.hasPrefix("gpt-5")
-            results.append(AIModelInfo(
-                id: id,
-                displayName: id,
-                provider: .codex,
-                speedTier: tier,
-                supportsReasoningEffort: reasoning
-            ))
-        }
-
-        return results.sorted { $0.id > $1.id }
     }
 
     private func loadCodexFromCache() -> [AIModelInfo]? {
         guard FileManager.default.fileExists(atPath: codexCacheURL.path),
-              let data = try? Data(contentsOf: codexCacheURL) else {
-            return nil
-        }
+              let data = try? Data(contentsOf: codexCacheURL) else { return nil }
         return Self.parseCodexCache(data: data)
     }
 
     nonisolated static func parseCodexCache(data: Data) -> [AIModelInfo]? {
         guard let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-              let modelsArray = json["models"] as? [[String: Any]] else {
-            return nil
-        }
+              let modelsArray = json["models"] as? [[String: Any]] else { return nil }
 
         var results: [AIModelInfo] = []
         for item in modelsArray {
@@ -414,17 +266,7 @@ final class ModelCatalogService {
             let displayName = item["display_name"] as? String ?? slug
             let supportedEfforts = item["supported_reasoning_efforts"] as? [String]
             let supportsReasoning = (supportedEfforts != nil && !supportedEfforts!.isEmpty) || slug.hasPrefix("o") || slug.hasPrefix("gpt-5")
-
-            let tier: ModelSpeedTier
-            if slug.contains("mini") {
-                tier = .fast
-            } else if supportsReasoning || slug.contains("sol") || slug.hasPrefix("o1") || slug.hasPrefix("o3") {
-                tier = .deep
-            } else {
-                tier = .standard
-            }
-
-            let description = item["description"] as? String
+            let tier: ModelSpeedTier = slug.contains("mini") ? .fast : ((supportsReasoning || slug.contains("sol") || slug.hasPrefix("o1") || slug.hasPrefix("o3")) ? .deep : .standard)
 
             results.append(AIModelInfo(
                 id: slug,
@@ -432,19 +274,15 @@ final class ModelCatalogService {
                 provider: .codex,
                 speedTier: tier,
                 supportsReasoningEffort: supportsReasoning,
-                descriptionText: description
+                descriptionText: item["description"] as? String
             ))
         }
-
         return results.isEmpty ? nil : results
     }
 
     private func configuredCodexModel() -> String? {
         guard FileManager.default.fileExists(atPath: codexConfigURL.path),
-              let content = try? String(contentsOf: codexConfigURL, encoding: .utf8) else {
-            return nil
-        }
-        // Match line `model = "..."`
+              let content = try? String(contentsOf: codexConfigURL, encoding: .utf8) else { return nil }
         for line in content.components(separatedBy: .newlines) {
             let trimmed = line.trimmingCharacters(in: .whitespaces)
             if trimmed.hasPrefix("model =") {
@@ -456,22 +294,6 @@ final class ModelCatalogService {
             }
         }
         return nil
-    }
-
-    private func saveGeminiToCache(_ models: [AIModelInfo]) {
-        guard let data = try? JSONEncoder().encode(models) else { return }
-        let dir = geminiCacheURL.deletingLastPathComponent()
-        try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
-        try? data.write(to: geminiCacheURL)
-    }
-
-    private func loadGeminiFromCache() -> [AIModelInfo]? {
-        guard FileManager.default.fileExists(atPath: geminiCacheURL.path),
-              let data = try? Data(contentsOf: geminiCacheURL),
-              let models = try? JSONDecoder().decode([AIModelInfo].self, from: data) else {
-            return nil
-        }
-        return models
     }
 
     nonisolated static func cleanGeminiDisplayName(from id: String) -> String {
