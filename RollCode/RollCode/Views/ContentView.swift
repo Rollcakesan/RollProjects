@@ -116,18 +116,8 @@ struct EmptyStateView<Actions: View>: View {
     var imageSize: CGFloat = 28
     @ViewBuilder var actions: Actions
 
-    init(
-        systemImage: String,
-        title: String,
-        message: String? = nil,
-        imageSize: CGFloat = 28,
-        @ViewBuilder actions: () -> Actions = { EmptyView() }
-    ) {
-        self.systemImage = systemImage
-        self.title = title
-        self.message = message
-        self.imageSize = imageSize
-        self.actions = actions()
+    init(systemImage: String, title: String, message: String? = nil, imageSize: CGFloat = 28, @ViewBuilder actions: () -> Actions = { EmptyView() }) {
+        self.systemImage = systemImage; self.title = title; self.message = message; self.imageSize = imageSize; self.actions = actions()
     }
 
     var body: some View {
@@ -158,14 +148,8 @@ struct PanelHeader<Leading: View, Trailing: View>: View {
     @ViewBuilder var leading: Leading
     @ViewBuilder var trailing: Trailing
 
-    init(
-        _ title: String,
-        @ViewBuilder leading: () -> Leading = { EmptyView() },
-        @ViewBuilder trailing: () -> Trailing = { EmptyView() }
-    ) {
-        self.title = title
-        self.leading = leading()
-        self.trailing = trailing()
+    init(_ title: String, @ViewBuilder leading: () -> Leading = { EmptyView() }, @ViewBuilder trailing: () -> Trailing = { EmptyView() }) {
+        self.title = title; self.leading = leading(); self.trailing = trailing()
     }
 
     var body: some View {
@@ -189,11 +173,7 @@ private struct TextDocumentFile: FileDocument {
     init(text: String) { self.text = text }
 
     init(configuration: ReadConfiguration) throws {
-        if let data = configuration.file.regularFileContents {
-            text = String(decoding: data, as: UTF8.self)
-        } else {
-            text = ""
-        }
+        text = configuration.file.regularFileContents.map { String(decoding: $0, as: UTF8.self) } ?? ""
     }
 
     func fileWrapper(configuration: WriteConfiguration) throws -> FileWrapper {

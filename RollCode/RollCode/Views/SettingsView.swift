@@ -202,10 +202,6 @@ struct SettingsView: View {
                         .foregroundStyle(isGeminiLoggedIn ? Color.green : RollCodeTheme.secondaryText)
                 }
 
-                Text("Direct Google login requires a Google Cloud Code Assist license (Enterprise/Workspace). For personal accounts, using Google AI Studio (Free) is recommended.")
-                    .font(.system(size: 10))
-                    .foregroundStyle(RollCodeTheme.secondaryText)
-
                 HStack(spacing: 10) {
                     if agent.geminiAuth.isLoggingIn {
                         ProgressView().controlSize(.small)
@@ -234,10 +230,6 @@ struct SettingsView: View {
             }
 
             Section("Google AI Studio (Recommended for Personal Accounts)") {
-                Text("Google provides free Gemini access for personal Google accounts via AI Studio:")
-                    .font(.system(size: 11))
-                    .foregroundStyle(RollCodeTheme.secondaryText)
-
                 Button {
                     if let url = URL(string: "https://aistudio.google.com/app/apikey") {
                         NSWorkspace.shared.open(url)

@@ -35,56 +35,38 @@ struct WorkspaceToolbarContent: ToolbarContent {
         }
 
         ToolbarItemGroup(placement: .primaryAction) {
-            Button {
-                workspace.saveActiveDocument()
-            } label: {
+            Button { workspace.saveActiveDocument() } label: {
                 Image(systemName: workspace.activeDocument?.isDirty == true ? "square.and.arrow.down.fill" : "square.and.arrow.down")
                     .foregroundStyle(workspace.activeDocument?.isDirty == true ? RollCodeTheme.accent : RollCodeTheme.primaryText)
             }
             .disabled(workspace.activeDocument == nil)
             .help("Save Active File (⌘S)")
 
-            Button {
-                workspace.formatAndCheckActiveDocument()
-            } label: {
-                Image(systemName: "paintbrush")
-            }
-            .disabled(workspace.activeDocument == nil || workspace.activeDocument?.isCheckingSyntax == true)
-            .help("Format & Check Active File (⇧⌥F)")
+            Button { workspace.formatAndCheckActiveDocument() } label: { Image(systemName: "paintbrush") }
+                .disabled(workspace.activeDocument == nil || workspace.activeDocument?.isCheckingSyntax == true)
+                .help("Format & Check Active File (⇧⌥F)")
 
-            Button { agent.isVisible.toggle() } label: {
-                Image(systemName: "sparkles")
-            }
-            .help("Toggle Agent (⇧⌘A)")
+            Button { agent.isVisible.toggle() } label: { Image(systemName: "sparkles") }
+                .help("Toggle Agent (⇧⌘A)")
 
-            Button { workspace.presentQuickOpen() } label: {
-                Image(systemName: "magnifyingglass")
-            }
-            .disabled(workspace.rootURL == nil)
-            .help("Quick Open (⌘P)")
+            Button { workspace.presentQuickOpen() } label: { Image(systemName: "magnifyingglass") }
+                .disabled(workspace.rootURL == nil)
+                .help("Quick Open (⌘P)")
 
-            Button { workspace.presentWorkspaceSearch() } label: {
-                Image(systemName: "text.magnifyingglass")
-            }
-            .disabled(workspace.rootURL == nil)
-            .help("Search in Project (⇧⌘F)")
+            Button { workspace.presentWorkspaceSearch() } label: { Image(systemName: "text.magnifyingglass") }
+                .disabled(workspace.rootURL == nil)
+                .help("Search in Project (⇧⌘F)")
 
-            Button { workspace.presentGitChanges() } label: {
-                Image(systemName: "arrow.triangle.branch")
-            }
-            .disabled(workspace.rootURL == nil)
-            .help("Git Changes (⇧⌘G)")
+            Button { workspace.presentGitChanges() } label: { Image(systemName: "arrow.triangle.branch") }
+                .disabled(workspace.rootURL == nil)
+                .help("Git Changes (⇧⌘G)")
 
-            Button { workspace.refreshTree() } label: {
-                Image(systemName: "arrow.clockwise")
-            }
-            .disabled(workspace.rootURL == nil)
-            .help("Refresh Files")
+            Button { workspace.refreshTree() } label: { Image(systemName: "arrow.clockwise") }
+                .disabled(workspace.rootURL == nil)
+                .help("Refresh Files")
 
-            Button { terminal.isVisible.toggle() } label: {
-                Image(systemName: terminal.isVisible ? "terminal.fill" : "terminal")
-            }
-            .help(terminal.isVisible ? "Hide Terminal" : "Show Terminal")
+            Button { terminal.isVisible.toggle() } label: { Image(systemName: terminal.isVisible ? "terminal.fill" : "terminal") }
+                .help(terminal.isVisible ? "Hide Terminal" : "Show Terminal")
         }
     }
 }

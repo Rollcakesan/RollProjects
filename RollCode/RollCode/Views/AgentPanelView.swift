@@ -87,13 +87,9 @@ struct AgentPanelView: View {
         return Menu {
             Section("Select Model") {
                 ForEach(availableModels) { model in
-                    Button {
-                        agent.setModel(model.id)
-                    } label: {
+                    Button { agent.setModel(model.id) } label: {
                         HStack {
-                            if model.id == currentID {
-                                Image(systemName: "checkmark")
-                            }
+                            if model.id == currentID { Image(systemName: "checkmark") }
                             Text("\(model.speedTier.badgeEmoji) \(model.displayName)")
                         }
                     }
@@ -104,13 +100,9 @@ struct AgentPanelView: View {
                 Divider()
                 Menu {
                     ForEach(ReasoningEffort.allCases) { effort in
-                        Button {
-                            agent.setReasoningEffort(effort)
-                        } label: {
+                        Button { agent.setReasoningEffort(effort) } label: {
                             HStack {
-                                if agent.currentReasoningEffort == effort {
-                                    Image(systemName: "checkmark")
-                                }
+                                if agent.currentReasoningEffort == effort { Image(systemName: "checkmark") }
                                 Text(effort.displayName)
                             }
                         }
@@ -200,10 +192,7 @@ struct AgentPanelView: View {
 
         return Menu {
             Button {
-                withAnimation {
-                    agent.newThread()
-                    prompt = ""
-                }
+                withAnimation { agent.newThread(); prompt = "" }
                 promptFocused = true
             } label: {
                 Label("New \(agent.selectedProvider.rawValue) Thread", systemImage: "plus")
@@ -213,16 +202,9 @@ struct AgentPanelView: View {
                 Divider()
                 Section("\(agent.selectedProvider.rawValue) Sessions") {
                     ForEach(currentProviderThreads) { thread in
-                        Button {
-                            withAnimation {
-                                agent.switchToThread(thread)
-                                prompt = ""
-                            }
-                        } label: {
+                        Button { withAnimation { agent.switchToThread(thread); prompt = "" } } label: {
                             HStack {
-                                if thread.id == agent.activeThread.id {
-                                    Image(systemName: "checkmark")
-                                }
+                                if thread.id == agent.activeThread.id { Image(systemName: "checkmark") }
                                 Text(thread.title)
                             }
                         }
@@ -234,12 +216,7 @@ struct AgentPanelView: View {
                 Divider()
                 Section("Past Codex Sessions") {
                     ForEach(agent.pastCodexSessions) { session in
-                        Button {
-                            withAnimation {
-                                agent.resumePastCodexSession(session)
-                                prompt = ""
-                            }
-                        } label: {
+                        Button { withAnimation { agent.resumePastCodexSession(session); prompt = "" } } label: {
                             Text(session.displayTitle)
                         }
                     }
@@ -307,19 +284,6 @@ struct AgentPanelView: View {
             ScrollViewReader { proxy in
                 ScrollView {
                     LazyVStack(alignment: .leading, spacing: 10) {
-                        if agent.entries.isEmpty {
-                            VStack(alignment: .leading, spacing: 7) {
-                                Text("What should I change?")
-                                    .font(.system(size: 15, weight: .medium))
-                                    .foregroundStyle(RollCodeTheme.primaryText)
-                                Text("\(agent.selectedProvider.rawValue) can inspect the workspace, edit files, and run tests. Changes are applied automatically.")
-                                    .font(.system(size: 11))
-                                    .foregroundStyle(RollCodeTheme.secondaryText)
-                                    .fixedSize(horizontal: false, vertical: true)
-                            }
-                            .padding(.top, 8)
-                        }
-
                         ForEach(agent.entries) { entry in
                             entryView(entry)
                                 .id(entry.id)
