@@ -400,22 +400,8 @@ struct CodeEditorView: NSViewRepresentable {
         }
 
         func applyHighlighting(language: CodeLanguage) {
-            guard let textStorage = textView?.textStorage, let textView else { return }
-            let fullLength = textStorage.length
-            guard fullLength > 0 else { return }
-
-            let activeRange: NSRange
-            if fullLength > 40_000, let layoutManager = textView.layoutManager, let textContainer = textView.textContainer {
-                let visibleRect = textView.enclosingScrollView?.contentView.bounds ?? textView.visibleRect
-                let glyphRange = layoutManager.glyphRange(forBoundingRect: visibleRect, in: textContainer)
-                let charRange = layoutManager.characterRange(forGlyphRange: glyphRange, actualGlyphRange: nil)
-                let padding = 15_000
-                let start = max(0, charRange.location - padding)
-                let end = min(fullLength, NSMaxRange(charRange) + padding)
-                activeRange = NSRange(location: start, length: end - start)
-            } else {
-                activeRange = NSRange(location: 0, length: fullLength)
-            }
+            guard let textStorage = textView?.textStorage, textStorage.length > 0 else { return }
+            let fullRange = NSRange(location: 0, length: textStorage.length)
 
             isApplyingAttributes = true
             textStorage.beginEditing()
@@ -424,17 +410,16 @@ struct CodeEditorView: NSViewRepresentable {
                 .foregroundColor: EditorPalette.foreground,
                 .backgroundColor: EditorPalette.background,
                 .paragraphStyle: EditorPalette.paragraphStyle(tabWidth: parent.tabWidth, fontSize: parent.fontSize)
-            ], range: activeRange)
+            ], range: fullRange)
 
             for rule in SyntaxRules.rules(for: language) {
-                for match in rule.regex.matches(in: textStorage.string, range: activeRange) {
+                for match in rule.regex.matches(in: textStorage.string, range: fullRange) {
                     textStorage.addAttribute(.foregroundColor, value: rule.color, range: match.range)
                 }
             }
 
             for errorLine in parent.errorLines {
-                if let range = characterRange(forLine: errorLine, in: textStorage.string),
-                   NSIntersectionRange(range, activeRange).length > 0 {
+                if let range = characterRange(forLine: errorLine, in: textStorage.string) {
                     textStorage.addAttribute(.backgroundColor, value: NSColor.systemRed.withAlphaComponent(0.18), range: range)
                     textStorage.addAttribute(.underlineColor, value: NSColor.systemRed, range: range)
                     textStorage.addAttribute(.underlineStyle, value: NSUnderlineStyle.patternDot.rawValue | NSUnderlineStyle.single.rawValue, range: range)
