@@ -43,12 +43,6 @@ final class WorkspaceModel {
     var creatingItemParentURL: URL?
     var creatingItemIsDirectory = false
     var creatingItemName = ""
-    var deletingURL: URL?
-    private(set) var unconfirmedClosingDocuments: [EditorDocument] = []
-    var unconfirmedClosingDocument: EditorDocument? {
-        unconfirmedClosingDocuments.first
-    }
-    var externalConflict: ExternalConflict?
     private var savingDocumentID: UUID?
     var isSavingActiveDocumentAs: Bool {
         get { savingDocumentID != nil }
@@ -364,15 +358,8 @@ final class WorkspaceModel {
     }
 
     func closeMultipleDocuments(_ docs: [EditorDocument]) {
-        let dirty = docs.filter(\.isDirty)
-        let clean = docs.filter { !$0.isDirty }
-        for doc in clean {
+        for doc in docs {
             forceCloseDocument(doc)
-        }
-        for doc in dirty {
-            if !unconfirmedClosingDocuments.contains(where: { $0.id == doc.id }) {
-                unconfirmedClosingDocuments.append(doc)
-            }
         }
     }
 
@@ -502,29 +489,7 @@ final class WorkspaceModel {
     }
 
     func closeDocument(_ document: EditorDocument) {
-        if document.isDirty {
-            if !unconfirmedClosingDocuments.contains(where: { $0.id == document.id }) {
-                unconfirmedClosingDocuments.append(document)
-            }
-            return
-        }
         forceCloseDocument(document)
-    }
-
-    func confirmCloseDocument(save: Bool) {
-        guard !unconfirmedClosingDocuments.isEmpty else { return }
-        let document = unconfirmedClosingDocuments.removeFirst()
-        if save {
-            guard self.save(document) else {
-                unconfirmedClosingDocuments.insert(document, at: 0)
-                return
-            }
-        }
-        forceCloseDocument(document)
-    }
-
-    func cancelCloseDocument() {
-        unconfirmedClosingDocuments.removeAll()
     }
 
     func forceCloseDocument(_ document: EditorDocument) {
@@ -542,50 +507,16 @@ final class WorkspaceModel {
         defer { isCheckingExternalChanges = false }
 
         for document in documents {
-            guard FileManager.default.fileExists(atPath: document.url.path) else {
-                if document.diskModificationDate != nil {
-                    document.recordDiskModificationDate(nil)
-                    alertMessage = "\(document.name) was removed outside RollCode. Your open editor content is still available."
-                }
-                continue
-            }
-
+            guard FileManager.default.fileExists(atPath: document.url.path) else { continue }
             let currentDate = document.url.modificationDate
             guard currentDate != document.diskModificationDate,
                   let data = try? Data(contentsOf: document.url),
                   let diskText = String(data: data, encoding: .utf8) else { continue }
 
-            if diskText == document.text {
-                document.markSaved(modificationDate: currentDate)
-                continue
-            }
-
             if !document.isDirty {
                 document.replaceFromDisk(text: diskText, modificationDate: currentDate)
-                continue
             }
-
-            externalConflict = ExternalConflict(
-                documentID: document.id,
-                documentName: document.name,
-                diskText: diskText,
-                modificationDate: currentDate
-            )
         }
-    }
-
-    func resolveExternalConflict(reload: Bool) {
-        guard let conflict = externalConflict,
-              let document = documents.first(where: { $0.id == conflict.documentID }) else {
-            externalConflict = nil
-            return
-        }
-        if reload {
-            document.replaceFromDisk(text: conflict.diskText, modificationDate: conflict.modificationDate)
-        } else {
-            document.recordDiskModificationDate(conflict.modificationDate)
-        }
-        externalConflict = nil
     }
 
     func revealInFinder(_ url: URL) {
@@ -663,25 +594,10 @@ final class WorkspaceModel {
         creatingItemName = ""
     }
 
-    func requestDeleteItem(at url: URL) {
-        deletingURL = url
-    }
-
-    func cancelDeleteItem() {
-        deletingURL = nil
-    }
-
-    func confirmDeleteItem() {
-        guard let url = deletingURL else { return }
-        deletingURL = nil
+    func deleteItem(at url: URL) {
         let affectedDocuments = documents.filter { document in
             document.url == url || document.url.path.hasPrefix(url.path + "/")
         }
-        guard !affectedDocuments.contains(where: \.isDirty) else {
-            alertMessage = "Save or close edited files inside \(url.lastPathComponent) before moving it to Trash."
-            return
-        }
-
         do {
             try FileManager.default.trashItem(at: url, resultingItemURL: nil)
             for document in affectedDocuments {
@@ -729,13 +645,6 @@ final class WorkspaceModel {
         }
         refreshTree()
     }
-}
-
-struct ExternalConflict: Equatable, Sendable {
-    let documentID: UUID
-    let documentName: String
-    let diskText: String
-    let modificationDate: Date?
 }
 
 enum WorkspaceError: LocalizedError, Sendable {

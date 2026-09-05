@@ -253,45 +253,5 @@ private struct WorkspaceModalsModifier: ViewModifier {
                     ShortcutCheatSheetView()
                 }
             }
-            .confirmationDialog(
-                "Save changes to \(workspace.unconfirmedClosingDocument?.name ?? "file")?",
-                isPresented: Binding(
-                    get: { workspace.unconfirmedClosingDocument != nil },
-                    set: { if !$0 { workspace.cancelCloseDocument() } }
-                ),
-                titleVisibility: .visible
-            ) {
-                Button("Save") { workspace.confirmCloseDocument(save: true) }
-                Button("Don't Save", role: .destructive) { workspace.confirmCloseDocument(save: false) }
-                Button("Cancel", role: .cancel) { workspace.cancelCloseDocument() }
-            } message: {
-                Text("Your changes will be lost if you close this tab without saving.")
-            }
-            .confirmationDialog(
-                "Move \(workspace.deletingURL?.lastPathComponent ?? "item") to Trash?",
-                isPresented: Binding(
-                    get: { workspace.deletingURL != nil },
-                    set: { if !$0 { workspace.cancelDeleteItem() } }
-                ),
-                titleVisibility: .visible
-            ) {
-                Button("Move to Trash", role: .destructive) { workspace.confirmDeleteItem() }
-                Button("Cancel", role: .cancel) { workspace.cancelDeleteItem() }
-            } message: {
-                Text("The item can be recovered from Trash.")
-            }
-            .confirmationDialog(
-                "\(workspace.externalConflict?.documentName ?? "File") changed on disk.",
-                isPresented: Binding(
-                    get: { workspace.externalConflict != nil },
-                    set: { if !$0 { workspace.resolveExternalConflict(reload: false) } }
-                ),
-                titleVisibility: .visible
-            ) {
-                Button("Reload from Disk") { workspace.resolveExternalConflict(reload: true) }
-                Button("Keep Editor Version", role: .cancel) { workspace.resolveExternalConflict(reload: false) }
-            } message: {
-                Text("Reload the file or keep the changes currently open in RollCode?")
-            }
     }
 }

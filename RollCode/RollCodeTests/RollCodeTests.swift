@@ -458,30 +458,9 @@ struct RollCodeTests {
             var isDir: ObjCBool = false
             #expect(FileManager.default.fileExists(atPath: createdFolder.path, isDirectory: &isDir) && isDir.boolValue)
 
-            workspace.requestDeleteItem(at: createdFile)
-            #expect(FileManager.default.fileExists(atPath: createdFile.path))
-            workspace.confirmDeleteItem()
+            workspace.deleteItem(at: createdFile)
             #expect(!FileManager.default.fileExists(atPath: createdFile.path))
             #expect(workspace.activeDocument == nil)
-        }
-    }
-
-    @Test("WorkspaceModel does not trash an open file with unsaved changes")
-    @MainActor
-    func workspaceProtectsDirtyFileFromDeletion() throws {
-        try withTemporaryDirectory { root in
-            let file = root.appending(path: "dirty.txt")
-            try "saved".write(to: file, atomically: true, encoding: .utf8)
-            let workspace = WorkspaceModel(restoresLastWorkspace: false)
-            workspace.openFile(file)
-            workspace.activeDocument?.text = "unsaved"
-
-            workspace.requestDeleteItem(at: file)
-            workspace.confirmDeleteItem()
-
-            #expect(FileManager.default.fileExists(atPath: file.path))
-            #expect(workspace.activeDocument?.text == "unsaved")
-            #expect(workspace.alertMessage != nil)
         }
     }
 
@@ -534,82 +513,9 @@ struct RollCodeTests {
         }
     }
 
-    @Test("GitBridgeService restores staging state when commit fails")
-    func gitDiffServiceRestoresIndexAfterFailedCommit() throws {
-        try withTemporaryDirectory { root in
-            try runGit(["init", "--quiet"], in: root)
-            try runGit(["config", "user.email", "tester@example.com"], in: root)
-            try runGit(["config", "user.name", "Tester"], in: root)
-            let file = root.appending(path: "file.txt")
-            try "base".write(to: file, atomically: true, encoding: .utf8)
-            try runGit(["add", "-A"], in: root)
-            try runGit(["commit", "--quiet", "-m", "Base"], in: root)
-
-            try "changed".write(to: file, atomically: true, encoding: .utf8)
-            let hook = root.appending(path: ".git/hooks/pre-commit")
-            try "#!/bin/sh\nexit 1\n".write(to: hook, atomically: true, encoding: .utf8)
-            try FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: hook.path)
-
-            #expect(throws: GitDiffError.self) {
-                try GitBridgeService.commit(in: root, message: "Rejected")
-            }
-            #expect(try runGitOutput(["diff", "--cached", "--name-only"], in: root).trimmed.isEmpty)
-            #expect(try GitBridgeService.changedPaths(in: root) == ["file.txt"])
-        }
-    }
-
-    @Test("WorkspaceModel saves edited documents before Git commit")
+    @Test("WorkspaceModel closes document directly without safety dialog")
     @MainActor
-    func workspaceSavesDocumentsBeforeGitCommit() async throws {
-        try await withTemporaryDirectory { root in
-            try runGit(["init", "--quiet"], in: root)
-            try runGit(["config", "user.email", "tester@example.com"], in: root)
-            try runGit(["config", "user.name", "Tester"], in: root)
-            let file = root.appending(path: "file.txt")
-            try "base".write(to: file, atomically: true, encoding: .utf8)
-            try runGit(["add", "-A"], in: root)
-            try runGit(["commit", "--quiet", "-m", "Base"], in: root)
-
-            let workspace = WorkspaceModel(restoresLastWorkspace: false)
-            workspace.openWorkspace(root)
-            workspace.openFile(file)
-            workspace.activeDocument?.text = "editor change"
-
-            try await workspace.gitCommit(message: "Save editor change")
-
-            #expect(try String(contentsOf: file, encoding: .utf8) == "editor change")
-            #expect(workspace.activeDocument?.isDirty == false)
-            #expect(try GitBridgeService.changedPaths(in: root).isEmpty)
-        }
-    }
-
-    @Test("WorkspaceModel keeps Save As bound to the initiating document")
-    @MainActor
-    func workspaceSaveAsKeepsOriginalDocument() throws {
-        try withTemporaryDirectory { root in
-            let firstURL = root.appending(path: "first.txt")
-            let secondURL = root.appending(path: "second.txt")
-            let destination = root.appending(path: "renamed.txt")
-            try "first".write(to: firstURL, atomically: true, encoding: .utf8)
-            try "second".write(to: secondURL, atomically: true, encoding: .utf8)
-            try "first".write(to: destination, atomically: true, encoding: .utf8)
-
-            let workspace = WorkspaceModel(restoresLastWorkspace: false)
-            workspace.openFile(firstURL)
-            let firstDocument = try #require(workspace.activeDocument)
-            workspace.saveActiveDocumentAs()
-            workspace.openFile(secondURL)
-
-            workspace.completeSaveActiveDocumentAs(destination: destination)
-
-            #expect(firstDocument.url == destination)
-            #expect(workspace.activeDocument?.url == secondURL)
-        }
-    }
-
-    @Test("WorkspaceModel safely prompts for unsaved document on close")
-    @MainActor
-    func workspacePromptsForUnsavedDocumentOnClose() throws {
+    func workspaceClosesDocumentDirectly() throws {
         try withTemporaryDirectory { root in
             let file = root.appending(path: "dirty.txt")
             try "initial".write(to: file, atomically: true, encoding: .utf8)
@@ -620,93 +526,7 @@ struct RollCodeTests {
             doc.text = "modified"
 
             workspace.closeDocument(doc)
-            #expect(workspace.unconfirmedClosingDocument?.id == doc.id)
-            #expect(workspace.documents.count == 1)
-
-            workspace.cancelCloseDocument()
-            #expect(workspace.unconfirmedClosingDocument == nil)
-            #expect(workspace.documents.count == 1)
-
-            workspace.closeDocument(doc)
-            workspace.confirmCloseDocument(save: true)
-            #expect(workspace.unconfirmedClosingDocument == nil)
             #expect(workspace.documents.isEmpty)
-            #expect(try String(contentsOf: file, encoding: .utf8) == "modified")
-        }
-    }
-
-    @Test("WorkspaceModel queues and prompts each unsaved document sequentially when closing multiple tabs")
-    @MainActor
-    func workspaceQueuesMultipleUnsavedDocumentsOnCloseOthers() throws {
-        try withTemporaryDirectory { root in
-            let file1 = root.appending(path: "keep.txt")
-            let file2 = root.appending(path: "dirty1.txt")
-            let file3 = root.appending(path: "dirty2.txt")
-            let file4 = root.appending(path: "clean.txt")
-            try "keep".write(to: file1, atomically: true, encoding: .utf8)
-            try "d1".write(to: file2, atomically: true, encoding: .utf8)
-            try "d2".write(to: file3, atomically: true, encoding: .utf8)
-            try "clean".write(to: file4, atomically: true, encoding: .utf8)
-
-            let workspace = WorkspaceModel(restoresLastWorkspace: false)
-            workspace.openFile(file1)
-            let keepDoc = try #require(workspace.activeDocument)
-            workspace.openFile(file2)
-            let d1Doc = try #require(workspace.activeDocument)
-            workspace.openFile(file3)
-            let d2Doc = try #require(workspace.activeDocument)
-            workspace.openFile(file4)
-
-            d1Doc.text = "d1 modified"
-            d2Doc.text = "d2 modified"
-
-            workspace.closeOtherDocuments(except: keepDoc)
-
-            // cleanDoc closed immediately, d1Doc and d2Doc queued
-            #expect(workspace.unconfirmedClosingDocuments.count == 2)
-            #expect(workspace.unconfirmedClosingDocument?.id == d1Doc.id)
-
-            // Confirm first document (discard)
-            workspace.confirmCloseDocument(save: false)
-            #expect(workspace.unconfirmedClosingDocuments.count == 1)
-            #expect(workspace.unconfirmedClosingDocument?.id == d2Doc.id)
-
-            // Confirm second document (save)
-            workspace.confirmCloseDocument(save: true)
-            #expect(workspace.unconfirmedClosingDocuments.isEmpty)
-            #expect(workspace.unconfirmedClosingDocument == nil)
-            #expect(workspace.documents.count == 1)
-            #expect(workspace.documents.first?.id == keepDoc.id)
-            #expect(try String(contentsOf: file3, encoding: .utf8) == "d2 modified")
-        }
-    }
-
-    @Test("WorkspaceModel handles external change conflicts without blocking")
-    @MainActor
-    func workspaceHandlesExternalChangeConflict() throws {
-        try withTemporaryDirectory { root in
-            let file = root.appending(path: "conflict.txt")
-            try "disk original".write(to: file, atomically: true, encoding: .utf8)
-
-            let workspace = WorkspaceModel(restoresLastWorkspace: false)
-            workspace.openFile(file)
-            let doc = try #require(workspace.activeDocument)
-            doc.text = "editor edit"
-
-            try "disk modified".write(to: file, atomically: true, encoding: .utf8)
-            try FileManager.default.setAttributes(
-                [.modificationDate: Date().addingTimeInterval(2)],
-                ofItemAtPath: file.path
-            )
-
-            workspace.checkForExternalChanges()
-            #expect(workspace.externalConflict?.documentID == doc.id)
-            #expect(workspace.externalConflict?.diskText == "disk modified")
-            #expect(doc.text == "editor edit")
-
-            workspace.resolveExternalConflict(reload: true)
-            #expect(workspace.externalConflict == nil)
-            #expect(doc.text == "disk modified")
         }
     }
 

@@ -83,17 +83,11 @@ public enum GitBridgeService {
             throw GitDiffError.commandFailed("Commit message cannot be empty.")
         }
         let repository = try repositoryContext(for: rootURL)
-        let indexSnapshot = try GitIndexSnapshot.capture(in: repository.rootURL)
-        do {
-            _ = try runGit(["add", "-A", "--", repository.pathspec], in: repository.rootURL)
-            _ = try runGit(
-                ["commit", "-m", trimmed, "--", repository.pathspec],
-                in: repository.rootURL
-            )
-        } catch {
-            try indexSnapshot.restore()
-            throw error
-        }
+        _ = try runGit(["add", "-A", "--", repository.pathspec], in: repository.rootURL)
+        _ = try runGit(
+            ["commit", "-m", trimmed, "--", repository.pathspec],
+            in: repository.rootURL
+        )
     }
 
     // MARK: - Internal Helpers
@@ -109,28 +103,6 @@ public enum GitBridgeService {
             let prefix = workspacePrefix + "/"
             guard repositoryPath.hasPrefix(prefix) else { return repositoryPath }
             return String(repositoryPath.dropFirst(prefix.count))
-        }
-    }
-
-    public struct GitIndexSnapshot: Sendable {
-        public let url: URL
-        public let data: Data?
-
-        public static func capture(in repositoryURL: URL) throws -> GitIndexSnapshot {
-            let path = try runGit(["rev-parse", "--git-path", "index"], in: repositoryURL).trimmingCharacters(in: .whitespacesAndNewlines)
-            let url = path.hasPrefix("/")
-                ? URL(fileURLWithPath: path)
-                : repositoryURL.appending(path: path)
-            let exists = FileManager.default.fileExists(atPath: url.path)
-            return GitIndexSnapshot(url: url, data: exists ? try Data(contentsOf: url) : nil)
-        }
-
-        public func restore() throws {
-            if let data {
-                try data.write(to: url, options: .atomic)
-            } else if FileManager.default.fileExists(atPath: url.path) {
-                try FileManager.default.removeItem(at: url)
-            }
         }
     }
 
