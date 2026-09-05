@@ -285,16 +285,10 @@ struct SettingsView: View {
     }
 
     private var isCodexLoggedIn: Bool {
-        switch agent.auth.status {
-        case .loggedIn, .apiKey: return true
-        default: return false
-        }
+        agent.auth.status != .unauthenticated && agent.auth.status != .cliNotInstalled
     }
 
     private var isGeminiLoggedIn: Bool {
-        switch agent.geminiAuth.status {
-        case .loggedIn, .apiKey: return true
-        default: return false
-        }
+        agent.geminiAuth.status != .unauthenticated && agent.geminiAuth.status != .cliNotInstalled
     }
 }

@@ -232,18 +232,10 @@ private struct MarkdownPreviewView: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 12) {
-                if let attributed = try? AttributedString(
-                    markdown: text,
-                    options: .init(interpretedSyntax: .full)
-                ) {
-                    Text(attributed)
-                        .textSelection(.enabled)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                } else {
-                    Text(text)
-                        .textSelection(.enabled)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                }
+                let content = (try? AttributedString(markdown: text, options: .init(interpretedSyntax: .full))) ?? AttributedString(text)
+                Text(content)
+                    .textSelection(.enabled)
+                    .frame(maxWidth: .infinity, alignment: .leading)
             }
             .padding(20)
         }

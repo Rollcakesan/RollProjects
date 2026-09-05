@@ -213,34 +213,19 @@ private struct WorkspaceModalsModifier: ViewModifier {
     func body(content: Content) -> some View {
         @Bindable var workspace = workspace
         content
-            .alert("RollCode", isPresented: Binding(
-                get: { workspace.alertMessage != nil },
-                set: { if !$0 { workspace.alertMessage = nil } }
-            )) {
+            .alert("RollCode", isPresented: Binding(get: { workspace.alertMessage != nil }, set: { if !$0 { workspace.alertMessage = nil } })) {
                 Button("OK", role: .cancel) { workspace.alertMessage = nil }
-            } message: {
-                Text(workspace.alertMessage ?? "")
-            }
-            .alert("Rename", isPresented: Binding(
-                get: { workspace.renamingURL != nil },
-                set: { if !$0 { workspace.cancelRename() } }
-            )) {
+            } message: { Text(workspace.alertMessage ?? "") }
+            .alert("Rename", isPresented: Binding(get: { workspace.renamingURL != nil }, set: { if !$0 { workspace.cancelRename() } })) {
                 TextField("New name", text: $workspace.renamingName)
                 Button("Rename") { workspace.confirmRename() }
                 Button("Cancel", role: .cancel) { workspace.cancelRename() }
-            } message: {
-                Text("Enter a new name for \(workspace.renamingURL?.lastPathComponent ?? "this item").")
-            }
-            .alert(workspace.creatingItemIsDirectory ? "New Folder" : "New File", isPresented: Binding(
-                get: { workspace.creatingItemParentURL != nil },
-                set: { if !$0 { workspace.cancelCreateItem() } }
-            )) {
+            } message: { Text("Enter a new name for \(workspace.renamingURL?.lastPathComponent ?? "this item").") }
+            .alert(workspace.creatingItemIsDirectory ? "New Folder" : "New File", isPresented: Binding(get: { workspace.creatingItemParentURL != nil }, set: { if !$0 { workspace.cancelCreateItem() } })) {
                 TextField("Name", text: $workspace.creatingItemName)
                 Button("Create") { workspace.confirmCreateItem() }
                 Button("Cancel", role: .cancel) { workspace.cancelCreateItem() }
-            } message: {
-                Text("Enter a name for the new \(workspace.creatingItemIsDirectory ? "folder" : "file").")
-            }
+            } message: { Text("Enter a name for the new \(workspace.creatingItemIsDirectory ? "folder" : "file").") }
             .sheet(item: $workspace.activeSheet) { sheet in
                 switch sheet {
                 case .quickOpen: QuickOpenView()

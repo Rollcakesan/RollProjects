@@ -442,8 +442,7 @@ final class LineNumberRulerView: NSRulerView {
                 NSBezierPath(ovalIn: NSRect(x: 6, y: y + 4, width: 5, height: 5)).fill()
             }
             let attrs = isErr ? errAttrs : normalAttrs
-            let label = "\(line)" as NSString
-            label.draw(at: NSPoint(x: ruleThickness - label.size(withAttributes: attrs).width - 8, y: y + 1), withAttributes: attrs)
+            ("\(line)" as NSString).draw(at: NSPoint(x: ruleThickness - ("\(line)" as NSString).size(withAttributes: attrs).width - 8, y: y + 1), withAttributes: attrs)
         }
 
         var charIdx = 0, line = 1

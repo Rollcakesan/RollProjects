@@ -403,18 +403,14 @@ struct AgentPanelView: View {
     private func changedFilesView(_ paths: [String]) -> some View {
         VStack(alignment: .leading, spacing: 4) {
             HStack {
-                Text("CHANGES")
-                    .font(.system(size: 9, weight: .bold))
+                Text("CHANGES").font(.system(size: 9, weight: .bold))
                 Spacer()
-                Button {
-                    workspace.presentGitChanges()
-                } label: {
+                Button { workspace.presentGitChanges() } label: {
                     Label("Review Diffs", systemImage: "arrow.triangle.merge")
                         .font(.system(size: 9, weight: .medium))
                         .foregroundStyle(RollCodeTheme.accent)
                 }
                 .buttonStyle(.plain)
-                .help("Open Git diff preview (⇧⌘G)")
             }
             .foregroundStyle(RollCodeTheme.secondaryText)
 
@@ -422,11 +418,8 @@ struct AgentPanelView: View {
                 HStack(spacing: 4) {
                     Button { openChangedFile(path) } label: {
                         HStack(spacing: 6) {
-                            Image(systemName: "doc.text")
-                                .font(.system(size: 10))
-                            Text(path)
-                                .font(.system(size: 10, design: .monospaced))
-                                .lineLimit(1)
+                            Image(systemName: "doc.text").font(.system(size: 10))
+                            Text(path).font(.system(size: 10, design: .monospaced)).lineLimit(1)
                             Spacer(minLength: 0)
                         }
                         .padding(.horizontal, 7)
@@ -436,9 +429,7 @@ struct AgentPanelView: View {
                     }
                     .buttonStyle(.plain)
 
-                    Button {
-                        workspace.presentGitChanges()
-                    } label: {
+                    Button { workspace.presentGitChanges() } label: {
                         Image(systemName: "plus.forwardslash.minus")
                             .font(.system(size: 10))
                             .foregroundStyle(RollCodeTheme.secondaryText)
@@ -555,13 +546,7 @@ struct AgentPanelView: View {
     }
 
     private func formattedTokenCount(_ count: Int) -> String {
-        if count >= 1_000_000 {
-            return String(format: "%.1fM tok", Double(count) / 1_000_000.0)
-        } else if count >= 1_000 {
-            return String(format: "%.1fk tok", Double(count) / 1_000.0)
-        } else {
-            return "\(count) tok"
-        }
+        count >= 1_000_000 ? String(format: "%.1fM tok", Double(count) / 1_000_000.0) : (count >= 1_000 ? String(format: "%.1fk tok", Double(count) / 1_000.0) : "\(count) tok")
     }
 
     private func checkFileMention(in text: String) {
@@ -622,23 +607,15 @@ struct AgentPanelView: View {
         fileMentionQuery = nil
 
         // Resolve @file mentions and attach contents into prompt
-        let pattern = #"(?:^|\s)@([A-Za-z0-9_./\-]+)"#
-        if let regex = try? NSRegularExpression(pattern: pattern) {
+        if let regex = try? NSRegularExpression(pattern: #"(?:^|\s)@([A-Za-z0-9_./\-]+)"#) {
             let nsReq = request as NSString
-            let matches = regex.matches(in: request, range: NSRange(location: 0, length: nsReq.length))
-            var referencedFiles: [String] = []
-            for match in matches {
-                guard match.numberOfRanges >= 2 else { continue }
-                let pathRange = match.range(at: 1)
-                let relPath = nsReq.substring(with: pathRange)
-                let targetURL = rootURL.appending(path: relPath)
-                if let content = try? String(contentsOf: targetURL, encoding: .utf8), content.count <= 100_000 {
-                    referencedFiles.append("[Context File: \(relPath)]\n```\n\(content)\n```")
-                }
+            let context = regex.matches(in: request, range: NSRange(location: 0, length: nsReq.length)).compactMap { match -> String? in
+                guard match.numberOfRanges >= 2 else { return nil }
+                let relPath = nsReq.substring(with: match.range(at: 1))
+                guard let content = try? String(contentsOf: rootURL.appending(path: relPath), encoding: .utf8), content.count <= 100_000 else { return nil }
+                return "[Context File: \(relPath)]\n```\n\(content)\n```"
             }
-            if !referencedFiles.isEmpty {
-                request += "\n\n" + referencedFiles.joined(separator: "\n\n")
-            }
+            if !context.isEmpty { request += "\n\n" + context.joined(separator: "\n\n") }
         }
 
         agent.send(request, in: rootURL, activeFileURL: workspace.activeDocument?.url)

@@ -188,12 +188,14 @@ private struct GitDiffPreview: View {
                 ScrollView([.horizontal, .vertical]) {
                     LazyVStack(alignment: .leading, spacing: 0) {
                         ForEach(Array(change.diff.split(separator: "\n", omittingEmptySubsequences: false).enumerated()), id: \.offset) { _, line in
+                            let isAdd = line.hasPrefix("+") && !line.hasPrefix("+++")
+                            let isDel = line.hasPrefix("-") && !line.hasPrefix("---")
                             Text(String(line).isEmpty ? " " : String(line))
                                 .font(.system(size: 11, design: .monospaced))
-                                .foregroundStyle(color(for: line))
+                                .foregroundStyle(line.hasPrefix("@@") ? RollCodeTheme.accent : (isAdd ? Color(red: 0.52, green: 0.82, blue: 0.57) : (isDel ? Color(red: 0.92, green: 0.50, blue: 0.50) : RollCodeTheme.secondaryText)))
                                 .frame(maxWidth: .infinity, alignment: .leading)
                                 .padding(.horizontal, 8)
-                                .background(background(for: line))
+                                .background(isAdd ? Color.green.opacity(0.08) : (isDel ? Color.red.opacity(0.08) : .clear))
                         }
                     }
                     .textSelection(.enabled)
@@ -203,13 +205,5 @@ private struct GitDiffPreview: View {
         } else {
             EmptyStateView(systemImage: "doc.text", title: "Select a changed file")
         }
-    }
-
-    private func color(for line: Substring) -> Color {
-        line.hasPrefix("@@") ? RollCodeTheme.accent : (line.hasPrefix("+") && !line.hasPrefix("+++") ? Color(red: 0.52, green: 0.82, blue: 0.57) : (line.hasPrefix("-") && !line.hasPrefix("---") ? Color(red: 0.92, green: 0.50, blue: 0.50) : RollCodeTheme.secondaryText))
-    }
-
-    private func background(for line: Substring) -> Color {
-        line.hasPrefix("+") && !line.hasPrefix("+++") ? Color.green.opacity(0.08) : (line.hasPrefix("-") && !line.hasPrefix("---") ? Color.red.opacity(0.08) : .clear)
     }
 }

@@ -49,14 +49,13 @@ struct ShortcutCheatSheetView: View {
 
     private var filteredShortcuts: [ShortcutItem] {
         searchText.isEmpty ? shortcuts : shortcuts.filter {
-            $0.title.localizedCaseInsensitiveContains(searchText) ||
-            $0.category.localizedCaseInsensitiveContains(searchText) ||
-            $0.keys.joined().localizedCaseInsensitiveContains(searchText)
+            $0.title.localizedCaseInsensitiveContains(searchText) || $0.category.localizedCaseInsensitiveContains(searchText) || $0.keys.joined().localizedCaseInsensitiveContains(searchText)
         }
     }
 
     private var categories: [String] {
-        filteredShortcuts.map(\.category).reduce(into: [String]()) { if !$0.contains($1) { $0.append($1) } }
+        var seen = Set<String>()
+        return filteredShortcuts.map(\.category).filter { seen.insert($0).inserted }
     }
 
     var body: some View {
