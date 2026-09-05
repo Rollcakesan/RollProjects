@@ -7,7 +7,7 @@ import SwiftUI
 @MainActor
 final class WorkspaceModel {
     private(set) var rootURL: URL?
-    private(set) var rootNode: FileNode?
+    var rootNode: FileNode?
     var documents: [EditorDocument] = []
     var activeDocumentID: UUID?
     var fileFilter = ""
@@ -263,32 +263,22 @@ final class WorkspaceModel {
         let normalized = query.trimmed
         let files = workspaceFiles
         guard !normalized.isEmpty else {
-            // Sort by recently opened files first
-            if !recentFileURLs.isEmpty {
-                var fileMap = Dictionary(files.map { ($0.url.standardizedFileURL, $0) }, uniquingKeysWith: { first, _ in first })
-                // Fallback: If rootNode is still loading or empty, include open documents in fileMap
-                for doc in documents {
-                    if fileMap[doc.url.standardizedFileURL] == nil {
-                        fileMap[doc.url.standardizedFileURL] = FileNode(url: doc.url, isDirectory: false)
-                    }
-                }
-                var result: [FileNode] = []
-                var seen = Set<URL>()
-                for recent in recentFileURLs {
-                    if let node = fileMap[recent.standardizedFileURL] {
-                        result.append(node)
-                        seen.insert(recent.standardizedFileURL)
-                    }
-                }
-                for file in files where !seen.contains(file.url.standardizedFileURL) {
-                    result.append(file)
-                }
-                return Array(result.prefix(100))
+            if recentFileURLs.isEmpty {
+                return Array(files.prefix(100))
             }
-            if files.isEmpty {
-                return documents.map { FileNode(url: $0.url, isDirectory: false) }
+            let fileMap = Dictionary(files.map { ($0.url.standardizedFileURL, $0) }, uniquingKeysWith: { first, _ in first })
+            var result: [FileNode] = []
+            var seen = Set<URL>()
+            for recent in recentFileURLs {
+                if let node = fileMap[recent.standardizedFileURL] {
+                    result.append(node)
+                    seen.insert(recent.standardizedFileURL)
+                }
             }
-            return Array(files.prefix(100))
+            for file in files where !seen.contains(file.url.standardizedFileURL) {
+                result.append(file)
+            }
+            return Array(result.prefix(100))
         }
 
         return files
@@ -377,7 +367,7 @@ final class WorkspaceModel {
                 throw WorkspaceError.notUTF8Text
             }
 
-            // Detect encoding: UTF-8 -> Shift-JIS (Windows-31J) -> ISO Latin 1
+            // Detect encoding: UTF-8 -> Shift-JIS
             let (text, encoding): (String, String.Encoding)
             if let utf8Text = String(data: data, encoding: .utf8) {
                 text = utf8Text
@@ -385,9 +375,6 @@ final class WorkspaceModel {
             } else if let sjisText = String(data: data, encoding: .shiftJIS) {
                 text = sjisText
                 encoding = .shiftJIS
-            } else if let latin1Text = String(data: data, encoding: .isoLatin1) {
-                text = latin1Text
-                encoding = .isoLatin1
             } else {
                 throw WorkspaceError.notUTF8Text
             }

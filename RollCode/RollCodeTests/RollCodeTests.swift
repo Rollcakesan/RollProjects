@@ -1335,6 +1335,7 @@ struct RollCodeTests {
             let defaults = UserDefaults(suiteName: suiteName)!
             let model = WorkspaceModel(defaults: defaults, restoresLastWorkspace: false)
             model.openWorkspace(root)
+            model.rootNode = FileNode.buildTree(at: root)
 
             model.openFile(fileA)
             model.openFile(fileB) // Most recent is beta.swift
