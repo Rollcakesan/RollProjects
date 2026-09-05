@@ -90,6 +90,44 @@ public enum GitBridgeService {
         )
     }
 
+    /// Returns the active Git branch name, if available.
+    public static func currentBranch(in rootURL: URL) throws -> String? {
+        let repository = try repositoryContext(for: rootURL)
+        let branch = try runGit(["branch", "--show-current"], in: repository.rootURL)
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        return branch.isEmpty ? nil : branch
+    }
+
+    /// Lists local Git branches in the repository.
+    public static func branches(in rootURL: URL) throws -> [String] {
+        let repository = try repositoryContext(for: rootURL)
+        let output = try runGit(["branch", "--format=%(refname:short)"], in: repository.rootURL)
+        return output.components(separatedBy: .newlines)
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty }
+    }
+
+    /// Switches the repository to the specified branch.
+    public static func switchBranch(to branch: String, in rootURL: URL) throws {
+        let repository = try repositoryContext(for: rootURL)
+        _ = try runGit(["checkout", branch], in: repository.rootURL)
+    }
+
+    /// Returns a map of relative workspace file paths to their Git status code (e.g. "M", "??").
+    public static func fileStatusMap(in rootURL: URL) throws -> [String: String] {
+        let repository = try repositoryContext(for: rootURL)
+        let statusOutput = try runGit(
+            ["status", "--porcelain=v1", "-z", "--untracked-files=all", "--", repository.pathspec],
+            in: repository.rootURL
+        )
+        var map = [String: String]()
+        for entry in statusEntries(from: statusOutput) {
+            let relPath = repository.workspacePath(for: entry.path)
+            map[relPath] = entry.status.trimmingCharacters(in: .whitespaces)
+        }
+        return map
+    }
+
     // MARK: - Internal Helpers
 
     public struct RepositoryContext: Sendable {

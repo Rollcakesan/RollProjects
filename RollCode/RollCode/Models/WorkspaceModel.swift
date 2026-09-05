@@ -1,6 +1,7 @@
 import AppKit
 import Foundation
 import Observation
+import SwiftUI
 
 @Observable
 @MainActor
@@ -29,6 +30,19 @@ final class WorkspaceModel {
         set { if !newValue { savingDocumentID = nil } }
     }
 
+    enum AppTheme: String, CaseIterable, Identifiable {
+        case system, dark, light
+        var id: String { rawValue }
+        var displayName: String { rawValue.capitalized }
+        var colorScheme: ColorScheme? {
+            switch self {
+            case .system: return nil
+            case .dark: return .dark
+            case .light: return .light
+            }
+        }
+    }
+
     enum FontScale: String, CaseIterable, Identifiable {
         case small, medium, large
         var id: String { rawValue }
@@ -52,6 +66,12 @@ final class WorkspaceModel {
     var uiFontSize: CGFloat { uiFontScale.fontSize }
     private(set) var tabWidth: Int
     private(set) var restoresLastWorkspace: Bool
+    private(set) var autoSaveEnabled: Bool
+    private(set) var appTheme: AppTheme
+    private(set) var recentFileURLs: [URL] = []
+    private(set) var currentBranch: String?
+    private(set) var branches: [String] = []
+    private(set) var gitStatusMap: [String: String] = [:]
     private(set) var isLoadingTree = false
 
     var onWorkspaceChanged: (@MainActor @Sendable (URL) -> Void)?
@@ -63,6 +83,9 @@ final class WorkspaceModel {
     private static let tabWidthKey = "RollCode.editorTabWidth"
     private static let fontSizeKey = "RollCode.editorFontSize"
     private static let uiFontScaleKey = "RollCode.uiFontScale"
+    private static let autoSaveKey = "RollCode.autoSaveEnabled"
+    private static let appThemeKey = "RollCode.appTheme"
+    private static let recentFilesKey = "RollCode.recentFileURLs"
 
     var lastWorkspacePath: String? {
         defaults.string(forKey: Self.lastWorkspacePathKey)
@@ -79,6 +102,12 @@ final class WorkspaceModel {
         let userPrefersRestore = defaults.object(forKey: Self.restoreLastWorkspaceKey) as? Bool ?? true
         self.restoresLastWorkspace = userPrefersRestore
 
+        self.autoSaveEnabled = defaults.object(forKey: Self.autoSaveKey) as? Bool ?? true
+        self.appTheme = defaults.string(forKey: Self.appThemeKey).flatMap(AppTheme.init(rawValue:)) ?? .system
+        if let storedRecentPaths = defaults.stringArray(forKey: Self.recentFilesKey) {
+            self.recentFileURLs = storedRecentPaths.map { URL(fileURLWithPath: $0) }
+        }
+
         guard restoresLastWorkspace && userPrefersRestore,
               let path = defaults.string(forKey: Self.lastWorkspacePathKey) else { return }
 
@@ -88,6 +117,26 @@ final class WorkspaceModel {
             return
         }
         openWorkspace(URL(fileURLWithPath: path, isDirectory: true))
+    }
+
+    func setAutoSaveEnabled(_ enabled: Bool) {
+        autoSaveEnabled = enabled
+        defaults.set(enabled, forKey: Self.autoSaveKey)
+    }
+
+    func setAppTheme(_ theme: AppTheme) {
+        appTheme = theme
+        defaults.set(theme.rawValue, forKey: Self.appThemeKey)
+    }
+
+    func recordRecentFile(_ url: URL) {
+        let stdURL = url.standardizedFileURL
+        recentFileURLs.removeAll { $0.standardizedFileURL == stdURL }
+        recentFileURLs.insert(stdURL, at: 0)
+        if recentFileURLs.count > 30 {
+            recentFileURLs = Array(recentFileURLs.prefix(30))
+        }
+        defaults.set(recentFileURLs.map(\.path), forKey: Self.recentFilesKey)
     }
 
     func setRestoresLastWorkspace(_ enabled: Bool) {
@@ -213,7 +262,34 @@ final class WorkspaceModel {
     func quickOpenFiles(matching query: String) -> [FileNode] {
         let normalized = query.trimmed
         let files = workspaceFiles
-        guard !normalized.isEmpty else { return Array(files.prefix(100)) }
+        guard !normalized.isEmpty else {
+            // Sort by recently opened files first
+            if !recentFileURLs.isEmpty {
+                var fileMap = Dictionary(files.map { ($0.url.standardizedFileURL, $0) }, uniquingKeysWith: { first, _ in first })
+                // Fallback: If rootNode is still loading or empty, include open documents in fileMap
+                for doc in documents {
+                    if fileMap[doc.url.standardizedFileURL] == nil {
+                        fileMap[doc.url.standardizedFileURL] = FileNode(url: doc.url, isDirectory: false)
+                    }
+                }
+                var result: [FileNode] = []
+                var seen = Set<URL>()
+                for recent in recentFileURLs {
+                    if let node = fileMap[recent.standardizedFileURL] {
+                        result.append(node)
+                        seen.insert(recent.standardizedFileURL)
+                    }
+                }
+                for file in files where !seen.contains(file.url.standardizedFileURL) {
+                    result.append(file)
+                }
+                return Array(result.prefix(100))
+            }
+            if files.isEmpty {
+                return documents.map { FileNode(url: $0.url, isDirectory: false) }
+            }
+            return Array(files.prefix(100))
+        }
 
         return files
             .compactMap { node -> (node: FileNode, path: String, score: Int)? in
@@ -237,6 +313,7 @@ final class WorkspaceModel {
     func refreshTree() {
         guard let rootURL else { return }
         isLoadingTree = true
+        refreshGitStatus()
         Task { [weak self] in
             let tree = await Task.detached(priority: .userInitiated) {
                 FileNode.buildTree(at: rootURL)
@@ -247,9 +324,47 @@ final class WorkspaceModel {
         }
     }
 
+    func refreshGitStatus() {
+        guard let rootURL else {
+            currentBranch = nil
+            branches = []
+            gitStatusMap = [:]
+            return
+        }
+        Task.detached(priority: .utility) {
+            let branch = try? GitBridgeService.currentBranch(in: rootURL)
+            let branchList = (try? GitBridgeService.branches(in: rootURL)) ?? []
+            let statusMap = (try? GitBridgeService.fileStatusMap(in: rootURL)) ?? [:]
+            await MainActor.run { [weak self] in
+                guard let self, self.rootURL == rootURL else { return }
+                self.currentBranch = branch
+                self.branches = branchList
+                self.gitStatusMap = statusMap
+            }
+        }
+    }
+
+    func switchBranch(to branch: String) {
+        guard let rootURL else { return }
+        Task.detached(priority: .userInitiated) {
+            do {
+                try GitBridgeService.switchBranch(to: branch, in: rootURL)
+                await MainActor.run { [weak self] in
+                    self?.refreshTree()
+                    self?.checkForExternalChanges()
+                }
+            } catch {
+                await MainActor.run { [weak self] in
+                    self?.alertMessage = "Failed to checkout '\(branch)': \(error.localizedDescription)"
+                }
+            }
+        }
+    }
+
     func openFile(_ url: URL) {
         if let existing = documents.first(where: { $0.url.standardizedFileURL == url.standardizedFileURL }) {
             activeDocumentID = existing.id
+            recordRecentFile(url)
             return
         }
 
@@ -258,12 +373,29 @@ final class WorkspaceModel {
             guard data.count <= 5_000_000 else {
                 throw WorkspaceError.fileTooLarge
             }
-            guard !data.prefix(8_192).contains(0), let text = String(data: data, encoding: .utf8) else {
+            guard !data.prefix(8_192).contains(0) else {
                 throw WorkspaceError.notUTF8Text
             }
-            let document = EditorDocument(url: url, text: text, diskModificationDate: url.modificationDate)
+
+            // Detect encoding: UTF-8 -> Shift-JIS (Windows-31J) -> ISO Latin 1
+            let (text, encoding): (String, String.Encoding)
+            if let utf8Text = String(data: data, encoding: .utf8) {
+                text = utf8Text
+                encoding = .utf8
+            } else if let sjisText = String(data: data, encoding: .shiftJIS) {
+                text = sjisText
+                encoding = .shiftJIS
+            } else if let latin1Text = String(data: data, encoding: .isoLatin1) {
+                text = latin1Text
+                encoding = .isoLatin1
+            } else {
+                throw WorkspaceError.notUTF8Text
+            }
+
+            let document = EditorDocument(url: url, text: text, encoding: encoding, diskModificationDate: url.modificationDate)
             documents.append(document)
             activeDocumentID = document.id
+            recordRecentFile(url)
             updateGitDiffLines(for: document)
         } catch {
             alertMessage = "Could not open \(url.lastPathComponent): \(error.localizedDescription)"
@@ -380,7 +512,7 @@ final class WorkspaceModel {
     @discardableResult
     func save(_ document: EditorDocument) -> Bool {
         do {
-            try document.text.write(to: document.url, atomically: true, encoding: .utf8)
+            try document.text.write(to: document.url, atomically: true, encoding: document.encoding)
             document.markSaved(modificationDate: document.url.modificationDate)
             updateGitDiffLines(for: document)
 

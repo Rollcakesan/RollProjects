@@ -89,6 +89,16 @@ struct CodeEditorView: NSViewRepresentable {
         textView.defaultParagraphStyle = paragraphStyle
         textView.typingAttributes[.paragraphStyle] = paragraphStyle
 
+        if textView.backgroundColor != EditorPalette.background {
+            textView.backgroundColor = EditorPalette.background
+            textView.insertionPointColor = EditorPalette.caret
+            textView.textColor = EditorPalette.foreground
+            textView.selectedTextAttributes = [
+                .backgroundColor: EditorPalette.selection,
+                .foregroundColor: EditorPalette.foreground
+            ]
+        }
+
         if !context.coordinator.isInternalTextChange && textView.string != text {
             let selection = textView.selectedRange()
             textView.string = text

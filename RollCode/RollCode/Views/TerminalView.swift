@@ -2,6 +2,7 @@ import SwiftUI
 
 struct TerminalView: View {
     @Environment(TerminalSession.self) private var terminal
+    @Environment(WorkspaceModel.self) private var workspace
     @State private var command = ""
     @FocusState private var inputFocused: Bool
 
@@ -13,10 +14,7 @@ struct TerminalView: View {
 
             ScrollViewReader { proxy in
                 ScrollView([.vertical, .horizontal]) {
-                    Text(terminal.output)
-                        .font(.system(size: 11, design: .monospaced))
-                        .foregroundStyle(RollCodeTheme.primaryText)
-                        .textSelection(.enabled)
+                    terminalOutputView
                         .frame(maxWidth: .infinity, alignment: .topLeading)
                         .padding(.horizontal, 10)
                         .padding(.vertical, 7)
@@ -142,5 +140,41 @@ struct TerminalView: View {
     private func runCommand() {
         terminal.send(command)
         command = ""
+    }
+
+    @ViewBuilder
+    private var terminalOutputView: some View {
+        Text(terminal.output)
+            .font(.system(size: 11, design: .monospaced))
+            .foregroundStyle(RollCodeTheme.primaryText)
+            .textSelection(.enabled)
+            .contextMenu {
+                Button("Copy All Output") {
+                    NSPasteboard.general.clearContents()
+                    NSPasteboard.general.setString(terminal.output, forType: .string)
+                }
+                if let candidate = firstExistingPath(in: terminal.output) {
+                    Button("Open '\(candidate.lastPathComponent)' in Editor") {
+                        workspace.openFile(candidate)
+                    }
+                }
+            }
+    }
+
+    private func firstExistingPath(in text: String) -> URL? {
+        guard let rootURL = workspace.rootURL else { return nil }
+        let words = text.components(separatedBy: CharacterSet.whitespacesAndNewlines)
+        for word in words.reversed() {
+            let cleaned = word.trimmingCharacters(in: CharacterSet(charactersIn: ":,'\"()[]{}<>"))
+            guard !cleaned.isEmpty, !cleaned.hasPrefix("-") else { continue }
+            let candidate = cleaned.hasPrefix("/")
+                ? URL(fileURLWithPath: cleaned)
+                : rootURL.appendingPathComponent(cleaned)
+            var isDir: ObjCBool = false
+            if FileManager.default.fileExists(atPath: candidate.path, isDirectory: &isDir), !isDir.boolValue {
+                return candidate
+            }
+        }
+        return nil
     }
 }

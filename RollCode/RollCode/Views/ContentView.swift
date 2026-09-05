@@ -75,6 +75,8 @@ struct ContentView: View {
         .onChange(of: scenePhase) { _, newPhase in
             if newPhase == .active {
                 workspace.checkForExternalChanges()
+            } else if workspace.autoSaveEnabled {
+                _ = workspace.saveAllDocuments()
             }
         }
     }
@@ -82,22 +84,88 @@ struct ContentView: View {
 
 @MainActor
 enum RollCodeTheme {
-    // SwiftUI Colors
-    static let windowBackground = Color(red: 0.075, green: 0.078, blue: 0.09)
-    static let sidebarBackground = Color(red: 0.09, green: 0.094, blue: 0.108)
-    static let editorBackground = Color(red: 0.115, green: 0.12, blue: 0.14)
-    static let elevatedBackground = Color(red: 0.145, green: 0.15, blue: 0.175)
-    static let selection = Color(red: 0.20, green: 0.27, blue: 0.40)
+    // SwiftUI Dynamic Colors based on macOS dark/light appearance
+    static var windowBackground: Color {
+        Color(nsColor: NSColor(name: nil) { appearance in
+            appearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua
+                ? NSColor(red: 0.075, green: 0.078, blue: 0.09, alpha: 1)
+                : NSColor(red: 0.96, green: 0.96, blue: 0.97, alpha: 1)
+        })
+    }
+
+    static var sidebarBackground: Color {
+        Color(nsColor: NSColor(name: nil) { appearance in
+            appearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua
+                ? NSColor(red: 0.09, green: 0.094, blue: 0.108, alpha: 1)
+                : NSColor(red: 0.94, green: 0.94, blue: 0.95, alpha: 1)
+        })
+    }
+
+    static var editorBackground: Color {
+        Color(nsColor: nsEditorBackground)
+    }
+
+    static var elevatedBackground: Color {
+        Color(nsColor: NSColor(name: nil) { appearance in
+            appearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua
+                ? NSColor(red: 0.145, green: 0.15, blue: 0.175, alpha: 1)
+                : NSColor(red: 0.90, green: 0.91, blue: 0.93, alpha: 1)
+        })
+    }
+
+    static var selection: Color {
+        Color(nsColor: nsSelection)
+    }
+
     static let accent = Color(red: 0.40, green: 0.61, blue: 0.98)
-    static let primaryText = Color(white: 0.88)
-    static let secondaryText = Color(white: 0.56)
-    static let divider = Color.white.opacity(0.08)
+
+    static var primaryText: Color {
+        Color(nsColor: nsForeground)
+    }
+
+    static var secondaryText: Color {
+        Color(nsColor: NSColor(name: nil) { appearance in
+            appearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua
+                ? NSColor(white: 0.56, alpha: 1)
+                : NSColor(white: 0.45, alpha: 1)
+        })
+    }
+
+    static var divider: Color {
+        Color(nsColor: NSColor(name: nil) { appearance in
+            appearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua
+                ? NSColor.white.withAlphaComponent(0.08)
+                : NSColor.black.withAlphaComponent(0.08)
+        })
+    }
 
     // AppKit NSColors
-    static let nsEditorBackground = NSColor(red: 0.115, green: 0.12, blue: 0.14, alpha: 1)
-    static let nsForeground = NSColor(white: 0.86, alpha: 1)
+    static var nsEditorBackground: NSColor {
+        NSColor(name: nil) { appearance in
+            appearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua
+                ? NSColor(red: 0.115, green: 0.12, blue: 0.14, alpha: 1)
+                : NSColor(white: 0.99, alpha: 1)
+        }
+    }
+
+    static var nsForeground: NSColor {
+        NSColor(name: nil) { appearance in
+            appearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua
+                ? NSColor(white: 0.86, alpha: 1)
+                : NSColor(white: 0.15, alpha: 1)
+        }
+    }
+
     static let nsCaret = NSColor(red: 0.40, green: 0.61, blue: 0.98, alpha: 1)
-    static let nsSelection = NSColor(red: 0.20, green: 0.32, blue: 0.52, alpha: 1)
+
+    static var nsSelection: NSColor {
+        NSColor(name: nil) { appearance in
+            appearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua
+                ? NSColor(red: 0.20, green: 0.32, blue: 0.52, alpha: 1)
+                : NSColor(red: 0.72, green: 0.83, blue: 0.98, alpha: 1)
+        }
+    }
+
     static let nsSearchMatch = NSColor(red: 0.64, green: 0.43, blue: 0.12, alpha: 0.9)
     static let editorFont = NSFont.monospacedSystemFont(ofSize: 14.5, weight: .regular)
 }

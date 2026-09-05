@@ -20,12 +20,14 @@ final class EditorDocument: Identifiable {
     var isCheckingSyntax: Bool = false
     var gitAddedLines: Set<Int> = []
     var gitModifiedLines: Set<Int> = []
+    var encoding: String.Encoding = .utf8
     private var cachedLineCount: Int
 
-    init(url: URL, text: String, diskModificationDate: Date? = nil) {
+    init(url: URL, text: String, encoding: String.Encoding = .utf8, diskModificationDate: Date? = nil) {
         self.url = url
         self.text = text
         self.savedText = text
+        self.encoding = encoding
         self.diskModificationDate = diskModificationDate
         self.cachedLineCount = text.count(where: \.isNewline) + 1
     }
@@ -34,6 +36,15 @@ final class EditorDocument: Identifiable {
     var isDirty: Bool { text != savedText }
     var language: CodeLanguage { CodeLanguage(url: url) }
     var lineCount: Int { cachedLineCount }
+    var encodingDisplayName: String {
+        switch encoding {
+        case .utf8: return "UTF-8"
+        case .shiftJIS, .japaneseEUC, String.Encoding(rawValue: 0x80000421) /* Windows-31J */: return "Shift-JIS"
+        case .isoLatin1, .ascii: return "ASCII"
+        case .utf16: return "UTF-16"
+        default: return "UTF-8"
+        }
+    }
 
     func markSaved(modificationDate: Date? = nil) {
         savedText = text

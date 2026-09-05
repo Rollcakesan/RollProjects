@@ -17,7 +17,7 @@ struct RollCodeApp: App {
                 .environment(workspace)
                 .environment(terminal)
                 .environment(agent)
-                .preferredColorScheme(.dark)
+                .preferredColorScheme(workspace.appTheme.colorScheme)
                 .onAppear {
                     appDelegate.workspace = workspace
                     workspace.onWorkspaceChanged = { url in
@@ -42,7 +42,7 @@ struct RollCodeApp: App {
                 .environment(workspace)
                 .environment(terminal)
                 .environment(agent)
-                .preferredColorScheme(.dark)
+                .preferredColorScheme(workspace.appTheme.colorScheme)
         }
         .commands {
             CommandGroup(replacing: .newItem) {

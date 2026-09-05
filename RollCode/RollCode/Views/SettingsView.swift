@@ -81,6 +81,21 @@ struct SettingsView: View {
                     }
                 }
                 .pickerStyle(.segmented)
+
+                Picker("Theme", selection: Binding(
+                    get: { workspace.appTheme },
+                    set: { workspace.setAppTheme($0) }
+                )) {
+                    ForEach(WorkspaceModel.AppTheme.allCases) { theme in
+                        Text(theme.displayName).tag(theme)
+                    }
+                }
+                .pickerStyle(.segmented)
+
+                Toggle("Auto Save (on window inactive / blur)", isOn: Binding(
+                    get: { workspace.autoSaveEnabled },
+                    set: { workspace.setAutoSaveEnabled($0) }
+                ))
             }
 
             Section("Startup & Workspace") {

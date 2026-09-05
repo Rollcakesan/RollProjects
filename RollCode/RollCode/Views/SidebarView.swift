@@ -129,10 +129,17 @@ private struct FileTreeNodeView: View {
             // Name label
             Text(node.name)
                 .font(.system(size: workspace.uiFontSize, weight: (node.isDirectory && isExpanded) ? .medium : .regular))
-                .foregroundStyle(isSelected ? RollCodeTheme.primaryText : (node.isDirectory ? RollCodeTheme.primaryText.opacity(0.9) : RollCodeTheme.secondaryText.opacity(0.95)))
+                .foregroundStyle(gitNameColor)
                 .lineLimit(1)
 
             Spacer(minLength: 0)
+
+            if let status = gitStatusLetter {
+                Text(status)
+                    .font(.system(size: 9, weight: .bold, design: .monospaced))
+                    .foregroundStyle(gitStatusColor)
+                    .padding(.trailing, 2)
+            }
         }
         .padding(.horizontal, 6)
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -165,6 +172,45 @@ private struct FileTreeNodeView: View {
         case "sh", "zsh", "bash": return Color(red: 0.48, green: 0.85, blue: 0.55)
         default: return RollCodeTheme.secondaryText
         }
+    }
+
+    private var relativeWorkspacePath: String {
+        workspace.relativePath(for: node.url)
+    }
+
+    private var gitStatusRaw: String? {
+        workspace.gitStatusMap[relativeWorkspacePath]
+    }
+
+    private var gitStatusLetter: String? {
+        guard !node.isDirectory, let raw = gitStatusRaw else { return nil }
+        if raw.contains("M") { return "M" }
+        if raw.contains("?") { return "U" }
+        if raw.contains("D") { return "D" }
+        return nil
+    }
+
+    private var gitStatusColor: Color {
+        guard let letter = gitStatusLetter else { return RollCodeTheme.secondaryText }
+        switch letter {
+        case "M": return Color(red: 0.94, green: 0.76, blue: 0.28)
+        case "U": return Color(red: 0.45, green: 0.85, blue: 0.48)
+        case "D": return Color(red: 0.95, green: 0.42, blue: 0.42)
+        default: return RollCodeTheme.secondaryText
+        }
+    }
+
+    private var gitNameColor: Color {
+        if isSelected { return RollCodeTheme.primaryText }
+        if !node.isDirectory, let letter = gitStatusLetter {
+            switch letter {
+            case "M": return Color(red: 0.94, green: 0.76, blue: 0.28)
+            case "U": return Color(red: 0.45, green: 0.85, blue: 0.48)
+            case "D": return Color(red: 0.95, green: 0.42, blue: 0.42).opacity(0.8)
+            default: break
+            }
+        }
+        return node.isDirectory ? RollCodeTheme.primaryText.opacity(0.9) : RollCodeTheme.secondaryText.opacity(0.95)
     }
 }
 

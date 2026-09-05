@@ -1300,6 +1300,60 @@ struct RollCodeTests {
         let sessionExplicitFalse = AgentSession(executableURL: nil, geminiExecutableURL: nil, useAppServer: false)
         #expect(sessionExplicitFalse.useAppServer == false)
     }
+
+    @Test("WorkspaceModel manages autoSaveEnabled and appTheme preferences")
+    @MainActor
+    func workspaceModelManagesPreferences() {
+        let suiteName = "TestPreferences_\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        let model = WorkspaceModel(defaults: defaults, restoresLastWorkspace: false)
+
+        #expect(model.autoSaveEnabled == true)
+        #expect(model.appTheme == .system)
+
+        model.setAutoSaveEnabled(false)
+        #expect(model.autoSaveEnabled == false)
+
+        model.setAppTheme(.dark)
+        #expect(model.appTheme == .dark)
+        #expect(model.appTheme.colorScheme == .dark)
+
+        model.setAppTheme(.light)
+        #expect(model.appTheme.colorScheme == .light)
+    }
+
+    @Test("WorkspaceModel prioritizes recent files in quick open when query is empty")
+    @MainActor
+    func workspaceModelPrioritizesRecentFiles() throws {
+        try withTemporaryDirectory { root in
+            let fileA = root.appendingPathComponent("alpha.swift")
+            let fileB = root.appendingPathComponent("beta.swift")
+            try "let a = 1".write(to: fileA, atomically: true, encoding: .utf8)
+            try "let b = 2".write(to: fileB, atomically: true, encoding: .utf8)
+
+            let suiteName = "TestMRU_\(UUID().uuidString)"
+            let defaults = UserDefaults(suiteName: suiteName)!
+            let model = WorkspaceModel(defaults: defaults, restoresLastWorkspace: false)
+            model.openWorkspace(root)
+
+            model.openFile(fileA)
+            model.openFile(fileB) // Most recent is beta.swift
+
+            let quickOpenEmpty = model.quickOpenFiles(matching: "")
+            #expect(quickOpenEmpty.first?.name == "beta.swift")
+        }
+    }
+
+    @Test("EditorDocument supports encoding detection and display name")
+    @MainActor
+    func editorDocumentEncodingSupport() throws {
+        let url = URL(fileURLWithPath: "/tmp/test.txt")
+        let docUtf8 = EditorDocument(url: url, text: "hello", encoding: .utf8)
+        #expect(docUtf8.encodingDisplayName == "UTF-8")
+
+        let docSJIS = EditorDocument(url: url, text: "こんにちは", encoding: .shiftJIS)
+        #expect(docSJIS.encodingDisplayName == "Shift-JIS")
+    }
 }
 
 @MainActor

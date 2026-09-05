@@ -11,6 +11,32 @@ struct StatusBarView: View {
                 Text("No folder open")
             }
 
+            if let branch = workspace.currentBranch {
+                Menu {
+                    ForEach(workspace.branches, id: \.self) { b in
+                        Button {
+                            workspace.switchBranch(to: b)
+                        } label: {
+                            HStack {
+                                Text(b)
+                                if b == branch {
+                                    Image(systemName: "checkmark")
+                                }
+                            }
+                        }
+                    }
+                } label: {
+                    HStack(spacing: 4) {
+                        Image(systemName: "arrow.triangle.branch")
+                        Text(branch)
+                            .lineLimit(1)
+                    }
+                }
+                .menuStyle(.borderlessButton)
+                .fixedSize()
+                .help("Current Branch: \(branch). Click to switch.")
+            }
+
             if let document = workspace.activeDocument {
                 if document.isCheckingSyntax {
                     HStack(spacing: 4) {
@@ -59,7 +85,7 @@ private struct ActiveDocumentStatus: View {
             Text(document.language.displayName)
             Text("\(document.lineCount) lines")
             Text(fontSizeText)
-            Text("UTF-8")
+            Text(document.encodingDisplayName)
         }
     }
 
