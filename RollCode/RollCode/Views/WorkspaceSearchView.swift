@@ -2,7 +2,7 @@ import SwiftUI
 
 struct WorkspaceSearchView: View {
     @Environment(WorkspaceModel.self) private var workspace
-    @Binding var isPresented: Bool
+    @Environment(\.dismiss) private var dismiss
     @State private var query = ""
     @State private var replacement = ""
     @State private var matches: [WorkspaceSearchMatch] = []
@@ -18,7 +18,7 @@ struct WorkspaceSearchView: View {
                     ProgressView().controlSize(.small)
                 }
             } trailing: {
-                Button { isPresented = false } label: {
+                Button { dismiss() } label: {
                     Image(systemName: "xmark")
                 }
                 .buttonStyle(.plain)
@@ -74,7 +74,7 @@ struct WorkspaceSearchView: View {
                             WorkspaceSearchRow(match: match)
                                 .onTapGesture {
                                     workspace.openSearchMatch(match)
-                                    isPresented = false
+                                    dismiss()
                                 }
                         }
                     }
@@ -87,7 +87,7 @@ struct WorkspaceSearchView: View {
         .onAppear { searchFocused = true }
         .task(id: query) { await search() }
         .onKeyPress(.escape) {
-            isPresented = false
+            dismiss()
             return .handled
         }
     }

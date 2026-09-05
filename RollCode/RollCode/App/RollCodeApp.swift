@@ -107,7 +107,7 @@ struct RollCodeApp: App {
             }
             CommandGroup(replacing: .help) {
                 Button("Keyboard Shortcuts") {
-                    workspace.isShortcutCheatSheetPresented = true
+                    workspace.activeSheet = .shortcutCheatSheet
                 }
                 .keyboardShortcut("/", modifiers: [.command, .shift])
             }

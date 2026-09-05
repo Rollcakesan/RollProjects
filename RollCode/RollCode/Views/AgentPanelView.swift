@@ -270,88 +270,35 @@ struct AgentPanelView: View {
 
     @ViewBuilder
     private var authBadge: some View {
-        if agent.selectedProvider == .gemini {
-            switch agent.geminiAuth.status {
-            case .loggedIn(let account):
-                HStack(spacing: 4) {
-                    Circle()
-                        .fill(Color.green)
-                        .frame(width: 6, height: 6)
-                    Text(account ?? "Google")
-                        .font(.system(size: 9))
-                        .foregroundStyle(RollCodeTheme.secondaryText)
-                        .lineLimit(1)
-                }
-                .help("Logged in via Google Account")
-            case .apiKey:
-                HStack(spacing: 4) {
-                    Circle()
-                        .fill(Color.blue)
-                        .frame(width: 6, height: 6)
-                    Text("API Key")
-                        .font(.system(size: 9))
-                        .foregroundStyle(RollCodeTheme.secondaryText)
-                }
-                .help("Authenticated via GEMINI_API_KEY")
-            case .unauthenticated:
-                if agent.geminiAuth.isLoggingIn {
-                    ProgressView().controlSize(.mini)
-                } else {
-                    Button {
-                        agent.geminiAuth.loginWithBrowser()
-                    } label: {
-                        HStack(spacing: 3) {
-                            Image(systemName: "arrow.up.right.square")
-                            Text("Log In")
-                        }
-                        .font(.system(size: 9, weight: .medium))
-                    }
-                    .buttonStyle(.bordered)
-                    .controlSize(.mini)
-                    .help("Log in with Google account via browser")
-                }
-            case .cliNotInstalled:
-                EmptyView()
+        let isGemini = agent.selectedProvider == .gemini
+        let isAPIKey: Bool = {
+            if isGemini {
+                if case .apiKey = agent.geminiAuth.status { return true }
+                return false
+            } else {
+                return agent.auth.status == .apiKey
             }
+        }()
+        let isLoggedIn = isGemini ? (agent.geminiAuth.status != .unauthenticated && agent.geminiAuth.status != .cliNotInstalled) : (agent.auth.status != .unauthenticated && agent.auth.status != .cliNotInstalled)
+        let statusText = isGemini ? agent.geminiAuth.status.displayText : agent.auth.status.displayText
+
+        if isLoggedIn {
+            HStack(spacing: 4) {
+                Circle().fill(isAPIKey ? Color.blue : Color.green).frame(width: 6, height: 6)
+                Text(statusText).font(.system(size: 9)).foregroundStyle(RollCodeTheme.secondaryText).lineLimit(1)
+            }
+            .help(isAPIKey ? "Authenticated via API Key" : "Logged in account")
+        } else if isGemini && agent.geminiAuth.isLoggingIn {
+            ProgressView().controlSize(.mini)
         } else {
-            switch agent.auth.status {
-            case .loggedIn(_, let email, _):
-                HStack(spacing: 4) {
-                    Circle()
-                        .fill(Color.green)
-                        .frame(width: 6, height: 6)
-                    Text(email ?? "ChatGPT")
-                        .font(.system(size: 9))
-                        .foregroundStyle(RollCodeTheme.secondaryText)
-                        .lineLimit(1)
-                }
-                .help("Logged in to Codex via ChatGPT")
-            case .apiKey:
-                HStack(spacing: 4) {
-                    Circle()
-                        .fill(Color.blue)
-                        .frame(width: 6, height: 6)
-                    Text("API Key")
-                        .font(.system(size: 9))
-                        .foregroundStyle(RollCodeTheme.secondaryText)
-                }
-                .help("Authenticated via OPENAI_API_KEY")
-            case .unauthenticated:
-                Button {
-                    agent.auth.requestLogin(in: terminal)
-                } label: {
-                    HStack(spacing: 3) {
-                        Image(systemName: "person.crop.circle.badge.plus")
-                        Text("Log In")
-                    }
+            Button {
+                if isGemini { agent.geminiAuth.loginWithBrowser() } else { agent.auth.requestLogin(in: terminal) }
+            } label: {
+                Label("Log In", systemImage: isGemini ? "arrow.up.right.square" : "person.crop.circle.badge.plus")
                     .font(.system(size: 9, weight: .medium))
-                }
-                .buttonStyle(.bordered)
-                .controlSize(.mini)
-                .help("Log in with ChatGPT account via 'codex login'")
-            case .cliNotInstalled:
-                EmptyView()
             }
+            .buttonStyle(.bordered)
+            .controlSize(.mini)
         }
     }
 

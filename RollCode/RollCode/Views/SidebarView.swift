@@ -160,29 +160,17 @@ private struct FileTreeNodeView: View {
     }
 
     private var nodeIconColor: Color {
-        if node.isDirectory {
-            return Color(red: 0.45, green: 0.64, blue: 0.95)
-        }
-        let ext = node.url.pathExtension.lowercased()
-        switch ext {
-        case "swift":
-            return Color(red: 0.96, green: 0.52, blue: 0.28)
-        case "js", "jsx", "ts", "tsx":
-            return Color(red: 0.95, green: 0.82, blue: 0.35)
-        case "py":
-            return Color(red: 0.35, green: 0.72, blue: 0.92)
-        case "json":
-            return Color(red: 0.95, green: 0.75, blue: 0.30)
-        case "md", "markdown":
-            return Color(red: 0.45, green: 0.75, blue: 0.95)
-        case "html", "htm":
-            return Color(red: 0.92, green: 0.42, blue: 0.28)
-        case "css":
-            return Color(red: 0.35, green: 0.65, blue: 0.95)
-        case "sh", "zsh", "bash":
-            return Color(red: 0.48, green: 0.85, blue: 0.55)
-        default:
-            return RollCodeTheme.secondaryText
+        if node.isDirectory { return Color(red: 0.45, green: 0.64, blue: 0.95) }
+        switch node.url.pathExtension.lowercased() {
+        case "swift": return Color(red: 0.96, green: 0.52, blue: 0.28)
+        case "js", "jsx", "ts", "tsx": return Color(red: 0.95, green: 0.82, blue: 0.35)
+        case "py": return Color(red: 0.35, green: 0.72, blue: 0.92)
+        case "json": return Color(red: 0.95, green: 0.75, blue: 0.30)
+        case "md", "markdown": return Color(red: 0.45, green: 0.75, blue: 0.95)
+        case "html", "htm": return Color(red: 0.92, green: 0.42, blue: 0.28)
+        case "css": return Color(red: 0.35, green: 0.65, blue: 0.95)
+        case "sh", "zsh", "bash": return Color(red: 0.48, green: 0.85, blue: 0.55)
+        default: return RollCodeTheme.secondaryText
         }
     }
 }

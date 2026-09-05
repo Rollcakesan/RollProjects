@@ -12,30 +12,10 @@ final class WorkspaceModel {
     var fileFilter = ""
     var alertMessage: String?
     enum WorkspaceSheet: String, Identifiable, Sendable {
-        case quickOpen
-        case workspaceSearch
-        case gitChanges
-        case shortcutCheatSheet
-
+        case quickOpen, workspaceSearch, gitChanges, shortcutCheatSheet
         var id: String { rawValue }
     }
     var activeSheet: WorkspaceSheet?
-    var isQuickOpenPresented: Bool {
-        get { activeSheet == .quickOpen }
-        set { activeSheet = newValue ? .quickOpen : (activeSheet == .quickOpen ? nil : activeSheet) }
-    }
-    var isWorkspaceSearchPresented: Bool {
-        get { activeSheet == .workspaceSearch }
-        set { activeSheet = newValue ? .workspaceSearch : (activeSheet == .workspaceSearch ? nil : activeSheet) }
-    }
-    var isGitChangesPresented: Bool {
-        get { activeSheet == .gitChanges }
-        set { activeSheet = newValue ? .gitChanges : (activeSheet == .gitChanges ? nil : activeSheet) }
-    }
-    var isShortcutCheatSheetPresented: Bool {
-        get { activeSheet == .shortcutCheatSheet }
-        set { activeSheet = newValue ? .shortcutCheatSheet : (activeSheet == .shortcutCheatSheet ? nil : activeSheet) }
-    }
     var isFolderPickerPresented = false
     var editorNavigationRequest: EditorNavigationRequest?
     var renamingURL: URL?
@@ -48,21 +28,11 @@ final class WorkspaceModel {
         get { savingDocumentID != nil }
         set { if !newValue { savingDocumentID = nil } }
     }
-    enum UIFontScale: String, CaseIterable, Identifiable {
-        case small = "small"
-        case medium = "medium"
-        case large = "large"
 
+    enum FontScale: String, CaseIterable, Identifiable {
+        case small, medium, large
         var id: String { rawValue }
-
-        var displayName: String {
-            switch self {
-            case .small: return "Small"
-            case .medium: return "Medium"
-            case .large: return "Large"
-            }
-        }
-
+        var displayName: String { rawValue.capitalized }
         var fontSize: CGFloat {
             switch self {
             case .small: return 12.5
@@ -71,40 +41,12 @@ final class WorkspaceModel {
             }
         }
     }
-
-    enum EditorFontScale: String, CaseIterable, Identifiable {
-        case small = "small"
-        case medium = "medium"
-        case large = "large"
-
-        var id: String { rawValue }
-
-        var displayName: String {
-            switch self {
-            case .small: return "Small"
-            case .medium: return "Medium"
-            case .large: return "Large"
-            }
-        }
-
-        var fontSize: CGFloat {
-            switch self {
-            case .small: return 12.5
-            case .medium: return 14.5
-            case .large: return 16.5
-            }
-        }
-    }
+    typealias UIFontScale = FontScale
+    typealias EditorFontScale = FontScale
 
     private(set) var fontSize: CGFloat
     var editorFontScale: EditorFontScale {
-        if fontSize <= 13.0 {
-            return .small
-        } else if fontSize >= 15.5 {
-            return .large
-        } else {
-            return .medium
-        }
+        fontSize <= 13.0 ? .small : (fontSize >= 15.5 ? .large : .medium)
     }
     private(set) var uiFontScale: UIFontScale
     var uiFontSize: CGFloat { uiFontScale.fontSize }

@@ -2,7 +2,7 @@ import SwiftUI
 
 struct QuickOpenView: View {
     @Environment(WorkspaceModel.self) private var workspace
-    @Binding var isPresented: Bool
+    @Environment(\.dismiss) private var dismiss
     @State private var query = ""
     @State private var selectedURL: URL?
     @FocusState private var searchFocused: Bool
@@ -80,7 +80,7 @@ struct QuickOpenView: View {
             return .handled
         }
         .onKeyPress(.escape) {
-            isPresented = false
+            dismiss()
             return .handled
         }
     }
@@ -95,7 +95,7 @@ struct QuickOpenView: View {
     private func openSelectedFile() {
         guard let url = selectedURL ?? matches.first?.url else { return }
         workspace.openFile(url)
-        isPresented = false
+        dismiss()
     }
 }
 

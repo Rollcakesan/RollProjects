@@ -243,14 +243,10 @@ private struct WorkspaceModalsModifier: ViewModifier {
             }
             .sheet(item: $workspace.activeSheet) { sheet in
                 switch sheet {
-                case .quickOpen:
-                    QuickOpenView(isPresented: $workspace.isQuickOpenPresented)
-                case .workspaceSearch:
-                    WorkspaceSearchView(isPresented: $workspace.isWorkspaceSearchPresented)
-                case .gitChanges:
-                    GitChangesView(isPresented: $workspace.isGitChangesPresented)
-                case .shortcutCheatSheet:
-                    ShortcutCheatSheetView()
+                case .quickOpen: QuickOpenView()
+                case .workspaceSearch: WorkspaceSearchView()
+                case .gitChanges: GitChangesView()
+                case .shortcutCheatSheet: ShortcutCheatSheetView()
                 }
             }
     }

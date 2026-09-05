@@ -220,36 +220,24 @@ struct CodeEditorView: NSViewRepresentable {
             }
 
             completionDebounceTask = Task { @MainActor [weak self] in
-                // 150ms debounce: wait until user stops typing
                 try? await Task.sleep(for: .milliseconds(150))
                 guard !Task.isCancelled, let self, let textView = self.textView else { return }
-
                 let selectedRange = textView.selectedRange()
-                guard selectedRange.length == 0, selectedRange.location >= 1 else {
-                    self.suggestionController.hide()
-                    return
-                }
+                let loc = selectedRange.location
                 let nsText = textView.string as NSString
-                guard selectedRange.location <= nsText.length else {
+                guard selectedRange.length == 0, loc >= 1, loc <= nsText.length else {
                     self.suggestionController.hide()
                     return
                 }
-
-                let charBefore = nsText.character(at: selectedRange.location - 1)
-                guard let unicodeScalar = UnicodeScalar(charBefore) else {
+                guard let char = UnicodeScalar(nsText.character(at: loc - 1)),
+                      char == "." || CharacterSet.alphanumerics.contains(char) || char == "_" else {
                     self.suggestionController.hide()
                     return
                 }
+                let isDot = (char == ".")
 
-                let isDot = (unicodeScalar == ".")
-                let isWordChar = CharacterSet.alphanumerics.contains(unicodeScalar) || unicodeScalar == "_"
-                guard isDot || isWordChar else {
-                    self.suggestionController.hide()
-                    return
-                }
-
-                let lineRange = nsText.lineRange(for: NSRange(location: selectedRange.location, length: 0))
-                let prefixRange = NSRange(location: lineRange.location, length: selectedRange.location - lineRange.location)
+                let lineRange = nsText.lineRange(for: NSRange(location: loc, length: 0))
+                let prefixRange = NSRange(location: lineRange.location, length: loc - lineRange.location)
                 let linePrefix = nsText.substring(with: prefixRange)
 
                 // Calculate 1-based line and 0-based character column
@@ -259,13 +247,13 @@ struct CodeEditorView: NSViewRepresentable {
                     scanLoc = NSMaxRange(nsText.lineRange(for: NSRange(location: scanLoc, length: 0)))
                     lineNumber += 1
                 }
-                let columnNumber = selectedRange.location - lineRange.location
+                let columnNumber = loc - lineRange.location
 
                 let lastWord: String
                 let wordRange: NSRange
                 if isDot {
                     lastWord = ""
-                    wordRange = NSRange(location: selectedRange.location, length: 0)
+                    wordRange = NSRange(location: loc, length: 0)
                 } else {
                     let delimiters = CharacterSet.alphanumerics.union(CharacterSet(charactersIn: "_")).inverted
                     guard let word = linePrefix.components(separatedBy: delimiters).last, !word.isEmpty else {
@@ -273,7 +261,7 @@ struct CodeEditorView: NSViewRepresentable {
                         return
                     }
                     lastWord = word
-                    wordRange = NSRange(location: selectedRange.location - word.utf16.count, length: word.utf16.count)
+                    wordRange = NSRange(location: loc - word.utf16.count, length: word.utf16.count)
                 }
 
                 let suggestions = await CodeCompletionService.shared.completions(
@@ -286,7 +274,7 @@ struct CodeEditorView: NSViewRepresentable {
                     character: columnNumber
                 )
 
-                guard !Task.isCancelled, textView.selectedRange().location == selectedRange.location else { return }
+                guard !Task.isCancelled, textView.selectedRange().location == loc else { return }
 
                 if !suggestions.isEmpty {
                     self.suggestionController.show(suggestions: suggestions, prefixRange: wordRange, in: textView)
@@ -485,7 +473,7 @@ final class EditorTextView: NSTextView {
 
         guard isHighlightingCurrentLine,
               let layoutManager = self.layoutManager,
-              let textContainer = self.textContainer else { return }
+              self.textContainer != nil else { return }
 
         let selection = selectedRange()
         guard selection.length == 0 else { return }

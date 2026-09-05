@@ -2,7 +2,7 @@ import SwiftUI
 
 struct GitChangesView: View {
     @Environment(WorkspaceModel.self) private var workspace
-    @Binding var isPresented: Bool
+    @Environment(\.dismiss) private var dismiss
     @State private var changes: [GitChange] = []
     @State private var selectedPath: String?
     @State private var isLoading = false
@@ -24,7 +24,7 @@ struct GitChangesView: View {
                 }
                 .buttonStyle(.plain)
                 .disabled(isLoading || isCommitting)
-                Button { isPresented = false } label: {
+                Button { dismiss() } label: {
                     Image(systemName: "xmark")
                 }
                 .buttonStyle(.plain)
@@ -93,7 +93,7 @@ struct GitChangesView: View {
         .background(RollCodeTheme.windowBackground)
         .task { await loadChanges() }
         .onKeyPress(.escape) {
-            isPresented = false
+            dismiss()
             return .handled
         }
     }
@@ -102,7 +102,7 @@ struct GitChangesView: View {
         guard let rootURL = workspace.rootURL else { return }
         let targetURL = rootURL.appendingPathComponent(path)
         workspace.openFile(targetURL)
-        isPresented = false
+        dismiss()
     }
 
     private func performCommit() {
@@ -206,15 +206,10 @@ private struct GitDiffPreview: View {
     }
 
     private func color(for line: Substring) -> Color {
-        if line.hasPrefix("+") && !line.hasPrefix("+++") { return Color(red: 0.52, green: 0.82, blue: 0.57) }
-        if line.hasPrefix("-") && !line.hasPrefix("---") { return Color(red: 0.92, green: 0.50, blue: 0.50) }
-        if line.hasPrefix("@@") { return RollCodeTheme.accent }
-        return RollCodeTheme.secondaryText
+        line.hasPrefix("@@") ? RollCodeTheme.accent : (line.hasPrefix("+") && !line.hasPrefix("+++") ? Color(red: 0.52, green: 0.82, blue: 0.57) : (line.hasPrefix("-") && !line.hasPrefix("---") ? Color(red: 0.92, green: 0.50, blue: 0.50) : RollCodeTheme.secondaryText))
     }
 
     private func background(for line: Substring) -> Color {
-        if line.hasPrefix("+") && !line.hasPrefix("+++") { return Color.green.opacity(0.08) }
-        if line.hasPrefix("-") && !line.hasPrefix("---") { return Color.red.opacity(0.08) }
-        return .clear
+        line.hasPrefix("+") && !line.hasPrefix("+++") ? Color.green.opacity(0.08) : (line.hasPrefix("-") && !line.hasPrefix("---") ? Color.red.opacity(0.08) : .clear)
     }
 }
