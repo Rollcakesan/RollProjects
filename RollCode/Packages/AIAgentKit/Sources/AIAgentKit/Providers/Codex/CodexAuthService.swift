@@ -50,31 +50,70 @@ final class CodexAuthService {
         }
 
         guard FileManager.default.fileExists(atPath: authFileURL.path),
-              let data = try? Data(contentsOf: authFileURL),
-              let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+              let data = try? Data(contentsOf: authFileURL) else {
             status = .unauthenticated
             return
         }
 
-        if let apiKey = json["OPENAI_API_KEY"] as? String, !apiKey.isEmpty {
+        struct AuthConfig: Decodable {
+            struct Tokens: Decodable {
+                let idToken: String?
+
+                enum CodingKeys: String, CodingKey {
+                    case idToken = "id_token"
+                }
+            }
+
+            let apiKey: String?
+            let authMode: String?
+            let tokens: Tokens?
+
+            enum CodingKeys: String, CodingKey {
+                case apiKey = "OPENAI_API_KEY"
+                case authMode = "auth_mode"
+                case tokens
+            }
+        }
+
+        struct JWTPayload: Decodable {
+            struct AuthInfo: Decodable {
+                let planType: String?
+
+                enum CodingKeys: String, CodingKey {
+                    case planType = "chatgpt_plan_type"
+                }
+            }
+
+            let email: String?
+            let auth: AuthInfo?
+
+            enum CodingKeys: String, CodingKey {
+                case email
+                case auth = "https://api.openai.com/auth"
+            }
+        }
+
+        guard let config = try? JSONDecoder().decode(AuthConfig.self, from: data) else {
+            status = .unauthenticated
+            return
+        }
+
+        if let apiKey = config.apiKey, !apiKey.isEmpty {
             status = .apiKey
             return
         }
 
-        let authMode = json["auth_mode"] as? String ?? ""
-        if authMode == "chatgpt", let tokens = json["tokens"] as? [String: Any], !tokens.isEmpty {
+        if config.authMode == "chatgpt", let tokens = config.tokens {
             var email: String?
             var plan: String?
 
-            if let idToken = tokens["id_token"] as? String {
+            if let idToken = tokens.idToken {
                 let parts = idToken.split(separator: ".")
                 if parts.count >= 2,
                    let payloadData = Data(base64Encoded: paddedBase64(String(parts[1]))),
-                   let payload = try? JSONSerialization.jsonObject(with: payloadData) as? [String: Any] {
-                    email = payload["email"] as? String
-                    if let authDict = payload["https://api.openai.com/auth"] as? [String: Any] {
-                        plan = authDict["chatgpt_plan_type"] as? String
-                    }
+                   let jwt = try? JSONDecoder().decode(JWTPayload.self, from: payloadData) {
+                    email = jwt.email
+                    plan = jwt.auth?.planType
                 }
             }
             status = .loggedIn(mode: "ChatGPT", email: email, plan: plan)

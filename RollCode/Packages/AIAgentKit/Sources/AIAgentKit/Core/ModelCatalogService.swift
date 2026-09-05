@@ -167,37 +167,58 @@ final class ModelCatalogService {
         }
     }
 
-    nonisolated static func parseGeminiModels(data: Data) -> [AIModelInfo]? {
-        guard let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-              let modelsArray = json["models"] as? [[String: Any]] else {
-            return nil
+    // MARK: - Decodable DTOs
+    private struct GeminiCatalogResponse: Decodable {
+        struct ModelItem: Decodable {
+            let name: String
+            let displayName: String?
+            let supportedGenerationMethods: [String]?
+            let inputTokenLimit: Int?
+            let description: String?
         }
+        let models: [ModelItem]
+    }
+
+    private struct VertexCatalogResponse: Decodable {
+        struct PublisherModel: Decodable {
+            let name: String
+        }
+        let publisherModels: [PublisherModel]
+    }
+
+    private struct CodexCacheResponse: Decodable {
+        struct CodexModelItem: Decodable {
+            let slug: String
+            let displayName: String?
+            let supportedReasoningEfforts: [String]?
+            let description: String?
+
+            enum CodingKeys: String, CodingKey {
+                case slug
+                case displayName = "display_name"
+                case supportedReasoningEfforts = "supported_reasoning_efforts"
+                case description
+            }
+        }
+        let models: [CodexModelItem]
+    }
+
+    nonisolated static func parseGeminiModels(data: Data) -> [AIModelInfo]? {
+        guard let response = try? JSONDecoder().decode(GeminiCatalogResponse.self, from: data) else { return nil }
 
         var results: [AIModelInfo] = []
-        for item in modelsArray {
-            guard let rawName = item["name"] as? String else { continue }
-            let methods = item["supportedGenerationMethods"] as? [String] ?? []
+        for item in response.models {
+            let methods = item.supportedGenerationMethods ?? []
             guard methods.contains("generateContent") else { continue }
 
-            let modelID = rawName.replacingOccurrences(of: "models/", with: "")
-            // Filter out non-chat / embedding / deprecated test models
+            let modelID = item.name.replacingOccurrences(of: "models/", with: "")
             if modelID.contains("embedding") || modelID.contains("aqa") || modelID.contains("imagen") {
                 continue
             }
 
-            let displayName = (item["displayName"] as? String)?.trimmingCharacters(in: .whitespacesAndNewlines)
+            let displayName = item.displayName?.trimmingCharacters(in: .whitespacesAndNewlines)
             let finalName = (displayName?.isEmpty == false) ? displayName! : cleanGeminiDisplayName(from: modelID)
-            let inputTokens = item["inputTokenLimit"] as? Int
-            let description = item["description"] as? String
-
-            let tier: ModelSpeedTier
-            if modelID.contains("flash") {
-                tier = .fast
-            } else if modelID.contains("pro") {
-                tier = .deep
-            } else {
-                tier = .standard
-            }
+            let tier: ModelSpeedTier = modelID.contains("flash") ? .fast : (modelID.contains("pro") ? .deep : .standard)
 
             results.append(AIModelInfo(
                 id: modelID,
@@ -205,29 +226,24 @@ final class ModelCatalogService {
                 provider: .gemini,
                 speedTier: tier,
                 supportsReasoningEffort: false,
-                contextWindow: inputTokens,
-                descriptionText: description
+                contextWindow: item.inputTokenLimit,
+                descriptionText: item.description
             ))
         }
 
-        // Sort Pro and Flash to the top
         return results.sorted { m1, m2 in
             let score1 = modelScore(m1.id)
             let score2 = modelScore(m2.id)
-            if score1 != score2 { return score1 > score2 }
-            return m1.id > m2.id
+            return score1 != score2 ? score1 > score2 : m1.id > m2.id
         }
     }
 
     nonisolated static func parseVertexGeminiModels(data: Data) -> [AIModelInfo]? {
-        guard let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-              let modelsArray = json["publisherModels"] as? [[String: Any]] else { return nil }
+        guard let response = try? JSONDecoder().decode(VertexCatalogResponse.self, from: data) else { return nil }
 
         var results: [AIModelInfo] = []
-        for item in modelsArray {
-            guard let rawName = item["name"] as? String, rawName.contains("gemini") else { continue }
-            let modelID = rawName.replacingOccurrences(of: "publishers/google/models/", with: "")
-
+        for item in response.publisherModels where item.name.contains("gemini") {
+            let modelID = item.name.replacingOccurrences(of: "publishers/google/models/", with: "")
             if modelID.contains("embedding") || modelID.contains("tts") || modelID.contains("robotics") ||
                modelID.contains("transcribe") || modelID.contains("translate") || modelID.contains("computer-use") ||
                modelID.contains("image") || modelID.contains("audio") { continue }
@@ -257,14 +273,13 @@ final class ModelCatalogService {
     }
 
     nonisolated static func parseCodexCache(data: Data) -> [AIModelInfo]? {
-        guard let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-              let modelsArray = json["models"] as? [[String: Any]] else { return nil }
+        guard let response = try? JSONDecoder().decode(CodexCacheResponse.self, from: data) else { return nil }
 
         var results: [AIModelInfo] = []
-        for item in modelsArray {
-            guard let slug = item["slug"] as? String, !slug.isEmpty else { continue }
-            let displayName = item["display_name"] as? String ?? slug
-            let supportedEfforts = item["supported_reasoning_efforts"] as? [String]
+        for item in response.models where !item.slug.isEmpty {
+            let slug = item.slug
+            let displayName = item.displayName ?? slug
+            let supportedEfforts = item.supportedReasoningEfforts
             let supportsReasoning = (supportedEfforts != nil && !supportedEfforts!.isEmpty) || slug.hasPrefix("o") || slug.hasPrefix("gpt-5")
             let tier: ModelSpeedTier = slug.contains("mini") ? .fast : ((supportsReasoning || slug.contains("sol") || slug.hasPrefix("o1") || slug.hasPrefix("o3")) ? .deep : .standard)
 
@@ -274,7 +289,7 @@ final class ModelCatalogService {
                 provider: .codex,
                 speedTier: tier,
                 supportsReasoningEffort: supportsReasoning,
-                descriptionText: item["description"] as? String
+                descriptionText: item.description
             ))
         }
         return results.isEmpty ? nil : results

@@ -652,20 +652,30 @@ final class AgentSession {
             return
         }
 
+        struct SessionIndexItem: Decodable {
+            let id: String
+            let threadName: String
+            let updatedAt: String?
+
+            enum CodingKeys: String, CodingKey {
+                case id
+                case threadName = "thread_name"
+                case updatedAt = "updated_at"
+            }
+        }
+
         var sessions: [CodexSessionSummary] = []
         let lines = content.components(separatedBy: .newlines).reversed()
         let formatter = ISO8601DateFormatter()
         formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        let decoder = JSONDecoder()
 
         for line in lines where !line.isEmpty {
             guard let data = line.data(using: .utf8),
-                  let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-                  let id = json["id"] as? String,
-                  let threadName = json["thread_name"] as? String else { continue }
+                  let item = try? decoder.decode(SessionIndexItem.self, from: data) else { continue }
 
-            let dateString = json["updated_at"] as? String
-            let date = dateString.flatMap { formatter.date(from: $0) ?? ISO8601DateFormatter().date(from: $0) }
-            sessions.append(CodexSessionSummary(id: id, threadName: threadName, updatedAt: date))
+            let date = item.updatedAt.flatMap { formatter.date(from: $0) ?? ISO8601DateFormatter().date(from: $0) }
+            sessions.append(CodexSessionSummary(id: item.id, threadName: item.threadName, updatedAt: date))
             if sessions.count >= 20 { break }
         }
         pastCodexSessions = sessions

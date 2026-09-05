@@ -74,10 +74,13 @@ final class GeminiAuthService {
 
         // Read ~/.gemini/projects.json
         let projectsURL = geminiDirURL.appending(path: "projects.json")
+        struct ProjectsConfig: Decodable {
+            let projects: [String: String]?
+        }
         guard FileManager.default.fileExists(atPath: projectsURL.path),
               let data = try? Data(contentsOf: projectsURL),
-              let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-              let projects = json["projects"] as? [String: String] else {
+              let config = try? JSONDecoder().decode(ProjectsConfig.self, from: data),
+              let projects = config.projects else {
             return nil
         }
 
