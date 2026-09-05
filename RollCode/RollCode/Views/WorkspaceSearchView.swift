@@ -8,7 +8,6 @@ struct WorkspaceSearchView: View {
     @State private var matches: [WorkspaceSearchMatch] = []
     @State private var isSearching = false
     @State private var isReplacing = false
-    @State private var isConfirmingReplaceAll = false
     @State private var statusMessage = ""
     @FocusState private var searchFocused: Bool
 
@@ -39,7 +38,7 @@ struct WorkspaceSearchView: View {
                         .clipShape(RoundedRectangle(cornerRadius: 5))
                         .overlay(RoundedRectangle(cornerRadius: 5).stroke(RollCodeTheme.divider))
 
-                    Button("Replace All") { isConfirmingReplaceAll = true }
+                    Button("Replace All") { performReplaceAll() }
                         .buttonStyle(.borderedProminent)
                         .controlSize(.small)
                         .disabled(matches.isEmpty || isReplacing)
@@ -90,18 +89,6 @@ struct WorkspaceSearchView: View {
         .onKeyPress(.escape) {
             isPresented = false
             return .handled
-        }
-        .confirmationDialog(
-            "Replace all matches?",
-            isPresented: $isConfirmingReplaceAll,
-            titleVisibility: .visible
-        ) {
-            Button("Replace All", role: .destructive) {
-                performReplaceAll()
-            }
-            Button("Cancel", role: .cancel) {}
-        } message: {
-            Text("This writes the replacement to every matching file in the project.")
         }
     }
 

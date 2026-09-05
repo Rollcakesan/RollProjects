@@ -129,12 +129,9 @@ struct CodeEditorView: NSViewRepresentable {
             scheduleCompletion(in: textView)
         }
 
-        private var lastBracketPair: (NSRange, NSRange)?
-
         func textViewDidChangeSelection(_ notification: Notification) {
             textView?.needsDisplay = true
             ruler?.needsDisplay = true
-            applyBracketMatching()
 
             if suggestionController.isVisible {
                 guard let textView,
@@ -143,64 +140,6 @@ struct CodeEditorView: NSViewRepresentable {
                     return
                 }
             }
-        }
-
-        private func applyBracketMatching() {
-            guard let textView = self.textView,
-                  let textStorage = textView.textStorage else { return }
-
-            if let (r1, r2) = lastBracketPair {
-                if r1.location + r1.length <= textStorage.length {
-                    textStorage.removeAttribute(.backgroundColor, range: r1)
-                }
-                if r2.location + r2.length <= textStorage.length {
-                    textStorage.removeAttribute(.backgroundColor, range: r2)
-                }
-                lastBracketPair = nil
-            }
-
-            let selection = textView.selectedRange()
-            guard selection.length == 0 else { return }
-            let text = textStorage.string as NSString
-            guard selection.location <= text.length else { return }
-
-            if let pair = findMatchingBracketPair(at: selection.location, in: text) {
-                lastBracketPair = pair
-                let highlightColor = NSColor.systemTeal.withAlphaComponent(0.28)
-                textStorage.addAttribute(.backgroundColor, value: highlightColor, range: pair.0)
-                textStorage.addAttribute(.backgroundColor, value: highlightColor, range: pair.1)
-            }
-        }
-
-        private func findMatchingBracketPair(at location: Int, in text: NSString) -> (NSRange, NSRange)? {
-            let forward: [unichar: unichar] = [40: 41, 91: 93, 123: 125] // () [] {}
-            let backward: [unichar: unichar] = [41: 40, 93: 91, 125: 123]
-
-            for loc in [location > 0 ? location - 1 : nil, location < text.length ? location : nil].compactMap({ $0 }) {
-                let code = text.character(at: loc)
-                if let target = forward[code] {
-                    var depth = 0
-                    for i in (loc + 1)..<text.length {
-                        let c = text.character(at: i)
-                        if c == code { depth += 1 }
-                        else if c == target {
-                            if depth == 0 { return (NSRange(location: loc, length: 1), NSRange(location: i, length: 1)) }
-                            depth -= 1
-                        }
-                    }
-                } else if let target = backward[code] {
-                    var depth = 0
-                    for i in stride(from: loc - 1, through: 0, by: -1) {
-                        let c = text.character(at: i)
-                        if c == code { depth += 1 }
-                        else if c == target {
-                            if depth == 0 { return (NSRange(location: i, length: 1), NSRange(location: loc, length: 1)) }
-                            depth -= 1
-                        }
-                    }
-                }
-            }
-            return nil
         }
 
         func textView(_ textView: NSTextView, doCommandBy commandSelector: Selector) -> Bool {
@@ -381,22 +320,13 @@ struct CodeEditorView: NSViewRepresentable {
         }
 
         func handleNavigationRequest(_ request: EditorNavigationRequest?) {
-            guard let request,
-                  request.id != lastNavigationRequestID,
-                  let textView else { return }
+            guard let request, request.id != lastNavigationRequestID, let textView else { return }
             lastNavigationRequestID = request.id
-
-            let text = textView.string as NSString
-            var line = 1
-            var location = 0
-            while line < request.line, location < text.length {
-                location = NSMaxRange(text.lineRange(for: NSRange(location: location, length: 0)))
-                line += 1
+            if let range = lineRange(forLine: request.line, in: textView.string as NSString) {
+                textView.setSelectedRange(range)
+                textView.scrollRangeToVisible(range)
+                textView.window?.makeFirstResponder(textView)
             }
-            let range = text.lineRange(for: NSRange(location: min(location, text.length), length: 0))
-            textView.setSelectedRange(range)
-            textView.scrollRangeToVisible(range)
-            textView.window?.makeFirstResponder(textView)
         }
 
         func applyHighlighting(language: CodeLanguage) {
@@ -419,7 +349,7 @@ struct CodeEditorView: NSViewRepresentable {
             }
 
             for errorLine in parent.errorLines {
-                if let range = characterRange(forLine: errorLine, in: textStorage.string) {
+                if let range = lineRange(forLine: errorLine, in: textStorage.string as NSString) {
                     textStorage.addAttribute(.backgroundColor, value: NSColor.systemRed.withAlphaComponent(0.18), range: range)
                     textStorage.addAttribute(.underlineColor, value: NSColor.systemRed, range: range)
                     textStorage.addAttribute(.underlineStyle, value: NSUnderlineStyle.patternDot.rawValue | NSUnderlineStyle.single.rawValue, range: range)
@@ -429,22 +359,15 @@ struct CodeEditorView: NSViewRepresentable {
             isApplyingAttributes = false
         }
 
-        private func characterRange(forLine targetLine: Int, in string: String) -> NSRange? {
-            let nsString = string as NSString
-            var currentLine = 1
-            var index = 0
-            while index < nsString.length {
-                let lineRange = nsString.lineRange(for: NSRange(location: index, length: 0))
-                if currentLine == targetLine {
-                    return lineRange
-                }
-                index = NSMaxRange(lineRange)
-                currentLine += 1
+        private func lineRange(forLine targetLine: Int, in string: NSString) -> NSRange? {
+            var line = 1, loc = 0
+            while loc < string.length {
+                let range = string.lineRange(for: NSRange(location: loc, length: 0))
+                if line == targetLine { return range }
+                loc = NSMaxRange(range)
+                line += 1
             }
-            if currentLine == targetLine && nsString.length == 0 {
-                return NSRange(location: 0, length: 0)
-            }
-            return nil
+            return (targetLine == 1 && string.length == 0) ? NSRange(location: 0, length: 0) : nil
         }
     }
 }
@@ -455,16 +378,10 @@ private enum EditorPalette {
     static var foreground: NSColor { RollCodeTheme.nsForeground }
     static var caret: NSColor { RollCodeTheme.nsCaret }
     static var selection: NSColor { RollCodeTheme.nsSelection }
-    static var font: NSFont { RollCodeTheme.editorFont }
-
-    static func font(size: CGFloat) -> NSFont {
-        .monospacedSystemFont(ofSize: size, weight: .regular)
-    }
-
+    static func font(size: CGFloat) -> NSFont { .monospacedSystemFont(ofSize: size, weight: .regular) }
     static func paragraphStyle(tabWidth: Int, fontSize: CGFloat = 14.5) -> NSParagraphStyle {
         let style = NSMutableParagraphStyle()
-        let spaceWidth = (" " as NSString).size(withAttributes: [.font: font(size: fontSize)]).width
-        style.defaultTabInterval = spaceWidth * CGFloat(tabWidth)
+        style.defaultTabInterval = (" " as NSString).size(withAttributes: [.font: font(size: fontSize)]).width * CGFloat(tabWidth)
         style.tabStops = []
         return style
     }
@@ -474,7 +391,6 @@ private enum EditorPalette {
 private struct SyntaxRule {
     let regex: NSRegularExpression
     let color: NSColor
-
     init(pattern: String, color: NSColor, options: NSRegularExpression.Options = []) {
         self.regex = (try? NSRegularExpression(pattern: pattern, options: options)) ?? (try! NSRegularExpression(pattern: "$^"))
         self.color = color
@@ -483,58 +399,17 @@ private struct SyntaxRule {
 
 @MainActor
 private enum SyntaxRules {
-    private static let keyword = NSColor(red: 0.78, green: 0.48, blue: 0.92, alpha: 1)
-    private static let string = NSColor(red: 0.72, green: 0.86, blue: 0.56, alpha: 1)
-    private static let comment = NSColor(red: 0.43, green: 0.48, blue: 0.52, alpha: 1)
-    private static let number = NSColor(red: 0.92, green: 0.68, blue: 0.43, alpha: 1)
-    private static let type = NSColor(red: 0.45, green: 0.75, blue: 0.94, alpha: 1)
-
-    private static let slashComments = SyntaxRule(pattern: #"//.*$|/\*[\s\S]*?\*/"#, color: comment, options: [.anchorsMatchLines])
-    private static let hashComments = SyntaxRule(pattern: #"#.*$"#, color: comment, options: [.anchorsMatchLines])
-
-    private static func keywordRule(for language: CodeLanguage) -> SyntaxRule? {
-        let words = language.standardKeywords
-        guard !words.isEmpty else { return nil }
-        let pattern = #"\b("# + words.joined(separator: "|") + #")\b"#
-        return SyntaxRule(pattern: pattern, color: keyword)
-    }
-
-    private static let commonRules = [
-        SyntaxRule(pattern: #"\b\d+(?:\.\d+)?\b"#, color: number),
-        SyntaxRule(pattern: #"\"(?:\\.|[^\"\\])*\"|'(?:\\.|[^'\\])*'"#, color: string),
-    ]
-
     static func rules(for language: CodeLanguage) -> [SyntaxRule] {
-        var list = commonRules
-        if let kwRule = keywordRule(for: language) {
-            list.append(kwRule)
+        var list = [
+            SyntaxRule(pattern: #"\b\d+(?:\.\d+)?\b"#, color: NSColor(red: 0.92, green: 0.68, blue: 0.43, alpha: 1)),
+            SyntaxRule(pattern: #"\"(?:\\.|[^\"\\])*\"|'(?:\\.|[^'\\])*'"#, color: NSColor(red: 0.72, green: 0.86, blue: 0.56, alpha: 1))
+        ]
+        let words = language.standardKeywords
+        if !words.isEmpty {
+            list.append(SyntaxRule(pattern: #"\b("# + words.joined(separator: "|") + #")\b"#, color: NSColor(red: 0.78, green: 0.48, blue: 0.92, alpha: 1)))
         }
-
-        switch language {
-        case .swift:
-            list.append(SyntaxRule(pattern: #"\b[A-Z][A-Za-z0-9_]*\b"#, color: type))
-            list.append(slashComments)
-        case .javascript, .typescript, .cFamily, .go, .rust:
-            list.append(slashComments)
-        case .python, .shell:
-            list.append(hashComments)
-        case .json:
-            list.append(SyntaxRule(pattern: #"\"(?:\\.|[^\"\\])*\"\s*(?=:)"#, color: type))
-        case .html:
-            list.append(SyntaxRule(pattern: #"</?[A-Za-z][^>]*>"#, color: type))
-            list.append(SyntaxRule(pattern: #"<!--[\s\S]*?-->"#, color: comment))
-        case .css:
-            list.append(SyntaxRule(pattern: #"[#.]?[A-Za-z_-][A-Za-z0-9_-]*(?=\s*\{)"#, color: type))
-            list.append(SyntaxRule(pattern: #"/\*[\s\S]*?\*/"#, color: comment))
-        case .markdown:
-            list.append(SyntaxRule(pattern: #"^#{1,6}\s+.*$"#, color: type, options: [.anchorsMatchLines]))
-            list.append(SyntaxRule(pattern: #"`[^`]+`|\*\*[^*]+\*\*"#, color: keyword))
-        case .yaml:
-            list.append(SyntaxRule(pattern: #"^[\s-]*[A-Za-z0-9_.-]+(?=:)"#, color: type, options: [.anchorsMatchLines]))
-            list.append(hashComments)
-        case .plainText:
-            break
-        }
+        let commentPattern = (language == .python || language == .shell || language == .yaml) ? #"#.*$"# : #"//.*$|/\*[\s\S]*?\*/"#
+        list.append(SyntaxRule(pattern: commentPattern, color: NSColor(red: 0.43, green: 0.48, blue: 0.52, alpha: 1), options: [.anchorsMatchLines]))
         return list
     }
 }
@@ -560,80 +435,44 @@ final class LineNumberRulerView: NSRulerView {
     override func drawHashMarksAndLabels(in rect: NSRect) {
         EditorPalette.background.setFill()
         bounds.fill()
-
-        guard let textView,
-              let layoutManager = textView.layoutManager,
-              let textContainer = textView.textContainer else { return }
+        guard let textView, let layoutManager = textView.layoutManager, let textContainer = textView.textContainer else { return }
 
         let visibleRect = textView.enclosingScrollView?.contentView.bounds ?? textView.visibleRect
         let visibleGlyphRange = layoutManager.glyphRange(forBoundingRect: visibleRect, in: textContainer)
         let text = textView.string as NSString
-        let attributes: [NSAttributedString.Key: Any] = [
-            .font: NSFont.monospacedDigitSystemFont(ofSize: 10, weight: .regular),
-            .foregroundColor: NSColor(white: 0.42, alpha: 1)
-        ]
+        let normalAttrs: [NSAttributedString.Key: Any] = [.font: NSFont.monospacedDigitSystemFont(ofSize: 10, weight: .regular), .foregroundColor: NSColor(white: 0.42, alpha: 1)]
+        let errAttrs: [NSAttributedString.Key: Any] = [.font: NSFont.monospacedDigitSystemFont(ofSize: 10, weight: .bold), .foregroundColor: NSColor.systemRed]
 
-        var characterIndex = 0
-        var lineNumber = 1
-        while characterIndex < text.length {
-            let lineRange = text.lineRange(for: NSRange(location: characterIndex, length: 0))
-            let glyphIndex = layoutManager.glyphIndexForCharacter(at: characterIndex)
-            let isError = errorLines.contains(lineNumber)
-            let isGitAdded = gitAddedLines.contains(lineNumber)
-            let isGitModified = gitModifiedLines.contains(lineNumber)
-
-            if NSLocationInRange(glyphIndex, visibleGlyphRange) {
-                let lineRect = layoutManager.lineFragmentRect(forGlyphAt: glyphIndex, effectiveRange: nil)
-                let y = lineRect.minY + textView.textContainerOrigin.y - visibleRect.minY
-                drawLineAnnotations(y: y, height: lineRect.height, lineNumber: lineNumber, isError: isError, isGitAdded: isGitAdded, isGitModified: isGitModified, defaultAttrs: attributes)
-            } else if glyphIndex > NSMaxRange(visibleGlyphRange) {
-                break
+        func drawRow(y: CGFloat, h: CGFloat, line: Int) {
+            if gitAddedLines.contains(line) || gitModifiedLines.contains(line) {
+                (gitAddedLines.contains(line) ? NSColor.systemGreen : NSColor.systemBlue).setFill()
+                NSRect(x: 1, y: y, width: 3, height: h).fill()
             }
-            characterIndex = NSMaxRange(lineRange)
-            lineNumber += 1
+            let isErr = errorLines.contains(line)
+            if isErr {
+                NSColor.systemRed.setFill()
+                NSBezierPath(ovalIn: NSRect(x: 6, y: y + 4, width: 5, height: 5)).fill()
+            }
+            let attrs = isErr ? errAttrs : normalAttrs
+            let label = "\(line)" as NSString
+            label.draw(at: NSPoint(x: ruleThickness - label.size(withAttributes: attrs).width - 8, y: y + 1), withAttributes: attrs)
         }
 
+        var charIdx = 0, line = 1
+        while charIdx < text.length {
+            let lineRange = text.lineRange(for: NSRange(location: charIdx, length: 0))
+            let glyphIdx = layoutManager.glyphIndexForCharacter(at: charIdx)
+            if NSLocationInRange(glyphIdx, visibleGlyphRange) {
+                let rect = layoutManager.lineFragmentRect(forGlyphAt: glyphIdx, effectiveRange: nil)
+                drawRow(y: rect.minY + textView.textContainerOrigin.y - visibleRect.minY, h: rect.height, line: line)
+            } else if glyphIdx > NSMaxRange(visibleGlyphRange) { break }
+            charIdx = NSMaxRange(lineRange)
+            line += 1
+        }
         if text.length == 0 || text.hasSuffix("\n") {
-            let lineRect = layoutManager.extraLineFragmentRect
-            let y = lineRect.minY + textView.textContainerOrigin.y - visibleRect.minY
-            drawLineAnnotations(
-                y: y,
-                height: max(lineRect.height, 16),
-                lineNumber: lineNumber,
-                isError: errorLines.contains(lineNumber),
-                isGitAdded: gitAddedLines.contains(lineNumber),
-                isGitModified: gitModifiedLines.contains(lineNumber),
-                defaultAttrs: attributes
-            )
+            let rect = layoutManager.extraLineFragmentRect
+            drawRow(y: rect.minY + textView.textContainerOrigin.y - visibleRect.minY, h: max(rect.height, 16), line: line)
         }
-    }
-
-    private func drawLineAnnotations(
-        y: CGFloat,
-        height: CGFloat,
-        lineNumber: Int,
-        isError: Bool,
-        isGitAdded: Bool,
-        isGitModified: Bool,
-        defaultAttrs: [NSAttributedString.Key: Any]
-    ) {
-        if isGitAdded {
-            NSColor.systemGreen.setFill()
-            NSRect(x: 1, y: y, width: 3, height: height).fill()
-        } else if isGitModified {
-            NSColor.systemBlue.setFill()
-            NSRect(x: 1, y: y, width: 3, height: height).fill()
-        }
-        if isError {
-            NSColor.systemRed.setFill()
-            NSBezierPath(ovalIn: NSRect(x: 6, y: y + 4, width: 5, height: 5)).fill()
-        }
-        let lineAttrs: [NSAttributedString.Key: Any] = isError ? [
-            .font: NSFont.monospacedDigitSystemFont(ofSize: 10, weight: .bold),
-            .foregroundColor: NSColor.systemRed
-        ] : defaultAttrs
-        let label = "\(lineNumber)" as NSString
-        label.draw(at: NSPoint(x: ruleThickness - label.size(withAttributes: lineAttrs).width - 8, y: y + 1), withAttributes: lineAttrs)
     }
 }
 

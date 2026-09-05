@@ -48,8 +48,7 @@ struct ShortcutCheatSheetView: View {
     ]
 
     private var filteredShortcuts: [ShortcutItem] {
-        if searchText.isEmpty { return shortcuts }
-        return shortcuts.filter {
+        searchText.isEmpty ? shortcuts : shortcuts.filter {
             $0.title.localizedCaseInsensitiveContains(searchText) ||
             $0.category.localizedCaseInsensitiveContains(searchText) ||
             $0.keys.joined().localizedCaseInsensitiveContains(searchText)
@@ -57,15 +56,7 @@ struct ShortcutCheatSheetView: View {
     }
 
     private var categories: [String] {
-        var seen = Set<String>()
-        var list = [String]()
-        for item in filteredShortcuts {
-            if !seen.contains(item.category) {
-                seen.insert(item.category)
-                list.append(item.category)
-            }
-        }
-        return list
+        filteredShortcuts.map(\.category).reduce(into: [String]()) { if !$0.contains($1) { $0.append($1) } }
     }
 
     var body: some View {

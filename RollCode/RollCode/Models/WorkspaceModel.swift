@@ -347,20 +347,12 @@ final class WorkspaceModel {
     }
 
     func closeOtherDocuments(except target: EditorDocument) {
-        let others = documents.filter { $0.id != target.id }
-        closeMultipleDocuments(others)
+        documents.filter { $0.id != target.id }.forEach(forceCloseDocument)
     }
 
     func closeDocumentsToTheRight(of target: EditorDocument) {
         guard let index = documents.firstIndex(where: { $0.id == target.id }) else { return }
-        let rightDocs = Array(documents[(index + 1)...])
-        closeMultipleDocuments(rightDocs)
-    }
-
-    func closeMultipleDocuments(_ docs: [EditorDocument]) {
-        for doc in docs {
-            forceCloseDocument(doc)
-        }
+        documents[(index + 1)...].forEach(forceCloseDocument)
     }
 
     func updateGitDiffLines(for document: EditorDocument) {
