@@ -44,7 +44,7 @@ final class CodeCompletionService {
             }
         }
 
-        let localMatches = self.localCompletions(for: trimmedPrefix, in: text, language: language)
+        let localMatches = self.completions(for: trimmedPrefix, in: text, language: language)
             .map { CodeCompletionSuggestion(label: $0) }
 
         if filteredLSP.isEmpty {
@@ -62,10 +62,6 @@ final class CodeCompletionService {
     }
 
     func completions(for prefix: String, in text: String, language: CodeLanguage) -> [String] {
-        localCompletions(for: prefix, in: text, language: language)
-    }
-
-    func localCompletions(for prefix: String, in text: String, language: CodeLanguage) -> [String] {
         let trimmedPrefix = prefix.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmedPrefix.isEmpty else { return [] }
 
