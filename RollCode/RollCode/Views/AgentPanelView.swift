@@ -360,61 +360,6 @@ struct AgentPanelView: View {
             ScrollViewReader { proxy in
                 ScrollView {
                     LazyVStack(alignment: .leading, spacing: 10) {
-                        if agent.selectedProvider == .codex && agent.auth.status == .unauthenticated {
-                            HStack(spacing: 8) {
-                                Image(systemName: "person.badge.key.fill")
-                                    .foregroundStyle(RollCodeTheme.accent)
-                                VStack(alignment: .leading, spacing: 2) {
-                                    Text("Codex Login")
-                                        .font(.system(size: 11, weight: .medium))
-                                        .foregroundStyle(RollCodeTheme.primaryText)
-                                    Text("Log in with your ChatGPT account to use Codex without an API key.")
-                                        .font(.system(size: 10))
-                                        .foregroundStyle(RollCodeTheme.secondaryText)
-                                }
-                                Spacer()
-                                Button("Log In") {
-                                    agent.auth.requestLogin(in: terminal)
-                                }
-                                .buttonStyle(.borderedProminent)
-                                .controlSize(.small)
-                            }
-                            .padding(8)
-                            .background(RollCodeTheme.elevatedBackground)
-                            .clipShape(RoundedRectangle(cornerRadius: 6))
-                        } else if agent.selectedProvider == .gemini && agent.geminiAuth.status == .unauthenticated {
-                            HStack(spacing: 8) {
-                                Image(systemName: "person.badge.key.fill")
-                                    .foregroundStyle(Color.blue)
-                                VStack(alignment: .leading, spacing: 2) {
-                                    Text("Gemini Login")
-                                        .font(.system(size: 11, weight: .medium))
-                                        .foregroundStyle(RollCodeTheme.primaryText)
-                                    Text("Log in with Google via browser, or enter an API key in Settings (⌘,).")
-                                        .font(.system(size: 10))
-                                        .foregroundStyle(RollCodeTheme.secondaryText)
-                                }
-                                Spacer()
-                                if agent.geminiAuth.isLoggingIn {
-                                    HStack(spacing: 4) {
-                                        ProgressView().controlSize(.small)
-                                        Text("Waiting…")
-                                            .font(.system(size: 10))
-                                            .foregroundStyle(RollCodeTheme.secondaryText)
-                                    }
-                                } else {
-                                    Button("Log In with Google") {
-                                        agent.geminiAuth.loginWithBrowser()
-                                    }
-                                    .buttonStyle(.borderedProminent)
-                                    .controlSize(.small)
-                                }
-                            }
-                            .padding(8)
-                            .background(RollCodeTheme.elevatedBackground)
-                            .clipShape(RoundedRectangle(cornerRadius: 6))
-                        }
-
                         if agent.entries.isEmpty {
                             VStack(alignment: .leading, spacing: 7) {
                                 Text("What should I change?")

@@ -44,14 +44,7 @@ struct ContentView: View {
         .toolbar {
             WorkspaceToolbarContent()
         }
-        .workspaceModals(
-            alertBinding: alertBinding,
-            renameBinding: renameBinding,
-            createBinding: createBinding,
-            confirmCloseBinding: confirmCloseBinding,
-            deleteBinding: deleteBinding,
-            externalConflictBinding: externalConflictBinding
-        )
+        .workspaceModals()
         .fileExporter(
             isPresented: $workspace.isSavingActiveDocumentAs,
             document: workspace.documentBeingSavedAs.map { TextDocumentFile(text: $0.text) },
@@ -91,48 +84,6 @@ struct ContentView: View {
                 workspace.checkForExternalChanges()
             }
         }
-    }
-
-    private var confirmCloseBinding: Binding<Bool> {
-        Binding(
-            get: { workspace.unconfirmedClosingDocument != nil },
-            set: { if !$0 { workspace.cancelCloseDocument() } }
-        )
-    }
-
-    private var externalConflictBinding: Binding<Bool> {
-        Binding(
-            get: { workspace.externalConflict != nil },
-            set: { if !$0 { workspace.resolveExternalConflict(reload: false) } }
-        )
-    }
-
-    private var deleteBinding: Binding<Bool> {
-        Binding(
-            get: { workspace.deletingURL != nil },
-            set: { if !$0 { workspace.cancelDeleteItem() } }
-        )
-    }
-
-    private var alertBinding: Binding<Bool> {
-        Binding(
-            get: { workspace.alertMessage != nil },
-            set: { if !$0 { workspace.alertMessage = nil } }
-        )
-    }
-
-    private var renameBinding: Binding<Bool> {
-        Binding(
-            get: { workspace.renamingURL != nil },
-            set: { if !$0 { workspace.cancelRename() } }
-        )
-    }
-
-    private var createBinding: Binding<Bool> {
-        Binding(
-            get: { workspace.creatingItemParentURL != nil },
-            set: { if !$0 { workspace.cancelCreateItem() } }
-        )
     }
 }
 
@@ -251,70 +202,63 @@ private struct TextDocumentFile: FileDocument {
 }
 
 extension View {
-    func workspaceModals(
-        alertBinding: Binding<Bool>,
-        renameBinding: Binding<Bool>,
-        createBinding: Binding<Bool>,
-        confirmCloseBinding: Binding<Bool>,
-        deleteBinding: Binding<Bool>,
-        externalConflictBinding: Binding<Bool>
-    ) -> some View {
-        modifier(WorkspaceModalsModifier(
-            alertBinding: alertBinding,
-            renameBinding: renameBinding,
-            createBinding: createBinding,
-            confirmCloseBinding: confirmCloseBinding,
-            deleteBinding: deleteBinding,
-            externalConflictBinding: externalConflictBinding
-        ))
+    func workspaceModals() -> some View {
+        modifier(WorkspaceModalsModifier())
     }
 }
 
 private struct WorkspaceModalsModifier: ViewModifier {
     @Environment(WorkspaceModel.self) private var workspace
-    @Binding var alertBinding: Bool
-    @Binding var renameBinding: Bool
-    @Binding var createBinding: Bool
-    @Binding var confirmCloseBinding: Bool
-    @Binding var deleteBinding: Bool
-    @Binding var externalConflictBinding: Bool
 
     func body(content: Content) -> some View {
+        @Bindable var workspace = workspace
         content
-            .alert("RollCode", isPresented: $alertBinding) {
+            .alert("RollCode", isPresented: Binding(
+                get: { workspace.alertMessage != nil },
+                set: { if !$0 { workspace.alertMessage = nil } }
+            )) {
                 Button("OK", role: .cancel) { workspace.alertMessage = nil }
             } message: {
                 Text(workspace.alertMessage ?? "")
             }
-            .alert("Rename", isPresented: $renameBinding) {
-                TextField("New name", text: Bindable(workspace).renamingName)
+            .alert("Rename", isPresented: Binding(
+                get: { workspace.renamingURL != nil },
+                set: { if !$0 { workspace.cancelRename() } }
+            )) {
+                TextField("New name", text: $workspace.renamingName)
                 Button("Rename") { workspace.confirmRename() }
                 Button("Cancel", role: .cancel) { workspace.cancelRename() }
             } message: {
                 Text("Enter a new name for \(workspace.renamingURL?.lastPathComponent ?? "this item").")
             }
-            .alert(workspace.creatingItemIsDirectory ? "New Folder" : "New File", isPresented: $createBinding) {
-                TextField("Name", text: Bindable(workspace).creatingItemName)
+            .alert(workspace.creatingItemIsDirectory ? "New Folder" : "New File", isPresented: Binding(
+                get: { workspace.creatingItemParentURL != nil },
+                set: { if !$0 { workspace.cancelCreateItem() } }
+            )) {
+                TextField("Name", text: $workspace.creatingItemName)
                 Button("Create") { workspace.confirmCreateItem() }
                 Button("Cancel", role: .cancel) { workspace.cancelCreateItem() }
             } message: {
                 Text("Enter a name for the new \(workspace.creatingItemIsDirectory ? "folder" : "file").")
             }
-            .sheet(isPresented: Bindable(workspace).isQuickOpenPresented) {
-                QuickOpenView(isPresented: Bindable(workspace).isQuickOpenPresented)
+            .sheet(isPresented: $workspace.isQuickOpenPresented) {
+                QuickOpenView(isPresented: $workspace.isQuickOpenPresented)
             }
-            .sheet(isPresented: Bindable(workspace).isWorkspaceSearchPresented) {
-                WorkspaceSearchView(isPresented: Bindable(workspace).isWorkspaceSearchPresented)
+            .sheet(isPresented: $workspace.isWorkspaceSearchPresented) {
+                WorkspaceSearchView(isPresented: $workspace.isWorkspaceSearchPresented)
             }
-            .sheet(isPresented: Bindable(workspace).isGitChangesPresented) {
-                GitChangesView(isPresented: Bindable(workspace).isGitChangesPresented)
+            .sheet(isPresented: $workspace.isGitChangesPresented) {
+                GitChangesView(isPresented: $workspace.isGitChangesPresented)
             }
-            .sheet(isPresented: Bindable(workspace).isShortcutCheatSheetPresented) {
+            .sheet(isPresented: $workspace.isShortcutCheatSheetPresented) {
                 ShortcutCheatSheetView()
             }
             .confirmationDialog(
                 "Save changes to \(workspace.unconfirmedClosingDocument?.name ?? "file")?",
-                isPresented: $confirmCloseBinding,
+                isPresented: Binding(
+                    get: { workspace.unconfirmedClosingDocument != nil },
+                    set: { if !$0 { workspace.cancelCloseDocument() } }
+                ),
                 titleVisibility: .visible
             ) {
                 Button("Save") { workspace.confirmCloseDocument(save: true) }
@@ -325,7 +269,10 @@ private struct WorkspaceModalsModifier: ViewModifier {
             }
             .confirmationDialog(
                 "Move \(workspace.deletingURL?.lastPathComponent ?? "item") to Trash?",
-                isPresented: $deleteBinding,
+                isPresented: Binding(
+                    get: { workspace.deletingURL != nil },
+                    set: { if !$0 { workspace.cancelDeleteItem() } }
+                ),
                 titleVisibility: .visible
             ) {
                 Button("Move to Trash", role: .destructive) { workspace.confirmDeleteItem() }
@@ -335,7 +282,10 @@ private struct WorkspaceModalsModifier: ViewModifier {
             }
             .confirmationDialog(
                 "\(workspace.externalConflict?.documentName ?? "File") changed on disk.",
-                isPresented: $externalConflictBinding,
+                isPresented: Binding(
+                    get: { workspace.externalConflict != nil },
+                    set: { if !$0 { workspace.resolveExternalConflict(reload: false) } }
+                ),
                 titleVisibility: .visible
             ) {
                 Button("Reload from Disk") { workspace.resolveExternalConflict(reload: true) }

@@ -42,6 +42,20 @@ final class AgentSession {
         var threads: [AgentThread] = []
         var selectedModel: String
         var reasoningEffort: ReasoningEffort
+
+        mutating func mutateThread(id: UUID, _ block: (inout AgentThread) -> Void) -> Bool {
+            if activeThread.id == id {
+                block(&activeThread)
+                activeThread.updatedAt = Date()
+                return true
+            }
+            if let idx = threads.firstIndex(where: { $0.id == id }) {
+                block(&threads[idx])
+                threads[idx].updatedAt = Date()
+                return true
+            }
+            return false
+        }
     }
 
     private var codexChannel: ProviderChannelState
@@ -95,6 +109,10 @@ final class AgentSession {
     }
 
     var activeThreadTitle: String { activeThread.title }
+
+    func mutateThread(id: UUID, _ block: (inout AgentThread) -> Void) {
+        _ = codexChannel.mutateThread(id: id, block) || geminiChannel.mutateThread(id: id, block)
+    }
 
     let auth: CodexAuthService
     let geminiAuth: GeminiAuthService
@@ -184,22 +202,19 @@ final class AgentSession {
 
     func setModel(_ modelID: String) {
         if selectedProvider == .codex {
-            codexChannel.selectedModel = modelID
-            codexChannel.activeThread.model = modelID
             selectedCodexModel = modelID
+            codexChannel.activeThread.model = modelID
         } else {
-            geminiChannel.selectedModel = modelID
-            geminiChannel.activeThread.model = modelID
             selectedGeminiModel = modelID
+            geminiChannel.activeThread.model = modelID
         }
         saveCurrentThreads()
     }
 
     func setReasoningEffort(_ effort: ReasoningEffort) {
         if selectedProvider == .codex {
-            codexChannel.reasoningEffort = effort
-            codexChannel.activeThread.reasoningEffort = effort.rawValue
             selectedReasoningEffort = effort
+            codexChannel.activeThread.reasoningEffort = effort.rawValue
         } else {
             geminiChannel.reasoningEffort = effort
             geminiChannel.activeThread.reasoningEffort = effort.rawValue
@@ -317,24 +332,30 @@ final class AgentSession {
         self.initialChangedPaths = Set((try? GitBridgeService.changedPaths(in: workspaceURL)) ?? [])
         saveCurrentThreads()
 
+        let targetThreadID = activeThread.id
+        activeTurnThreadID = targetThreadID
+        turnStartTime = Date()
+
         let contextualPrompt = makeContextualPrompt(prompt, activeFileURL: activeFileURL)
 
         if selectedProvider == .codex && useAppServer {
             runCodexAppServerTurn(
                 prompt: contextualPrompt,
                 workspaceURL: workspaceURL,
-                activeFileURL: activeFileURL
+                activeFileURL: activeFileURL,
+                targetThreadID: targetThreadID
             )
             return
         }
 
-        runProcessTurn(prompt: contextualPrompt, workspaceURL: workspaceURL)
+        runProcessTurn(prompt: contextualPrompt, workspaceURL: workspaceURL, targetThreadID: targetThreadID)
     }
 
     private func runCodexAppServerTurn(
         prompt: String,
         workspaceURL: URL,
-        activeFileURL: URL?
+        activeFileURL: URL?,
+        targetThreadID: UUID
     ) {
         let appServer = CodexAppServerClient.shared
         let model = currentModel.isEmpty ? nil : currentModel
@@ -343,16 +364,17 @@ final class AgentSession {
 
         Task { @MainActor [weak self] in
             guard let self else { return }
-            guard self.activeTurnThreadID == self.activeThread.id else { return }
             do {
+                var existingCodexThreadID: String?
+                self.mutateThread(id: targetThreadID) { existingCodexThreadID = $0.codexThreadID }
                 let threadId: String
-                if let existing = self.activeThread.codexThreadID, !existing.isEmpty {
+                if let existing = existingCodexThreadID, !existing.isEmpty {
                     threadId = existing
                 } else {
                     threadId = try await appServer.startThread(cwd: cwd, model: model)
-                    guard self.activeTurnThreadID == self.activeThread.id else { return }
-                    self.activeThread.codexThreadID = threadId
-                    self.activeThread.updatedAt = Date()
+                    self.mutateThread(id: targetThreadID) {
+                        $0.codexThreadID = threadId
+                    }
                     self.saveCurrentThreads()
                 }
 
@@ -364,46 +386,45 @@ final class AgentSession {
                     model: model,
                     effort: effort,
                     onDelta: { [weak self] delta in
-                        guard let self, self.activeTurnThreadID == self.activeThread.id else { return }
-                        if !messageAppended {
-                            self.entries.append(.message(AgentMessage(role: .assistant, text: delta, senderName: "CODEX")))
-                            messageAppended = true
-                        } else {
-                            if let last = self.entries.last, case .message(let msg) = last, msg.role == .assistant {
-                                let updated = AgentMessage(id: msg.id, role: .assistant, text: msg.text + delta, senderName: "CODEX")
-                                self.entries[self.entries.count - 1] = .message(updated)
+                        guard let self else { return }
+                        self.mutateThread(id: targetThreadID) { thread in
+                            if !messageAppended {
+                                thread.entries.append(.message(AgentMessage(role: .assistant, text: delta, senderName: "CODEX")))
+                                messageAppended = true
                             } else {
-                                self.entries.append(.message(AgentMessage(role: .assistant, text: delta, senderName: "CODEX")))
+                                if let last = thread.entries.last, case .message(let msg) = last, msg.role == .assistant {
+                                    let updated = AgentMessage(id: msg.id, role: .assistant, text: msg.text + delta, senderName: "CODEX")
+                                    thread.entries[thread.entries.count - 1] = .message(updated)
+                                } else {
+                                    thread.entries.append(.message(AgentMessage(role: .assistant, text: delta, senderName: "CODEX")))
+                                }
                             }
                         }
                     },
                     onUsage: { [weak self] usage in
-                        guard let self, self.activeTurnThreadID == self.activeThread.id else { return }
-                        self.activeThread.inputTokens += usage.inputTokens
-                        self.activeThread.outputTokens += usage.outputTokens
-                        self.activeThread.cachedTokens += usage.cachedTokens
+                        guard let self else { return }
+                        self.mutateThread(id: targetThreadID) { thread in
+                            thread.inputTokens += usage.inputTokens
+                            thread.outputTokens += usage.outputTokens
+                            thread.cachedTokens += usage.cachedTokens
+                        }
                     },
                     onComplete: { [weak self] success, errorMessage in
                         guard let self else { return }
                         let reset = if case .appServerStopping(_, _, let resetThread) = self.runState { resetThread } else { false }
-                        self.completeAppServerTurn(success: success, errorMessage: errorMessage, resetThread: reset)
+                        self.completeAppServerTurn(targetThreadID: targetThreadID, success: success, errorMessage: errorMessage, resetThread: reset)
                     }
                 )
 
-                if self.activeTurnThreadID == self.activeThread.id {
-                    self.runState = .appServerRunning(threadId: threadId, turnId: turnId)
-                } else {
-                    try? await appServer.interruptTurn(threadId: threadId, turnId: turnId)
-                }
+                self.runState = .appServerRunning(threadId: threadId, turnId: turnId)
             } catch {
-                guard self.activeTurnThreadID == self.activeThread.id else { return }
                 self.logger.warning("Codex App Server failed (\(error.localizedDescription)), falling back to CLI execution")
-                self.runProcessTurn(prompt: prompt, workspaceURL: workspaceURL)
+                self.runProcessTurn(prompt: prompt, workspaceURL: workspaceURL, targetThreadID: targetThreadID)
             }
         }
     }
 
-    private func runProcessTurn(prompt: String, workspaceURL: URL) {
+    private func runProcessTurn(prompt: String, workspaceURL: URL, targetThreadID: UUID) {
         guard let executableURL = currentExecutableURL else { return }
         let process = Process()
         let standardOutput = Pipe()
@@ -435,7 +456,7 @@ final class AgentSession {
             try process.run()
             runState = .running(process)
             logger.debug("Started \(self.selectedProvider.rawValue, privacy: .public) agent process")
-            monitor(process, standardOutput: standardOutput, standardError: standardError)
+            monitor(process, standardOutput: standardOutput, standardError: standardError, targetThreadID: targetThreadID)
 
             let inputHandle = standardInput.fileHandleForWriting
             if selectedProvider == .codex {
@@ -455,18 +476,15 @@ final class AgentSession {
             runState = .idle
             activeTurnThreadID = nil
             logger.error("Could not start \(self.selectedProvider.rawValue, privacy: .public) agent: \(error.localizedDescription, privacy: .private)")
-            entries.append(.message(AgentMessage(role: .system, text: "Could not start \(selectedProvider.rawValue): \(error.localizedDescription)")))
+            mutateThread(id: targetThreadID) {
+                $0.entries.append(.message(AgentMessage(role: .system, text: "Could not start \(self.selectedProvider.rawValue): \(error.localizedDescription)")))
+            }
         }
     }
 
-    private func completeAppServerTurn(success: Bool, errorMessage: String?, resetThread: Bool) {
+    private func completeAppServerTurn(targetThreadID: UUID, success: Bool, errorMessage: String?, resetThread: Bool) {
         Task { @MainActor [weak self] in
             guard let self else { return }
-            guard activeTurnThreadID == activeThread.id else {
-                runState = .idle
-                activeTurnThreadID = nil
-                return
-            }
             let changedPaths: [String]
             if let workspaceURL {
                 let current = await Task.detached(priority: .utility) {
@@ -478,7 +496,9 @@ final class AgentSession {
             }
 
             if let turnStartTime {
-                activeThread.lastDurationSeconds = Date().timeIntervalSince(turnStartTime)
+                self.mutateThread(id: targetThreadID) {
+                    $0.lastDurationSeconds = Date().timeIntervalSince(turnStartTime)
+                }
             }
             turnStartTime = nil
 
@@ -486,7 +506,7 @@ final class AgentSession {
             runState = .idle
             activeTurnThreadID = nil
 
-            mergeChangedFiles(changedPaths)
+            mergeChangedFiles(changedPaths, targetThreadID: targetThreadID)
 
             if stopped {
                 entries.append(.message(AgentMessage(role: .system, text: "Agent stopped.")))
@@ -836,15 +856,15 @@ final class AgentSession {
         return env
     }
 
-    private func monitor(_ process: Process, standardOutput: Pipe, standardError: Pipe) {
+    private func monitor(_ process: Process, standardOutput: Pipe, standardError: Pipe, targetThreadID: UUID) {
         let isGemini = selectedProvider == .gemini
         let outputTask = Task { [weak self] in
             do {
                 for try await line in standardOutput.fileHandleForReading.bytes.lines where !line.isEmpty {
                     if isGemini {
-                        self?.appendGeminiOutput(line)
+                        self?.appendGeminiOutput(line, targetThreadID: targetThreadID)
                     } else {
-                        self?.consume(CodexEventParser.parse(line))
+                        self?.consume(CodexEventParser.parse(line), targetThreadID: targetThreadID)
                     }
                 }
             } catch {}
@@ -861,52 +881,64 @@ final class AgentSession {
             await outputTask.value
             await errorTask.value
             process.waitUntilExit()
-            await self?.finish(process, exitCode: process.terminationStatus)
+            await self?.finish(process, exitCode: process.terminationStatus, targetThreadID: targetThreadID)
         }
     }
 
-    private func consume(_ event: CodexEvent?) {
-        guard let event, activeTurnThreadID == activeThread.id else { return }
+    private func consume(_ event: CodexEvent?, targetThreadID: UUID) {
+        guard let event else { return }
         switch event {
         case .threadStarted(let threadID):
-            self.threadID = threadID
+            mutateThread(id: targetThreadID) {
+                $0.codexThreadID = threadID
+            }
         case .message(let text):
-            entries.append(.message(AgentMessage(role: .assistant, text: text, senderName: "CODEX")))
+            mutateThread(id: targetThreadID) {
+                $0.entries.append(.message(AgentMessage(role: .assistant, text: text, senderName: "CODEX")))
+            }
         case .activity(let activity, let changedFiles):
-            upsert(.activity(activity))
-            mergeChangedFiles(changedFiles)
+            upsert(.activity(activity), targetThreadID: targetThreadID)
+            mergeChangedFiles(changedFiles, targetThreadID: targetThreadID)
         case .usage(let description):
-            upsert(.usage(description))
+            upsert(.usage(description), targetThreadID: targetThreadID)
             if let parsed = AgentTokenUsage.parse(from: description) {
-                activeThread.inputTokens += parsed.inputTokens
-                activeThread.outputTokens += parsed.outputTokens
-                activeThread.cachedTokens += parsed.cachedTokens
+                mutateThread(id: targetThreadID) {
+                    $0.inputTokens += parsed.inputTokens
+                    $0.outputTokens += parsed.outputTokens
+                    $0.cachedTokens += parsed.cachedTokens
+                }
             }
         case .error(let message):
-            entries.append(.message(AgentMessage(role: .system, text: message)))
+            mutateThread(id: targetThreadID) {
+                $0.entries.append(.message(AgentMessage(role: .system, text: message)))
+            }
         }
     }
 
-    private func upsert(_ entry: AgentEntry) {
-        if let index = entries.firstIndex(where: { $0.id == entry.id }) {
-            entries[index] = entry
-        } else {
-            entries.append(entry)
+    private func upsert(_ entry: AgentEntry, targetThreadID: UUID) {
+        mutateThread(id: targetThreadID) { thread in
+            if let index = thread.entries.firstIndex(where: { $0.id == entry.id }) {
+                thread.entries[index] = entry
+            } else {
+                thread.entries.append(entry)
+            }
         }
     }
 
-    private func mergeChangedFiles(_ paths: [String]) {
+    private func mergeChangedFiles(_ paths: [String], targetThreadID: UUID) {
         guard !paths.isEmpty else { return }
-        let existing = entries.compactMap { entry -> [String]? in
-            guard case .changes(let paths) = entry else { return nil }
-            return paths
-        }.first ?? []
+        var existing: [String] = []
+        mutateThread(id: targetThreadID) { thread in
+            existing = thread.entries.compactMap { entry -> [String]? in
+                guard case .changes(let paths) = entry else { return nil }
+                return paths
+            }.first ?? []
+        }
         let merged = Set(existing).union(paths.map(relativePath)).sorted()
-        upsert(.changes(merged))
+        upsert(.changes(merged), targetThreadID: targetThreadID)
     }
 
     private func appendStandardError(_ text: String) {
-        guard activeTurnThreadID == activeThread.id else { return }
         errorBuffer += text
         if errorBuffer.count > 20_000 {
             errorBuffer = String(errorBuffer.suffix(20_000))
@@ -917,16 +949,17 @@ final class AgentSession {
         ANSIEscapeCleaner.stripEscapes(from: text)
     }
 
-    private func appendGeminiOutput(_ text: String) {
-        guard activeTurnThreadID == activeThread.id else { return }
+    private func appendGeminiOutput(_ text: String, targetThreadID: UUID) {
         let cleanText = Self.stripANSIEscapes(from: text).trimmingCharacters(in: .newlines)
         guard !cleanText.isEmpty else { return }
 
-        if let last = entries.last, case .message(let message) = last, message.role == .assistant {
-            let updated = message.text + "\n" + cleanText
-            entries[entries.count - 1] = .message(AgentMessage(role: .assistant, text: updated, senderName: "GEMINI"))
-        } else {
-            entries.append(.message(AgentMessage(role: .assistant, text: cleanText, senderName: "GEMINI")))
+        mutateThread(id: targetThreadID) { thread in
+            if let last = thread.entries.last, case .message(let message) = last, message.role == .assistant {
+                let updated = message.text + "\n" + cleanText
+                thread.entries[thread.entries.count - 1] = .message(AgentMessage(role: .assistant, text: updated, senderName: "GEMINI"))
+            } else {
+                thread.entries.append(.message(AgentMessage(role: .assistant, text: cleanText, senderName: "GEMINI")))
+            }
         }
     }
 
@@ -935,13 +968,8 @@ final class AgentSession {
         return URL(fileURLWithPath: path).relativePath(from: workspaceURL)
     }
 
-    private func finish(_ process: Process, exitCode: Int32) async {
+    private func finish(_ process: Process, exitCode: Int32, targetThreadID: UUID) async {
         guard runState.process === process else { return }
-        guard activeTurnThreadID == activeThread.id else {
-            runState = .idle
-            activeTurnThreadID = nil
-            return
-        }
         let changedPaths: [String]
         if let workspaceURL {
             let current = await Task.detached(priority: .utility) {
@@ -954,7 +982,9 @@ final class AgentSession {
         guard runState.process === process else { return }
 
         if let turnStartTime {
-            activeThread.lastDurationSeconds = Date().timeIntervalSince(turnStartTime)
+            mutateThread(id: targetThreadID) {
+                $0.lastDurationSeconds = Date().timeIntervalSince(turnStartTime)
+            }
         }
         turnStartTime = nil
 
@@ -975,10 +1005,12 @@ final class AgentSession {
 
         logger.debug("\(self.selectedProvider.rawValue, privacy: .public) agent finished with exit code \(exitCode, privacy: .public)")
 
-        mergeChangedFiles(changedPaths)
+        mergeChangedFiles(changedPaths, targetThreadID: targetThreadID)
 
         if stopped {
-            entries.append(.message(AgentMessage(role: .system, text: "Agent stopped.")))
+            mutateThread(id: targetThreadID) {
+                $0.entries.append(.message(AgentMessage(role: .system, text: "Agent stopped.")))
+            }
         } else if exitCode != 0 {
             let detail = errorBuffer.trimmingCharacters(in: .whitespacesAndNewlines)
             let lower = detail.lowercased()
@@ -991,7 +1023,9 @@ final class AgentSession {
             } else {
                 message = detail.isEmpty ? "\(selectedProvider.rawValue) exited with code \(exitCode)." : detail
             }
-            entries.append(.message(AgentMessage(role: .system, text: message)))
+            mutateThread(id: targetThreadID) {
+                $0.entries.append(.message(AgentMessage(role: .system, text: message)))
+            }
         }
         onRunCompleted?()
         saveCurrentThreads()

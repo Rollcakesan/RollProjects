@@ -23,10 +23,16 @@ final class WorkspaceModel {
     var creatingItemIsDirectory = false
     var creatingItemName = ""
     var deletingURL: URL?
-    var unconfirmedClosingDocument: EditorDocument?
+    private(set) var unconfirmedClosingDocuments: [EditorDocument] = []
+    var unconfirmedClosingDocument: EditorDocument? {
+        unconfirmedClosingDocuments.first
+    }
     var externalConflict: ExternalConflict?
-    var isSavingActiveDocumentAs = false
     private var savingDocumentID: UUID?
+    var isSavingActiveDocumentAs: Bool {
+        get { savingDocumentID != nil }
+        set { if !newValue { savingDocumentID = nil } }
+    }
     enum UIFontScale: String, CaseIterable, Identifiable {
         case small = "small"
         case medium = "medium"
@@ -100,7 +106,6 @@ final class WorkspaceModel {
     private static let tabWidthKey = "RollCode.editorTabWidth"
     private static let fontSizeKey = "RollCode.editorFontSize"
     private static let uiFontScaleKey = "RollCode.uiFontScale"
-    private static let legacyUIFontSizeKey = "RollCode.uiFontSize"
 
     var lastWorkspacePath: String? {
         defaults.string(forKey: Self.lastWorkspacePathKey)
@@ -112,24 +117,8 @@ final class WorkspaceModel {
         self.tabWidth = [2, 4, 8].contains(savedTabWidth) ? savedTabWidth : 4
         let savedFontSize = defaults.double(forKey: Self.fontSizeKey)
         self.fontSize = savedFontSize >= 9 && savedFontSize <= 32 ? CGFloat(savedFontSize) : 14.5
-        if let savedScaleString = defaults.string(forKey: Self.uiFontScaleKey),
-           let savedScale = UIFontScale(rawValue: savedScaleString) {
-            self.uiFontScale = savedScale
-        } else {
-            // Backward compatibility with legacy numeric uiFontSize
-            let legacySize = defaults.double(forKey: Self.legacyUIFontSizeKey)
-            if legacySize > 0 {
-                if legacySize <= 13.0 {
-                    self.uiFontScale = .small
-                } else if legacySize >= 15.5 {
-                    self.uiFontScale = .large
-                } else {
-                    self.uiFontScale = .medium
-                }
-            } else {
-                self.uiFontScale = .medium
-            }
-        }
+        self.uiFontScale = defaults.string(forKey: Self.uiFontScaleKey)
+            .flatMap(UIFontScale.init(rawValue:)) ?? .medium
         let userPrefersRestore = defaults.object(forKey: Self.restoreLastWorkspaceKey) as? Bool ?? true
         self.restoresLastWorkspace = userPrefersRestore
 
@@ -344,16 +333,25 @@ final class WorkspaceModel {
 
     func closeOtherDocuments(except target: EditorDocument) {
         let others = documents.filter { $0.id != target.id }
-        for doc in others {
-            closeDocument(doc)
-        }
+        closeMultipleDocuments(others)
     }
 
     func closeDocumentsToTheRight(of target: EditorDocument) {
         guard let index = documents.firstIndex(where: { $0.id == target.id }) else { return }
         let rightDocs = Array(documents[(index + 1)...])
-        for doc in rightDocs {
-            closeDocument(doc)
+        closeMultipleDocuments(rightDocs)
+    }
+
+    func closeMultipleDocuments(_ docs: [EditorDocument]) {
+        let dirty = docs.filter(\.isDirty)
+        let clean = docs.filter { !$0.isDirty }
+        for doc in clean {
+            forceCloseDocument(doc)
+        }
+        for doc in dirty {
+            if !unconfirmedClosingDocuments.contains(where: { $0.id == doc.id }) {
+                unconfirmedClosingDocuments.append(doc)
+            }
         }
     }
 
@@ -427,9 +425,7 @@ final class WorkspaceModel {
     }
 
     func saveActiveDocumentAs() {
-        guard let activeDocument else { return }
-        savingDocumentID = activeDocument.id
-        isSavingActiveDocumentAs = true
+        savingDocumentID = activeDocument?.id
     }
 
     var documentBeingSavedAs: EditorDocument? {
@@ -486,23 +482,28 @@ final class WorkspaceModel {
 
     func closeDocument(_ document: EditorDocument) {
         if document.isDirty {
-            unconfirmedClosingDocument = document
+            if !unconfirmedClosingDocuments.contains(where: { $0.id == document.id }) {
+                unconfirmedClosingDocuments.append(document)
+            }
             return
         }
         forceCloseDocument(document)
     }
 
     func confirmCloseDocument(save: Bool) {
-        guard let document = unconfirmedClosingDocument else { return }
-        unconfirmedClosingDocument = nil
+        guard !unconfirmedClosingDocuments.isEmpty else { return }
+        let document = unconfirmedClosingDocuments.removeFirst()
         if save {
-            guard self.save(document) else { return }
+            guard self.save(document) else {
+                unconfirmedClosingDocuments.insert(document, at: 0)
+                return
+            }
         }
         forceCloseDocument(document)
     }
 
     func cancelCloseDocument() {
-        unconfirmedClosingDocument = nil
+        unconfirmedClosingDocuments.removeAll()
     }
 
     func forceCloseDocument(_ document: EditorDocument) {
