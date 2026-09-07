@@ -11,7 +11,6 @@ struct AgentPanelView: View {
     @State private var codexPromptDraft = ""
     @State private var geminiPromptDraft = ""
     @State private var fileMentionQuery: String?
-    @State private var sentMessageScrollTarget: AgentEntry.ID?
     @FocusState private var promptFocused: Bool
 
     var body: some View {
@@ -280,72 +279,91 @@ struct AgentPanelView: View {
     }
 
     private var conversation: some View {
-        GeometryReader { geometry in
-            ScrollViewReader { proxy in
-                ScrollView {
-                    LazyVStack(alignment: .leading, spacing: 10) {
-                        ForEach(agent.entries) { entry in
-                            entryView(entry)
-                                .id(entry.id)
-                        }
-
-                        if agent.isRunning {
-                            HStack(spacing: 6) {
-                                ProgressView().controlSize(.small)
-                                Text("\(agent.selectedProvider.rawValue) is working…")
-                                    .font(.system(size: 10))
-                                    .foregroundStyle(RollCodeTheme.secondaryText)
-                            }
-                        }
-
-                        if sentMessageScrollTarget != nil && agent.isRunning {
-                            Color.clear
-                                .frame(height: geometry.size.height)
-                                .accessibilityHidden(true)
-                        }
-
-                        Color.clear
-                            .frame(height: 1)
-                            .id("bottom_anchor")
+        ScrollViewReader { proxy in
+            ScrollView {
+                LazyVStack(alignment: .leading, spacing: 10) {
+                    ForEach(agent.entries) { entry in
+                        entryView(entry)
+                            .id(entry.id)
                     }
-                    .padding(10)
+
+                    if agent.isRunning {
+                        agentRunningFeedbackView
+                    }
+
+                    Color.clear
+                        .frame(height: 1)
+                        .id("bottom_anchor")
                 }
-                .defaultScrollAnchor(.bottom)
-                .onChange(of: sentMessageScrollTarget) { _, target in
-                    guard let target else { return }
-                    scrollToSentMessage(target, using: proxy)
+                .padding(10)
+            }
+            .defaultScrollAnchor(.bottom)
+            .onChange(of: agent.entries.count) {
+                withAnimation(.easeOut(duration: 0.2)) {
+                    proxy.scrollTo("bottom_anchor", anchor: .bottom)
                 }
-                .onChange(of: agent.entries.count) {
-                    guard sentMessageScrollTarget == nil else { return }
+            }
+            .onChange(of: agent.isRunning) { _, isRunning in
+                if isRunning {
                     withAnimation(.easeOut(duration: 0.2)) {
                         proxy.scrollTo("bottom_anchor", anchor: .bottom)
                     }
                 }
-                .onChange(of: agent.isRunning) { _, isRunning in
-                    if isRunning, let target = sentMessageScrollTarget {
-                        scrollToSentMessage(target, using: proxy)
-                    } else if !isRunning {
-                        sentMessageScrollTarget = nil
-                    }
-                }
-                .onChange(of: agent.activeThread.id) {
-                    sentMessageScrollTarget = nil
-                    proxy.scrollTo("bottom_anchor", anchor: .bottom)
-                }
-                .onAppear {
-                    proxy.scrollTo("bottom_anchor", anchor: .bottom)
-                }
+            }
+            .onChange(of: agent.activeThread.id) {
+                proxy.scrollTo("bottom_anchor", anchor: .bottom)
+            }
+            .onAppear {
+                proxy.scrollTo("bottom_anchor", anchor: .bottom)
             }
         }
     }
 
-    private func scrollToSentMessage(_ target: AgentEntry.ID, using proxy: ScrollViewProxy) {
-        Task { @MainActor in
-            await Task.yield()
-            withAnimation(.easeOut(duration: 0.2)) {
-                proxy.scrollTo(target, anchor: .top)
+    private var agentRunningFeedbackView: some View {
+        TimelineView(.periodic(from: .now, by: 0.2)) { timeline in
+            HStack(spacing: 8) {
+                PulsingIndicator(color: providerAccentColor)
+                    .frame(width: 8, height: 8)
+
+                VStack(alignment: .leading, spacing: 2) {
+                    HStack(spacing: 4) {
+                        Text(agent.selectedProvider.rawValue)
+                            .font(.system(size: 10, weight: .bold))
+                            .foregroundStyle(providerAccentColor)
+
+                        Text("·")
+                            .font(.system(size: 10))
+                            .foregroundStyle(RollCodeTheme.secondaryText)
+
+                        Text(agent.currentExecutionStatus)
+                            .font(.system(size: 10, weight: .medium))
+                            .foregroundStyle(RollCodeTheme.primaryText)
+                            .lineLimit(1)
+                    }
+
+                    if let startTime = agent.liveTurnStartTime {
+                        let elapsed = max(0, timeline.date.timeIntervalSince(startTime))
+                        Text(String(format: "Elapsed: %.1fs", elapsed))
+                            .font(.system(size: 9, design: .monospaced))
+                            .foregroundStyle(RollCodeTheme.secondaryText)
+                    }
+                }
+
+                Spacer()
+
+                ProgressView()
+                    .controlSize(.mini)
             }
+            .padding(.horizontal, 9)
+            .padding(.vertical, 6)
+            .background(RollCodeTheme.elevatedBackground)
+            .clipShape(RoundedRectangle(cornerRadius: 6))
+            .overlay(RoundedRectangle(cornerRadius: 6).stroke(RollCodeTheme.divider))
         }
+    }
+
+    private var providerAccentColor: Color {
+        agent.selectedProvider == .codex ? Color.purple.opacity(0.9) : Color.blue.opacity(0.9)
     }
 
     @ViewBuilder
@@ -583,9 +601,6 @@ struct AgentPanelView: View {
         }
 
         agent.send(request, in: rootURL, activeFileURL: workspace.activeDocument?.url)
-        if case .message(let message) = agent.entries.last, message.role == .user {
-            sentMessageScrollTarget = .message(message.id)
-        }
     }
 
     private func openChangedFile(_ path: String) {
@@ -594,5 +609,25 @@ struct AgentPanelView: View {
         var isDirectory: ObjCBool = false
         guard FileManager.default.fileExists(atPath: url.path, isDirectory: &isDirectory), !isDirectory.boolValue else { return }
         workspace.openFile(url)
+    }
+}
+
+private struct PulsingIndicator: View {
+    let color: Color
+    @State private var isPulsing = false
+
+    var body: some View {
+        ZStack {
+            Circle()
+                .fill(color.opacity(isPulsing ? 0.25 : 0.6))
+                .scaleEffect(isPulsing ? 1.5 : 1.0)
+            Circle()
+                .fill(color)
+        }
+        .onAppear {
+            withAnimation(.easeInOut(duration: 0.9).repeatForever(autoreverses: true)) {
+                isPulsing = true
+            }
+        }
     }
 }

@@ -77,7 +77,7 @@ public struct MarkdownCodeBlockView: View {
             HStack {
                 Text((language ?? "code").uppercased())
                     .font(.system(size: 8.5, weight: .bold, design: .monospaced))
-                    .foregroundStyle(Color.white.opacity(0.55))
+                    .foregroundStyle(AIAgentColors.secondaryText)
                 Spacer()
                 Button {
                     NSPasteboard.general.clearContents()
@@ -94,27 +94,27 @@ public struct MarkdownCodeBlockView: View {
                         Text(isCopied ? "Copied" : "Copy")
                             .font(.system(size: 9, weight: .medium))
                     }
-                    .foregroundStyle(isCopied ? Color.green : Color.white.opacity(0.55))
+                    .foregroundStyle(isCopied ? Color.green : AIAgentColors.secondaryText)
                 }
                 .buttonStyle(.plain)
             }
             .padding(.horizontal, 8)
             .padding(.vertical, 4)
-            .background(Color(red: 0.145, green: 0.15, blue: 0.175).opacity(0.8))
+            .background(AIAgentColors.codeHeaderBackground)
 
-            Divider().overlay(Color.white.opacity(0.08))
+            Divider().overlay(AIAgentColors.divider)
 
             ScrollView(.horizontal, showsIndicators: false) {
                 Text(code)
                     .font(.system(size: 10.5, design: .monospaced))
-                    .foregroundStyle(Color(white: 0.88))
+                    .foregroundStyle(AIAgentColors.primaryText)
                     .textSelection(.enabled)
                     .padding(8)
             }
         }
-        .background(Color(red: 0.115, green: 0.12, blue: 0.14))
+        .background(AIAgentColors.codeBodyBackground)
         .clipShape(RoundedRectangle(cornerRadius: 5))
-        .overlay(RoundedRectangle(cornerRadius: 5).stroke(Color.white.opacity(0.08)))
+        .overlay(RoundedRectangle(cornerRadius: 5).stroke(AIAgentColors.divider))
         .padding(.vertical, 2)
     }
 }

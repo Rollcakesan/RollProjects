@@ -233,8 +233,21 @@ final class AgentSession {
     @ObservationIgnored private var errorBuffer = ""
     @ObservationIgnored private var workspaceURL: URL?
     @ObservationIgnored private var initialChangedPaths: Set<String> = []
-    @ObservationIgnored private var turnStartTime: Date?
+    private(set) var turnStartTime: Date?
+    private(set) var currentActivityTitle: String?
     private var activeTurnThreadID: UUID?
+
+    var currentExecutionStatus: String {
+        guard isRunning else { return "" }
+        if let currentActivityTitle, !currentActivityTitle.isEmpty {
+            return currentActivityTitle
+        }
+        return "Thinking…"
+    }
+
+    var liveTurnStartTime: Date? {
+        turnStartTime
+    }
 
     @ObservationIgnored let useAppServer: Bool
 
@@ -322,6 +335,7 @@ final class AgentSession {
         activeTurnThreadID = activeThread.id
         errorBuffer = ""
         self.turnStartTime = Date()
+        self.currentActivityTitle = "Thinking…"
         self.activeThread.model = currentModel
         self.activeThread.reasoningEffort = currentReasoningEffort.rawValue
         self.workspaceURL = workspaceURL.standardizedFileURL
@@ -331,6 +345,7 @@ final class AgentSession {
         let targetThreadID = activeThread.id
         activeTurnThreadID = targetThreadID
         turnStartTime = Date()
+        currentActivityTitle = "Thinking…"
 
         let contextualPrompt = makeContextualPrompt(prompt, activeFileURL: activeFileURL)
 
@@ -383,6 +398,7 @@ final class AgentSession {
                     effort: effort,
                     onDelta: { [weak self] delta in
                         guard let self else { return }
+                        self.currentActivityTitle = "Responding…"
                         self.mutateThread(id: targetThreadID) { thread in
                             if !messageAppended {
                                 thread.entries.append(.message(AgentMessage(role: .assistant, text: delta, senderName: "CODEX")))
@@ -504,6 +520,7 @@ final class AgentSession {
             }
         }
         turnStartTime = nil
+        currentActivityTitle = nil
         runState = .idle
         activeTurnThreadID = nil
 
@@ -542,6 +559,7 @@ final class AgentSession {
     }
 
     private func stop(resetThread: Bool) {
+        currentActivityTitle = "Stopping…"
         switch runState {
         case .appServerRunning(let threadId, let turnId):
             runState = .appServerStopping(threadId: threadId, turnId: turnId, resetThread: resetThread)
@@ -561,6 +579,7 @@ final class AgentSession {
             guard activeTurnThreadID != nil else { return }
             activeTurnThreadID = nil
             turnStartTime = nil
+            currentActivityTitle = nil
             if resetThread {
                 resetThreadState()
             }
@@ -918,14 +937,17 @@ final class AgentSession {
         guard let event else { return }
         switch event {
         case .threadStarted(let threadID):
+            currentActivityTitle = "Starting session…"
             mutateThread(id: targetThreadID) {
                 $0.codexThreadID = threadID
             }
         case .message(let text):
+            currentActivityTitle = "Responding…"
             mutateThread(id: targetThreadID) {
                 $0.entries.append(.message(AgentMessage(role: .assistant, text: text, senderName: "CODEX")))
             }
         case .activity(let activity, let changedFiles):
+            currentActivityTitle = activity.title
             upsert(.activity(activity), targetThreadID: targetThreadID)
             mergeChangedFiles(changedFiles, targetThreadID: targetThreadID)
         case .usage(let description):
@@ -938,6 +960,7 @@ final class AgentSession {
                 }
             }
         case .error(let message):
+            currentActivityTitle = nil
             mutateThread(id: targetThreadID) {
                 $0.entries.append(.message(AgentMessage(role: .system, text: message)))
             }
@@ -981,6 +1004,7 @@ final class AgentSession {
     private func appendGeminiOutput(_ text: String, targetThreadID: UUID) {
         let cleanText = Self.stripANSIEscapes(from: text).trimmingCharacters(in: .newlines)
         guard !cleanText.isEmpty else { return }
+        currentActivityTitle = "Responding…"
 
         mutateThread(id: targetThreadID) { thread in
             if let last = thread.entries.last, case .message(let message) = last, message.role == .assistant {
