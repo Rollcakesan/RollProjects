@@ -245,7 +245,7 @@ final class AgentSession {
         geminiAuth: GeminiAuthService = GeminiAuthService(),
         modelCatalog: ModelCatalogService = ModelCatalogService(),
         defaults: UserDefaults = .standard,
-        useAppServer: Bool? = nil,
+        useAppServer: Bool = false,
         initialProvider: AgentProvider? = nil
     ) {
         self.executableURL = executableURL
@@ -254,11 +254,7 @@ final class AgentSession {
         self.geminiAuth = geminiAuth
         self.modelCatalog = modelCatalog
         self.defaults = defaults
-        if let useAppServer {
-            self.useAppServer = useAppServer
-        } else {
-            self.useAppServer = (executableURL == nil || executableURL == CodexExecutableLocator.locate())
-        }
+        self.useAppServer = useAppServer
         let restoredProvider = defaults.string(forKey: Self.providerDefaultsKey)
             .flatMap(AgentProvider.init(rawValue:))
         self.selectedProvider = initialProvider ?? restoredProvider ?? .codex
@@ -790,28 +786,41 @@ final class AgentSession {
         }
     }
 
-    private func argumentsForCurrentThread() -> [String] {
-        var arguments = [
-            "exec",
-            "--json",
-            "--color", "never",
-            "--sandbox", "workspace-write",
-            "--skip-git-repo-check",
-            "--config", "approval_policy=\"never\""
-        ]
+    func argumentsForCurrentThread() -> [String] {
         let model = currentModel
-        if !model.isEmpty {
-            arguments += ["-m", model]
+        let reasoningEffort = currentReasoningEffort.rawValue
+
+        if let threadID, !threadID.isEmpty {
+            var arguments = [
+                "exec",
+                "resume",
+                threadID,
+                "--json",
+                "--skip-git-repo-check",
+                "--config", "approval_policy=\"never\""
+            ]
+            if !model.isEmpty {
+                arguments += ["-m", model]
+            }
+            arguments += ["-c", "model_reasoning_effort=\"\(reasoningEffort)\""]
+            arguments.append("-")
+            return arguments
+        } else {
+            var arguments = [
+                "exec",
+                "--json",
+                "--color", "never",
+                "--sandbox", "workspace-write",
+                "--skip-git-repo-check",
+                "--config", "approval_policy=\"never\""
+            ]
+            if !model.isEmpty {
+                arguments += ["-m", model]
+            }
+            arguments += ["-c", "model_reasoning_effort=\"\(reasoningEffort)\""]
+            arguments.append("-")
+            return arguments
         }
-        let info = modelCatalog.findModel(id: model, provider: .codex)
-        if info?.supportsReasoningEffort == true || model.hasPrefix("o") || model.hasPrefix("gpt-5") {
-            arguments += ["-c", "model_reasoning_effort=\"\(currentReasoningEffort.rawValue)\""]
-        }
-        if let threadID {
-            arguments += ["resume", threadID]
-        }
-        arguments.append("-")
-        return arguments
     }
 
     private func makeContextualPrompt(_ prompt: String, activeFileURL: URL?) -> String {

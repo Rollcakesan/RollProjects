@@ -165,4 +165,40 @@ struct AIAgentKitTests {
         #expect(parsed[2].id == "gemini-2.5-flash")
         #expect(parsed[2].speedTier == .fast)
     }
+
+    @Test("AgentSession formats CLI arguments correctly for initial execution and resume")
+    @MainActor
+    func agentSessionFormatsCLIArguments() {
+        let session = AgentSession(executableURL: nil, geminiExecutableURL: nil)
+        session.setModel("gpt-5.6-sol")
+        session.setReasoningEffort(.medium)
+
+        // Initial run
+        let initialArgs = session.argumentsForCurrentThread()
+        #expect(initialArgs.starts(with: ["exec", "--json", "--color", "never", "--sandbox", "workspace-write", "--skip-git-repo-check"]))
+        #expect(initialArgs.contains("approval_policy=\"never\""))
+        #expect(initialArgs.contains("-m"))
+        #expect(initialArgs.contains("gpt-5.6-sol"))
+        #expect(initialArgs.contains("model_reasoning_effort=\"medium\""))
+        #expect(initialArgs.last == "-")
+        #expect(!initialArgs.contains("resume"))
+
+        // Resume run
+        session.threadID = "test-thread-id-456"
+        let resumeArgs = session.argumentsForCurrentThread()
+        #expect(resumeArgs.starts(with: ["exec", "resume", "test-thread-id-456", "--json", "--skip-git-repo-check"]))
+        #expect(resumeArgs.contains("approval_policy=\"never\""))
+        #expect(!resumeArgs.contains("--color"))
+        #expect(!resumeArgs.contains("--sandbox"))
+        #expect(resumeArgs.contains("-m"))
+        #expect(resumeArgs.contains("gpt-5.6-sol"))
+        #expect(resumeArgs.contains("model_reasoning_effort=\"medium\""))
+        #expect(resumeArgs.last == "-")
+
+        // Effort customization
+        session.setReasoningEffort(.high)
+        let highArgs = session.argumentsForCurrentThread()
+        #expect(highArgs.contains("model_reasoning_effort=\"high\""))
+    }
 }
+

@@ -1295,10 +1295,10 @@ struct RollCodeTests {
     @MainActor
     func agentSessionSupportsUseAppServer() {
         let sessionDefault = AgentSession(executableURL: nil, geminiExecutableURL: nil)
-        #expect(sessionDefault.useAppServer == true)
+        #expect(sessionDefault.useAppServer == false)
 
-        let sessionExplicitFalse = AgentSession(executableURL: nil, geminiExecutableURL: nil, useAppServer: false)
-        #expect(sessionExplicitFalse.useAppServer == false)
+        let sessionExplicitTrue = AgentSession(executableURL: nil, geminiExecutableURL: nil, useAppServer: true)
+        #expect(sessionExplicitTrue.useAppServer == true)
     }
 
     @Test("WorkspaceModel manages autoSaveEnabled and appTheme preferences")
