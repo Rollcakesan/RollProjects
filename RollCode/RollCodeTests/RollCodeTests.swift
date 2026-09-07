@@ -798,6 +798,63 @@ struct RollCodeTests {
         }
     }
 
+    @Test("AgentSession heals corrupted persisted threads on load")
+    @MainActor
+    func agentSessionHealsCorruptedPersistedThreadsOnLoad() throws {
+        try withTemporaryDirectory { root in
+            let session = AgentSession(executableURL: nil, geminiExecutableURL: nil)
+            let storageURL = session.storageFileURL(for: root)
+            try FileManager.default.createDirectory(at: storageURL.deletingLastPathComponent(), withIntermediateDirectories: true)
+
+            // Write a corrupt thread to disk: marked as Gemini, but with codexThreadID and gpt-5.6-sol model
+            let corruptJSON = """
+            [
+              {
+                "id": "11111111-1111-1111-1111-111111111111",
+                "title": "Corrupt Codex Thread",
+                "updatedAt": "2026-09-07T12:00:00Z",
+                "model": "gpt-5.6-sol",
+                "provider": "Gemini",
+                "codexThreadID": "01a06ece-mock-id",
+                "entries": [
+                  {
+                    "type": "message",
+                    "message": {
+                      "id": "22222222-2222-2222-2222-222222222222",
+                      "role": "assistant",
+                      "text": "Hello from Codex",
+                      "senderName": "CODEX"
+                    }
+                  }
+                ]
+              }
+            ]
+            """
+            try corruptJSON.write(to: storageURL, atomically: true, encoding: .utf8)
+
+            session.loadThreads(for: root)
+
+            // The loaded thread should be healed to Codex and put in codexChannel
+            let codexThreads = session.threads(for: .codex)
+            let geminiThreads = session.threads(for: .gemini)
+
+            #expect(codexThreads.count == 1)
+            #expect(codexThreads.first?.provider == .codex)
+            #expect(codexThreads.first?.title == "Corrupt Codex Thread")
+            #expect(codexThreads.first?.codexThreadID == "01a06ece-mock-id")
+
+            #expect(geminiThreads.isEmpty)
+
+            // Re-read file from disk to verify it was re-saved cleanly
+            let reReadData = try Data(contentsOf: storageURL)
+            let decoder = JSONDecoder()
+            decoder.dateDecodingStrategy = .iso8601
+            let reSavedThreads = try decoder.decode([AgentThread].self, from: reReadData)
+            #expect(reSavedThreads.count == 1)
+            #expect(reSavedThreads.first?.provider == .codex)
+        }
+    }
+
     @Test("TerminalSession manages multiple tabs and tab switching")
     @MainActor
     func terminalSessionManagesMultipleTabs() {

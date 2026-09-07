@@ -200,5 +200,125 @@ struct AIAgentKitTests {
         let highArgs = session.argumentsForCurrentThread()
         #expect(highArgs.contains("model_reasoning_effort=\"high\""))
     }
+
+    @Test("AgentThread decodes with self-healing to repair misattributed provider")
+    func agentThreadSelfHealingOnDecoding() throws {
+        let json = """
+        {
+          "id": "11111111-1111-1111-1111-111111111111",
+          "title": "Codex Question",
+          "createdAt": 1700000000,
+          "updatedAt": 1700000000,
+          "model": "gpt-5.6-sol",
+          "provider": "Gemini",
+          "codexThreadID": "01a06ece-mock",
+          "entries": [
+            {
+              "type": "message",
+              "message": {
+                "id": "22222222-2222-2222-2222-222222222222",
+                "role": "assistant",
+                "text": "Hello from codex",
+                "createdAt": 1700000000,
+                "senderName": "CODEX"
+              }
+            }
+          ]
+        }
+        """.data(using: .utf8)!
+
+        let decoded = try JSONDecoder().decode(AgentThread.self, from: json)
+        #expect(decoded.provider == .codex)
+        #expect(decoded.codexThreadID == "01a06ece-mock")
+
+        let geminiJson = """
+        {
+          "id": "33333333-3333-3333-3333-333333333333",
+          "title": "Gemini Question",
+          "createdAt": 1700000000,
+          "updatedAt": 1700000000,
+          "model": "gemini-2.5-flash",
+          "provider": "Codex",
+          "entries": []
+        }
+        """.data(using: .utf8)!
+
+        let decodedGemini = try JSONDecoder().decode(AgentThread.self, from: geminiJson)
+        #expect(decodedGemini.provider == .gemini)
+    }
+
+    @Test("AgentThread sanitization strips foreign entries and fixes mismatched models")
+    func agentThreadSanitizationStripsForeignEntries() {
+        let thread = AgentThread(
+            provider: .gemini,
+            title: "Mixed Thread",
+            entries: [
+                .message(AgentMessage(role: .user, text: "Question")),
+                .message(AgentMessage(role: .assistant, text: "Codex answer", senderName: "CODEX")),
+                .message(AgentMessage(role: .assistant, text: "Gemini answer", senderName: "GEMINI"))
+            ],
+            model: "gpt-5.6-sol"
+        )
+
+        let sanitizedGemini = thread.sanitized(for: .gemini)
+        #expect(sanitizedGemini.provider == .gemini)
+        #expect(sanitizedGemini.model == nil)
+        #expect(sanitizedGemini.entries.count == 2)
+        #expect(!sanitizedGemini.entries.contains { entry in
+            if case .message(let m) = entry { return m.senderName == "CODEX" }
+            return false
+        })
+
+        let sanitizedCodex = thread.sanitized(for: .codex)
+        #expect(sanitizedCodex.provider == .codex)
+        #expect(sanitizedCodex.model == "gpt-5.6-sol")
+        #expect(sanitizedCodex.entries.count == 2)
+        #expect(!sanitizedCodex.entries.contains { entry in
+            if case .message(let m) = entry { return m.senderName == "GEMINI" }
+            return false
+        })
+    }
+
+    @Test("AgentSession isolates channels, prompt drafts, and threads between Codex and Gemini")
+    @MainActor
+    func agentSessionChannelAndDraftIsolation() {
+        let session = AgentSession(executableURL: nil, geminiExecutableURL: nil)
+
+        // Codex channel setup
+        session.selectProvider(.codex)
+        session.currentPromptDraft = "Codex draft 1"
+        session.entries = [.message(AgentMessage(role: .user, text: "Codex prompt 1"))]
+        let codexThreadID = session.activeThread.id
+
+        // Switch to Gemini channel
+        session.selectProvider(.gemini)
+        #expect(session.currentPromptDraft == "")
+        #expect(session.entries.isEmpty)
+        #expect(session.activeThread.provider == .gemini)
+
+        session.currentPromptDraft = "Gemini draft 1"
+        session.entries = [.message(AgentMessage(role: .user, text: "Gemini prompt 1", senderName: "GEMINI"))]
+        let geminiThreadID = session.activeThread.id
+
+        // Switch back to Codex channel
+        session.selectProvider(.codex)
+        #expect(session.currentPromptDraft == "Codex draft 1")
+        #expect(session.entries.count == 1)
+        #expect(session.activeThread.id == codexThreadID)
+        #expect(session.activeThread.provider == .codex)
+
+        // Switch back to Gemini channel
+        session.selectProvider(.gemini)
+        #expect(session.currentPromptDraft == "Gemini draft 1")
+        #expect(session.entries.count == 1)
+        #expect(session.activeThread.id == geminiThreadID)
+        #expect(session.activeThread.provider == .gemini)
+
+        // Contextual prompt should exclude any foreign messages
+        let contextualPrompt = session.makeContextualPrompt("Tell me more", activeFileURL: nil)
+        #expect(contextualPrompt.contains("Gemini prompt 1"))
+        #expect(!contextualPrompt.contains("Codex prompt 1"))
+    }
 }
+
 

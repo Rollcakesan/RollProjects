@@ -238,17 +238,79 @@ public struct AgentThread: Identifiable, Equatable, Sendable, Codable {
     public init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         self.id = try container.decode(UUID.self, forKey: .id)
-        self.provider = try container.decode(AgentProvider.self, forKey: .provider)
+        let decodedProvider = try container.decodeIfPresent(AgentProvider.self, forKey: .provider)
         self.codexThreadID = try container.decodeIfPresent(String.self, forKey: .codexThreadID)
         self.title = try container.decode(String.self, forKey: .title)
         self.updatedAt = try container.decode(Date.self, forKey: .updatedAt)
-        self.entries = try container.decode([AgentEntry].self, forKey: .entries)
-        self.model = try container.decodeIfPresent(String.self, forKey: .model)
+        var decodedEntries = try container.decode([AgentEntry].self, forKey: .entries)
+        var decodedModel = try container.decodeIfPresent(String.self, forKey: .model)
         self.reasoningEffort = try container.decodeIfPresent(String.self, forKey: .reasoningEffort)
         self.inputTokens = try container.decodeIfPresent(Int.self, forKey: .inputTokens) ?? 0
         self.outputTokens = try container.decodeIfPresent(Int.self, forKey: .outputTokens) ?? 0
         self.cachedTokens = try container.decodeIfPresent(Int.self, forKey: .cachedTokens) ?? 0
         self.lastDurationSeconds = try container.decodeIfPresent(Double.self, forKey: .lastDurationSeconds)
+
+        // Strict provider sanity verification & self-healing:
+        let isDefinitivelyCodex = self.codexThreadID != nil
+            || (decodedModel?.hasPrefix("gpt") == true)
+            || (decodedModel?.hasPrefix("o") == true)
+            || decodedEntries.contains(where: {
+                if case .message(let m) = $0, m.senderName == "CODEX" { return true }
+                if case .activity = $0 { return true }
+                return false
+            })
+
+        if isDefinitivelyCodex {
+            self.provider = .codex
+            decodedEntries.removeAll {
+                if case .message(let m) = $0, m.senderName == "GEMINI" { return true }
+                return false
+            }
+        } else if decodedProvider == .gemini || decodedEntries.contains(where: {
+            if case .message(let m) = $0, m.senderName == "GEMINI" { return true }
+            return false
+        }) || (decodedModel?.contains("gemini") == true) {
+            self.provider = .gemini
+            self.codexThreadID = nil
+            if let m = decodedModel, m.hasPrefix("gpt") || m.hasPrefix("o") {
+                decodedModel = nil
+            }
+            decodedEntries.removeAll {
+                if case .message(let m) = $0, m.senderName == "CODEX" { return true }
+                if case .activity = $0 { return true }
+                return false
+            }
+        } else {
+            self.provider = decodedProvider ?? .codex
+        }
+        self.model = decodedModel
+        self.entries = decodedEntries
+    }
+
+    public mutating func sanitize(for targetProvider: AgentProvider) {
+        self.provider = targetProvider
+        if targetProvider == .codex {
+            entries.removeAll {
+                if case .message(let m) = $0, m.senderName == "GEMINI" { return true }
+                return false
+            }
+        } else {
+            codexThreadID = nil
+            if let m = model, m.hasPrefix("gpt") || m.hasPrefix("o") {
+                model = nil
+            }
+            entries.removeAll {
+                if case .message(let m) = $0, m.senderName == "CODEX" { return true }
+                if case .activity = $0 { return true }
+                return false
+            }
+        }
+    }
+
+    public func sanitized(for targetProvider: AgentProvider) -> AgentThread {
+        var copy = self
+        copy.sanitize(for: targetProvider)
+        return copy
     }
 }
 

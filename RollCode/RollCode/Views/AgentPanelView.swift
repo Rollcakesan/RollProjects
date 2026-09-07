@@ -8,8 +8,6 @@ struct AgentPanelView: View {
     @Environment(WorkspaceModel.self) private var workspace
     @Environment(TerminalSession.self) private var terminal
     @State private var prompt = ""
-    @State private var codexPromptDraft = ""
-    @State private var geminiPromptDraft = ""
     @State private var fileMentionQuery: String?
     @FocusState private var promptFocused: Bool
 
@@ -29,12 +27,16 @@ struct AgentPanelView: View {
         }
         .background(RollCodeTheme.sidebarBackground)
         .onAppear {
+            prompt = agent.currentPromptDraft
             agent.auth.refresh()
             agent.geminiAuth.refresh()
             agent.loadPastCodexSessions()
             Task {
                 await agent.refreshModelCatalog()
             }
+        }
+        .onChange(of: agent.selectedProvider) { _, _ in
+            prompt = agent.currentPromptDraft
         }
     }
 
@@ -60,6 +62,7 @@ struct AgentPanelView: View {
 
             Button {
                 agent.newThread()
+                agent.currentPromptDraft = ""
                 prompt = ""
                 promptFocused = true
             } label: {
@@ -177,13 +180,9 @@ struct AgentPanelView: View {
 
     private func selectProvider(_ provider: AgentProvider) {
         guard provider != agent.selectedProvider, !agent.isRunning else { return }
-        if agent.selectedProvider == .codex {
-            codexPromptDraft = prompt
-        } else {
-            geminiPromptDraft = prompt
-        }
+        agent.currentPromptDraft = prompt
         agent.selectProvider(provider)
-        prompt = (provider == .codex) ? codexPromptDraft : geminiPromptDraft
+        prompt = agent.currentPromptDraft
     }
 
     private var threadSwitcherMenu: some View {
@@ -191,7 +190,11 @@ struct AgentPanelView: View {
 
         return Menu {
             Button {
-                withAnimation { agent.newThread(); prompt = "" }
+                withAnimation {
+                    agent.newThread()
+                    agent.currentPromptDraft = ""
+                    prompt = ""
+                }
                 promptFocused = true
             } label: {
                 Label("New \(agent.selectedProvider.rawValue) Thread", systemImage: "plus")
@@ -201,7 +204,12 @@ struct AgentPanelView: View {
                 Divider()
                 Section("\(agent.selectedProvider.rawValue) Sessions") {
                     ForEach(currentProviderThreads) { thread in
-                        Button { withAnimation { agent.switchToThread(thread); prompt = "" } } label: {
+                        Button {
+                            withAnimation {
+                                agent.switchToThread(thread)
+                                prompt = agent.currentPromptDraft
+                            }
+                        } label: {
                             HStack {
                                 if thread.id == agent.activeThread.id { Image(systemName: "checkmark") }
                                 Text(thread.title)
@@ -215,7 +223,13 @@ struct AgentPanelView: View {
                 Divider()
                 Section("Past Codex Sessions") {
                     ForEach(agent.pastCodexSessions) { session in
-                        Button { withAnimation { agent.resumePastCodexSession(session); prompt = "" } } label: {
+                        Button {
+                            withAnimation {
+                                agent.resumePastCodexSession(session)
+                                agent.currentPromptDraft = ""
+                                prompt = ""
+                            }
+                        } label: {
                             Text(session.displayTitle)
                         }
                     }
@@ -478,6 +492,7 @@ struct AgentPanelView: View {
                 onSubmit: submit,
                 onStop: { agent.stop() },
                 onTextChange: { newPrompt in
+                    agent.currentPromptDraft = newPrompt
                     checkFileMention(in: newPrompt)
                 }
             )
@@ -586,6 +601,7 @@ struct AgentPanelView: View {
         guard canSubmit, let rootURL = workspace.rootURL, workspace.saveAllDocuments() else { return }
         var request = prompt
         prompt = ""
+        agent.currentPromptDraft = ""
         fileMentionQuery = nil
 
         // Resolve @file mentions and attach contents into prompt
