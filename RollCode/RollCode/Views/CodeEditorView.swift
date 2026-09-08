@@ -105,6 +105,7 @@ struct CodeEditorView: NSViewRepresentable {
             textView.setSelectedRange(NSRange(location: min(selection.location, text.utf16.count), length: 0))
         }
         context.coordinator.applyHighlighting(language: language)
+        context.coordinator.scheduleSemanticHighlighting()
         context.coordinator.handleNavigationRequest(navigationRequest)
         context.coordinator.ruler?.errorLines = errorLines
         context.coordinator.ruler?.gitAddedLines = gitAddedLines
@@ -122,6 +123,7 @@ struct CodeEditorView: NSViewRepresentable {
         private var isPerformingSmartEdit = false
         private var lastNavigationRequestID: UUID?
         private var completionDebounceTask: Task<Void, Never>?
+        private var semanticTokensTask: Task<Void, Never>?
         let suggestionController = SuggestionOverlayController()
 
         init(parent: CodeEditorView) {
@@ -134,6 +136,7 @@ struct CodeEditorView: NSViewRepresentable {
             parent.text = textView.string
             isInternalTextChange = false
             applyHighlighting(language: parent.language)
+            scheduleSemanticHighlighting()
             ruler?.needsDisplay = true
 
             scheduleCompletion(in: textView)
@@ -367,6 +370,52 @@ struct CodeEditorView: NSViewRepresentable {
             }
             return (targetLine == 1 && string.length == 0) ? NSRange(location: 0, length: 0) : nil
         }
+
+        func scheduleSemanticHighlighting() {
+            guard let url = parent.documentURL else { return }
+            semanticTokensTask?.cancel()
+
+            semanticTokensTask = Task { @MainActor [weak self] in
+                try? await Task.sleep(for: .milliseconds(150))
+                guard !Task.isCancelled, let self, let textView = self.textView else { return }
+                let currentText = textView.string
+                let tokens = await LSPManager.shared.requestSemanticTokens(
+                    for: self.parent.language,
+                    url: url,
+                    text: currentText,
+                    workspaceURL: self.parent.workspaceURL
+                )
+                guard !Task.isCancelled, !tokens.isEmpty, textView.string == currentText else { return }
+                self.applySemanticTokens(tokens)
+            }
+        }
+
+        private func applySemanticTokens(_ tokens: [LSPSemanticToken]) {
+            guard let textStorage = textView?.textStorage, textStorage.length > 0 else { return }
+            let nsText = textStorage.string as NSString
+            var lineIndex = 0
+            var lineStartOffset = 0
+            let totalLength = nsText.length
+
+            isApplyingAttributes = true
+            textStorage.beginEditing()
+
+            for token in tokens {
+                while lineIndex < token.line && lineStartOffset < totalLength {
+                    let range = nsText.lineRange(for: NSRange(location: lineStartOffset, length: 0))
+                    lineStartOffset = NSMaxRange(range)
+                    lineIndex += 1
+                }
+                guard lineIndex == token.line else { continue }
+                let tokenLocation = lineStartOffset + token.character
+                guard tokenLocation + token.length <= totalLength,
+                      let color = EditorPalette.color(forTokenType: token.type) else { continue }
+                textStorage.addAttribute(.foregroundColor, value: color, range: NSRange(location: tokenLocation, length: token.length))
+            }
+
+            textStorage.endEditing()
+            isApplyingAttributes = false
+        }
     }
 }
 
@@ -382,6 +431,22 @@ private enum EditorPalette {
         style.defaultTabInterval = (" " as NSString).size(withAttributes: [.font: font(size: fontSize)]).width * CGFloat(tabWidth)
         style.tabStops = []
         return style
+    }
+    static func color(forTokenType type: String) -> NSColor? {
+        switch type {
+        case "type", "class", "struct", "interface", "enum", "typeParameter":
+            return NSColor(red: 0.31, green: 0.79, blue: 0.69, alpha: 1) // Mint / Teal
+        case "function", "method":
+            return NSColor(red: 0.31, green: 0.76, blue: 1.0, alpha: 1)  // Light Blue
+        case "variable", "property", "parameter", "enumMember":
+            return NSColor(red: 0.61, green: 0.86, blue: 1.0, alpha: 1)  // Light Cyan
+        case "keyword", "modifier":
+            return NSColor(red: 0.77, green: 0.53, blue: 0.75, alpha: 1) // Purple
+        case "macro", "decorator":
+            return NSColor(red: 0.86, green: 0.86, blue: 0.67, alpha: 1) // Gold
+        default:
+            return nil
+        }
     }
 }
 

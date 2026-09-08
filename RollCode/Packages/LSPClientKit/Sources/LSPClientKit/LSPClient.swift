@@ -26,6 +26,9 @@ public final class LSPClient {
     private var initContinuations: [CheckedContinuation<Bool, Never>] = []
     private var pendingCompletions: [Int: PendingCompletion] = [:]
     private var pendingFormatting: [Int: PendingFormatting] = [:]
+    private var pendingSemanticTokens: [Int: CheckedContinuation<[LSPSemanticToken], Never>] = [:]
+    private var semanticTokenTypes: [String] = []
+    private var semanticTokenModifiers: [String] = []
     private var openDocumentVersions: [URL: Int] = [:]
     private var positionEncoding = "utf-16"
     private let readQueue = DispatchQueue(label: "com.rollcode.lsp.reader")
@@ -121,7 +124,12 @@ public final class LSPClient {
                             "documentationFormat": ["plaintext", "markdown"]
                         ]
                     ],
-                    "formatting": ["dynamicRegistration": false]
+                    "formatting": ["dynamicRegistration": false],
+                    "semanticTokens": [
+                        "dynamicRegistration": false,
+                        "requests": ["full": true],
+                        "formats": ["relative"]
+                    ]
                 ]
             ]
         ]
@@ -205,6 +213,24 @@ public final class LSPClient {
         }
     }
 
+    public func requestSemanticTokens(url: URL, text: String, languageId: String) async -> [LSPSemanticToken] {
+        guard await ensureInitialized() else { return [] }
+        syncDocument(url: url, text: text, languageId: languageId)
+        let requestID = nextRequestID()
+        let params: [String: Any] = [
+            "textDocument": ["uri": url.standardizedFileURL.absoluteString]
+        ]
+        return await withCheckedContinuation { continuation in
+            pendingSemanticTokens[requestID] = continuation
+            send(method: "textDocument/semanticTokens/full", id: requestID, params: params)
+            Task { @MainActor [weak self] in
+                try? await Task.sleep(nanoseconds: 3_000_000_000)
+                guard let self, let pending = self.pendingSemanticTokens.removeValue(forKey: requestID) else { return }
+                pending.resume(returning: [])
+            }
+        }
+    }
+
     public func closeDocument(_ url: URL) {
         guard state == .ready else { return }
         let standardized = url.standardizedFileURL
@@ -227,6 +253,10 @@ public final class LSPClient {
             pending.continuation.resume(returning: nil)
         }
         pendingFormatting.removeAll()
+        for (_, continuation) in pendingSemanticTokens {
+            continuation.resume(returning: [])
+        }
+        pendingSemanticTokens.removeAll()
 
         let requestID = nextRequestID()
         shutdownRequestID = requestID
@@ -281,9 +311,19 @@ public final class LSPClient {
         if id == initializeRequestID {
             initializeRequestID = nil
             if let result = message["result"] as? [String: Any],
-               let capabilities = result["capabilities"] as? [String: Any],
-               let encoding = capabilities["positionEncoding"] as? String {
-                positionEncoding = encoding.lowercased()
+               let capabilities = result["capabilities"] as? [String: Any] {
+                if let encoding = capabilities["positionEncoding"] as? String {
+                    positionEncoding = encoding.lowercased()
+                }
+                if let provider = capabilities["semanticTokensProvider"] as? [String: Any],
+                   let legend = provider["legend"] as? [String: Any] {
+                    if let types = legend["tokenTypes"] as? [String] {
+                        semanticTokenTypes = types
+                    }
+                    if let modifiers = legend["tokenModifiers"] as? [String] {
+                        semanticTokenModifiers = modifiers
+                    }
+                }
             }
             send(method: "initialized", params: [:])
             state = .ready
@@ -311,6 +351,14 @@ public final class LSPClient {
                 ? Self.formattedText(from: message, text: pending.text, positionEncoding: positionEncoding)
                 : nil
             pending.continuation.resume(returning: formatted)
+            return
+        }
+
+        if let continuation = pendingSemanticTokens.removeValue(forKey: id) {
+            let tokens = message["error"] == nil
+                ? Self.parseSemanticTokens(from: message, tokenTypes: semanticTokenTypes, tokenModifiers: semanticTokenModifiers)
+                : []
+            continuation.resume(returning: tokens)
             return
         }
     }
@@ -482,6 +530,49 @@ public final class LSPClient {
             mutableText.replaceCharacters(in: range, with: replacement)
         }
         return mutableText as String
+    }
+
+    nonisolated public static func parseSemanticTokens(
+        from message: [String: Any],
+        tokenTypes: [String],
+        tokenModifiers: [String] = []
+    ) -> [LSPSemanticToken] {
+        guard let result = message["result"] as? [String: Any],
+              let data = result["data"] as? [Int] else { return [] }
+        var tokens: [LSPSemanticToken] = []
+        var currentLine = 0
+        var currentCharacter = 0
+        var i = 0
+        while i + 4 < data.count {
+            let deltaLine = data[i]
+            let deltaStartChar = data[i + 1]
+            let length = data[i + 2]
+            let tokenTypeIndex = data[i + 3]
+            let tokenModifierBits = data[i + 4]
+
+            if deltaLine > 0 {
+                currentLine += deltaLine
+                currentCharacter = deltaStartChar
+            } else {
+                currentCharacter += deltaStartChar
+            }
+
+            let typeName = (tokenTypeIndex >= 0 && tokenTypeIndex < tokenTypes.count) ? tokenTypes[tokenTypeIndex] : ""
+            var activeModifiers: [String] = []
+            for (bit, modifier) in tokenModifiers.enumerated() where (tokenModifierBits & (1 << bit)) != 0 {
+                activeModifiers.append(modifier)
+            }
+
+            tokens.append(LSPSemanticToken(
+                line: currentLine,
+                character: currentCharacter,
+                length: length,
+                type: typeName,
+                modifiers: activeModifiers
+            ))
+            i += 5
+        }
+        return tokens
     }
 
     nonisolated public static func characterOffset(

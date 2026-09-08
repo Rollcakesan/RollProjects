@@ -34,6 +34,22 @@ public final class LSPManager {
         )
     }
 
+    public func requestSemanticTokens(
+        for language: LSPDocumentLanguage,
+        url: URL,
+        text: String,
+        workspaceURL: URL? = nil
+    ) async -> [LSPSemanticToken] {
+        let rootURL = (workspaceURL ?? url.deletingLastPathComponent()).standardizedFileURL
+        guard let resolvedServer = LanguageServerConfig.resolve(for: language, documentURL: url),
+              let client = client(for: resolvedServer, rootURL: rootURL) else { return [] }
+        return await client.requestSemanticTokens(
+            url: url,
+            text: text,
+            languageId: resolvedServer.languageId
+        )
+    }
+
     public func formatDocument(
         for language: LSPDocumentLanguage,
         url: URL,

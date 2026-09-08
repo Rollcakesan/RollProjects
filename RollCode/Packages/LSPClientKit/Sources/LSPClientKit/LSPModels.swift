@@ -78,3 +78,20 @@ public struct LSPCompletionItem: Hashable, Identifiable, Sendable {
         self.replacementRange = replacementRange
     }
 }
+
+/// Semantic token returned from LSP textDocument/semanticTokens.
+public struct LSPSemanticToken: Hashable, Sendable {
+    public let line: Int
+    public let character: Int
+    public let length: Int
+    public let type: String
+    public let modifiers: [String]
+
+    public init(line: Int, character: Int, length: Int, type: String, modifiers: [String] = []) {
+        self.line = line
+        self.character = character
+        self.length = length
+        self.type = type
+        self.modifiers = modifiers
+    }
+}

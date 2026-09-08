@@ -105,4 +105,44 @@ struct LSPClientKitTests {
         #expect(swiftServer?.identifier == "sourcekit-lsp")
         #expect(swiftServer?.languageId == "swift")
     }
+
+    @Test("LSPClient parses relative semantic tokens correctly")
+    func parsesSemanticTokens() {
+        // [deltaLine, deltaStartChar, length, tokenTypeIndex, tokenModifierBits]
+        // Token 1: line 0, char 4, length 6, type 0 ("class"), modifier 1
+        // Token 2: line 0 (delta 0), char 11 (delta 7), length 3, type 1 ("identifier"), modifier 0
+        // Token 3: line 2 (delta 2), char 4 (delta 4), length 4, type 2 ("keyword"), modifier 0
+        let rawJSON: [String: Any] = [
+            "result": [
+                "data": [
+                    0, 4, 6, 0, 1,
+                    0, 7, 3, 1, 0,
+                    2, 4, 4, 2, 0
+                ]
+            ]
+        ]
+        let tokenTypes = ["class", "variable", "keyword"]
+        let tokenModifiers = ["declaration"]
+
+        let tokens = LSPClient.parseSemanticTokens(from: rawJSON, tokenTypes: tokenTypes, tokenModifiers: tokenModifiers)
+        #expect(tokens.count == 3)
+
+        #expect(tokens[0].line == 0)
+        #expect(tokens[0].character == 4)
+        #expect(tokens[0].length == 6)
+        #expect(tokens[0].type == "class")
+        #expect(tokens[0].modifiers == ["declaration"])
+
+        #expect(tokens[1].line == 0)
+        #expect(tokens[1].character == 11)
+        #expect(tokens[1].length == 3)
+        #expect(tokens[1].type == "variable")
+        #expect(tokens[1].modifiers.isEmpty)
+
+        #expect(tokens[2].line == 2)
+        #expect(tokens[2].character == 4)
+        #expect(tokens[2].length == 4)
+        #expect(tokens[2].type == "keyword")
+        #expect(tokens[2].modifiers.isEmpty)
+    }
 }
