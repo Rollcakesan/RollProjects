@@ -4,6 +4,7 @@ import Foundation
 
 @Suite("TerminalCoreKit Tests")
 struct TerminalCoreKitTests {
+    // ANSI エスケープシーケンスおよび復帰文字 (\r) の除去機能を検証
     @Test("ANSIEscapeCleaner removes control sequences and carriage returns")
     func testANSIEscapeCleaner() {
         let raw = "\u{001B}[31mError:\u{001B}[0m File not found\r\n"
@@ -11,6 +12,7 @@ struct TerminalCoreKitTests {
         #expect(cleaned == "Error: File not found\n")
     }
 
+    // TerminalSession のタブ管理（作成・切り替え・クローズ）機能を検証
     @Test("TerminalSession manages tabs and commands", .serialized)
     @MainActor
     func testTerminalSessionTabs() {

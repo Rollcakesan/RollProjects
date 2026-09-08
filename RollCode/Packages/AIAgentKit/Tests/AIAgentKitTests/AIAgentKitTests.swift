@@ -4,6 +4,7 @@ import Testing
 
 @Suite("AIAgentKit Test Suite")
 struct AIAgentKitTests {
+    // CodexEventParser がスレッド開始、メッセージ、コマンド実行、ファイル変更イベントを正しく読み取るかを検証
     @Test("CodexEventParser reads thread started, messages, command execution, and file changes")
     func codexEventParserReadsThreadMessagesCommandsAndChanges() throws {
         let thread = try #require(CodexEventParser.parse(
@@ -39,6 +40,7 @@ struct AIAgentKitTests {
         #expect(changeActivity.state == .completed)
     }
 
+    // CodexEventParser がトークン使用量 (usage) およびエラー/失敗イベントを正しく読み取るかを検証
     @Test("CodexEventParser reads usage tokens and failure events")
     func codexEventParserReadsUsageAndFailures() throws {
         let completed = try #require(CodexEventParser.parse(
@@ -52,6 +54,7 @@ struct AIAgentKitTests {
         #expect(failed == .error("Authentication required"))
     }
 
+    // CodexAuthService が ChatGPT ログインモードとトークン/プラン情報を正しく解析できるかを検証
     @Test("CodexAuthService parses ChatGPT login mode and credentials")
     @MainActor
     func codexAuthServiceParsesChatGPTLogin() throws {
@@ -70,6 +73,7 @@ struct AIAgentKitTests {
         #expect(service.status.displayText == "test@example.com (Plus)")
     }
 
+    // AgentSession が複数スレッドの作成とスレッド間の切り替えを正しく管理できるかを検証
     @Test("AgentSession supports multiple threads and switching")
     @MainActor
     func agentSessionSupportsMultipleThreads() throws {
@@ -94,6 +98,7 @@ struct AIAgentKitTests {
         #expect(session.threads.count == 2)
     }
 
+    // AgentTokenUsage がトークン表記文字列を正しく数値にパースできるかを検証
     @Test("AgentTokenUsage parses token descriptions accurately")
     func agentTokenUsageParsesDescriptions() throws {
         let usage1 = try #require(AgentTokenUsage.parse(from: "20 input · 10 cached · 5 output"))
@@ -106,6 +111,7 @@ struct AIAgentKitTests {
         #expect(usage2 == nil)
     }
 
+    // CodexAppServerClient の JSONDictionary のサブスクリプトアクセスと Sendable 安全性を検証
     @Test("CodexAppServerClient JSONDictionary subscript and Sendable safety")
     @MainActor
     func codexAppServerServiceJSONDictionary() {
@@ -119,6 +125,7 @@ struct AIAgentKitTests {
         #expect((dict["nested"] as? [String: Any])?["name"] as? String == "gpt-5.6-sol")
     }
 
+    // GeminiAuthService が期限内の有効な OAuth アクセストークンを正しく読み出して返せるかを検証
     @Test("GeminiAuthService reads and returns unexpired OAuth access token")
     @MainActor
     func geminiAuthServiceReturnsValidOAuthToken() async throws {
@@ -142,6 +149,7 @@ struct AIAgentKitTests {
         #expect(token == "mock-access-token-123")
     }
 
+    // ModelCatalogService が Vertex AI Gemini モデル一覧をパースし最新モデルを最上位にランク付けできるかを検証
     @Test("ModelCatalogService parses Vertex AI Gemini models and sorts latest model highest")
     @MainActor
     func modelCatalogServiceVertexGeminiParsing() throws {
@@ -166,6 +174,7 @@ struct AIAgentKitTests {
         #expect(parsed[2].speedTier == .fast)
     }
 
+    // AgentSession が初回実行および再開 (resume) 時に適切な CLI 引数をフォーマットできるかを検証
     @Test("AgentSession formats CLI arguments correctly for initial execution and resume")
     @MainActor
     func agentSessionFormatsCLIArguments() {
@@ -201,6 +210,7 @@ struct AIAgentKitTests {
         #expect(highArgs.contains("model_reasoning_effort=\"high\""))
     }
 
+    // AgentThread のデコード時に Codex 識別子が含まれている場合のプロバイダー誤判定を自動修復できるかを検証
     @Test("AgentThread repairs misattributed provider when codex identifiers are present")
     func agentThreadRepairsProviderOnDecoding() throws {
         let json = """
@@ -210,6 +220,7 @@ struct AIAgentKitTests {
         #expect(decoded.provider == .codex)
     }
 
+    // AgentSession が Codex と Gemini のメッセージチャンネルを互いに混在させず完全に分離できるかを検証
     @Test("AgentSession isolates channels between Codex and Gemini")
     @MainActor
     func agentSessionChannelIsolation() {

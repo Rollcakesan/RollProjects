@@ -4,6 +4,7 @@ import Foundation
 
 @Suite("WorkspaceIndexKit Tests")
 struct WorkspaceIndexKitTests {
+    // クイックオープン用マッチャーが完全一致およびあいまい一致（Fuzzy Match）で正しくスコアリングするかを検証
     @Test("QuickOpenMatcher scores exact and fuzzy matches")
     func testQuickOpenMatcher() {
         let exactScore = QuickOpenMatcher.score(query: "main", candidate: "main.swift")
@@ -16,6 +17,7 @@ struct WorkspaceIndexKitTests {
         #expect(noMatch == nil)
     }
 
+    // ワークスペース内の検索（行番号・一致箇所特定）および一括置換機能を検証
     @Test("WorkspaceSearch finds matches and performs replacement")
     func testWorkspaceSearchAndReplace() {
         let fileURL = URL(fileURLWithPath: "/workspace/File.swift")
@@ -38,6 +40,7 @@ struct WorkspaceIndexKitTests {
         #expect(replacements[0].text.contains("let baz = 1"))
     }
 
+    // ディレクトリ構造から FileNode のファイルツリーが正しく構築されるかを検証
     @Test("FileNode builds tree from directory")
     func testFileNodeTree() {
         let tempDir = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)

@@ -4,6 +4,7 @@ import Testing
 
 @Suite("LSPClientKit Tests")
 struct LSPClientKitTests {
+    // 受信バッファから JSON-RPC メッセージを正しく抽出・パースできるかを検証
     @Test("LSPClient extracts JSON-RPC messages correctly")
     func extractsJSONRPCMessages() {
         let json = "{\"jsonrpc\":\"2.0\",\"id\":1,\"result\":{}}"
@@ -16,6 +17,7 @@ struct LSPClientKitTests {
         #expect(buffer.isEmpty)
     }
 
+    // LSP の補完レスポンスから候補アイテム（ラベル、補完テキスト、詳細情報）を正しくデコードできるかを検証
     @Test("LSPClient decodes completion suggestions from result object")
     func decodesCompletionSuggestions() {
         let rawJSON: [String: Any] = [
@@ -38,6 +40,7 @@ struct LSPClientKitTests {
         #expect(items[0].detail == "print(items...)")
     }
 
+    // LSP のフォーマット編集差分を末尾からの逆順で正確に適用できるかを検証
     @Test("LSPClient applies document formatting edits in reverse order")
     func appliesFormattingEdits() {
         let text = "let   x=1\n"
@@ -75,6 +78,7 @@ struct LSPClientKitTests {
         #expect(formatted == "let x = 1\n")
     }
 
+    // エディタの UTF-16 位置情報をサーバー側で合意された LSP 文字エンコーディング（UTF-8, UTF-16, UTF-32）に正しく変換できるかを検証
     @Test("LSPClient converts UTF-16 editor positions to negotiated LSP encodings")
     func convertsPositionEncodings() {
         let text = "😀abc"
@@ -98,6 +102,7 @@ struct LSPClientKitTests {
         ) == 1)
     }
 
+    // 言語設定に応じて利用可能な言語サーバー定義を正しく解決できるかを検証
     @Test("LanguageServerConfig resolves language servers")
     func resolvesLanguageServers() {
         let swiftServer = LanguageServerConfig.resolve(for: .swift)
@@ -106,6 +111,7 @@ struct LSPClientKitTests {
         #expect(swiftServer?.languageId == "swift")
     }
 
+    // LSP 3.16+ 相対デルタ整数ストリームからセマンティックトークンを正しくデコードできるかを検証
     @Test("LSPClient parses relative semantic tokens correctly")
     func parsesSemanticTokens() {
         // [deltaLine, deltaStartChar, length, tokenTypeIndex, tokenModifierBits]

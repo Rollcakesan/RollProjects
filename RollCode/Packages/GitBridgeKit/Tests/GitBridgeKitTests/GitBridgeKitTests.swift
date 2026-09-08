@@ -4,6 +4,7 @@ import Testing
 
 @Suite("GitBridgeKit Tests")
 struct GitBridgeKitTests {
+    // unified diff の追加行番号を正しく解析できるかを検証
     @Test("diffLineNumbers correctly parses unified diff addition lines")
     func diffLineNumbersParsesAddedLines() {
         let sampleDiff = """
@@ -22,6 +23,7 @@ struct GitBridgeKitTests {
         #expect(modified.isEmpty)
     }
 
+    // git status の -z (ヌル文字区切り) porcelain フォーマットを正しくパースできるかを検証
     @Test("statusEntries parses porcelain z-format strings")
     func statusEntriesParsesNullDelimitedFields() {
         let nullByte = "\0"
@@ -34,6 +36,7 @@ struct GitBridgeKitTests {
         #expect(entries[1].path == "file2.txt")
     }
 
+    // GitChange モデルが Identifiable および Equatable に準拠しているかを検証
     @Test("GitChange models conform to Identifiable and Equatable")
     func gitChangeProperties() {
         let change = GitChange(path: "Sources/App.swift", status: "M ", diff: "+let a = 1")

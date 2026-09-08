@@ -10,6 +10,7 @@ import AIAgentKit
 
 @Suite("RollCode Test Suite")
 struct RollCodeTests {
+    // CodexEventParser がスレッド開始、メッセージ、コマンド実行、ファイル変更イベントを正しく読み取るかを検証
     @Test("CodexEventParser reads thread started, messages, command execution, and file changes")
     func codexEventParserReadsThreadMessagesCommandsAndChanges() throws {
         let thread = try #require(CodexEventParser.parse(
@@ -45,6 +46,7 @@ struct RollCodeTests {
         #expect(changeActivity.state == .completed)
     }
 
+    // CodexEventParser がトークン使用量および失敗イベントを正しく読み取るかを検証
     @Test("CodexEventParser reads usage tokens and failure events")
     func codexEventParserReadsUsageAndFailures() throws {
         let completed = try #require(CodexEventParser.parse(
@@ -58,6 +60,7 @@ struct RollCodeTests {
         #expect(failed == .error("Authentication required"))
     }
 
+    // CodexEventParser が構造化された JSON ツール呼び出し結果をデコードできるかを検証
     @Test("CodexEventParser decodes structured JSON tool call results")
     func codexEventParserDecodesStructuredToolResults() throws {
         let event = try #require(CodexEventParser.parse(
@@ -72,6 +75,7 @@ struct RollCodeTests {
         #expect(activity.detail.contains("\"count\":2"))
     }
 
+    // AgentSession が Codex JSON Lines をストリーミングし状態遷移を追跡できるかを検証
     @Test("AgentSession streams Codex JSON Lines and tracks state changes")
     @MainActor
     func agentSessionStreamsCodexJSONLines() async throws {
@@ -104,6 +108,7 @@ struct RollCodeTests {
         }
     }
 
+    // ファイル拡張子からのプログラミング言語判定機能を検証
     @Test(
         "Code language detection from file extension",
         arguments: [
@@ -119,6 +124,7 @@ struct RollCodeTests {
         #expect(CodeLanguage(url: URL(fileURLWithPath: path)) == expected)
     }
 
+    // FileNode.buildTree がディレクトリをファイルより先にソートし除外対象フォルダをスキップするかを検証
     @Test("FileNode.buildTree sorts directories before files and skips ignored folders")
     func treeSortsDirectoriesBeforeFilesAndSkipsHeavyFolders() throws {
         try withTemporaryDirectory { root in
@@ -131,6 +137,7 @@ struct RollCodeTests {
         }
     }
 
+    // FileNode.matchingFiles が階層内のファイルを大文字小文字を区別せず検索できるかを検証
     @Test("FileNode.matchingFiles finds nested files case-insensitively")
     func treeFindsNestedFilesCaseInsensitively() throws {
         try withTemporaryDirectory { root in
@@ -143,6 +150,7 @@ struct RollCodeTests {
         }
     }
 
+    // QuickOpenMatcher がより一致度の高いあいまいマッチ候補を上位にランク付けするかを検証
     @Test("QuickOpenMatcher ranks tighter fuzzy matches higher")
     func quickOpenMatcherSupportsFuzzyPathsAndRanksTighterMatchesHigher() {
         let tight = QuickOpenMatcher.score(query: "wsm", candidate: "WorkspaceModel.swift")
@@ -154,6 +162,7 @@ struct RollCodeTests {
         #expect(QuickOpenMatcher.score(query: "xyz", candidate: "WorkspaceModel.swift") == nil)
     }
 
+    // EditorSmartEditing が括弧などのペアを自動補完し選択範囲を囲めるかを検証
     @Test("EditorSmartEditing auto-closes pairs and wraps selected ranges")
     func smartEditingPairsAndWrapsCharacters() throws {
         let emptyPair = try #require(EditorSmartEditing.edit(for: "(", in: "", range: NSRange(location: 0, length: 0)))
@@ -169,6 +178,7 @@ struct RollCodeTests {
         #expect(skipClosing.selection.location == 2)
     }
 
+    // EditorSmartEditing が改行時の自動インデントおよび空ブロック展開を正しく処理するかを検証
     @Test("EditorSmartEditing automatically indents new lines and expands empty blocks")
     func smartEditingIndentsNewLinesAndExpandsEmptyBlocks() throws {
         let indented = try #require(EditorSmartEditing.edit(
@@ -196,6 +206,7 @@ struct RollCodeTests {
         #expect(twoSpaces.selection.location == 4)
     }
 
+    // 閉じ波括弧の自動アンインデント、Tab/Shift+Tabによる複数行インデント/アンインデント、ソフトバックスペースを検証
     @Test("EditorSmartEditing auto-dedents closing brace and performs line indent/dedent and soft backspace")
     func editorSmartEditingIndentFeatures() throws {
         // 1. Auto-dedent on '}'
@@ -229,6 +240,7 @@ struct RollCodeTests {
         #expect(dedented.replacement == "first\nsecond")
     }
 
+    // WorkspaceSearch が行単位での大文字小文字を区別しない一致検索と文字列置換を実行できるかを検証
     @Test("WorkspaceSearch finds case-insensitive matches by line and replaces literal text")
     func workspaceSearchFindsAndReplacesLiteralText() throws {
         let root = URL(fileURLWithPath: "/tmp/project", isDirectory: true)
@@ -256,6 +268,7 @@ struct RollCodeTests {
         #expect(replacement.text == "let value = $EDITOR\\name\n// $EDITOR\\name and $EDITOR\\name")
     }
 
+    // GitBridgeService が追跡対象 (tracked) および未追跡 (untracked) の変更差分を正しく取得できるかを検証
     @Test("GitBridgeService returns tracked and untracked changes")
     func gitDiffServiceReturnsWorkingTreeChanges() throws {
         try withTemporaryDirectory { root in
@@ -278,6 +291,7 @@ struct RollCodeTests {
         }
     }
 
+    // 初回コミット前（HEAD 未作成状態）でもステージングされたファイルを表示できるかを検証
     @Test("GitBridgeService shows staged files before the first commit")
     func gitDiffServiceSupportsRepositoryWithoutHead() throws {
         try withTemporaryDirectory { root in
@@ -292,6 +306,7 @@ struct RollCodeTests {
         }
     }
 
+    // WorkspaceModel がテキストファイルを開き、編集し、保存できるかを検証
     @Test("WorkspaceModel opens, modifies, and saves text files")
     @MainActor
     func workspaceOpensAndSavesTextFile() throws {
@@ -309,6 +324,7 @@ struct RollCodeTests {
         }
     }
 
+    // 外部プロセスによってディスク上で変更された未編集ファイルを自動再読込するかを検証
     @Test("WorkspaceModel reloads clean files changed externally on disk")
     @MainActor
     func workspaceReloadsCleanFileChangedOnDisk() throws {
@@ -330,6 +346,7 @@ struct RollCodeTests {
         }
     }
 
+    // 開いているファイルの名前変更時にドキュメント URL が型付きスローとともに更新されるかを検証
     @Test("WorkspaceModel renames open file and updates document URL with Typed Throws")
     @MainActor
     func workspaceRenamesOpenFileAndUpdatesDocumentURL() throws {
@@ -348,6 +365,7 @@ struct RollCodeTests {
         }
     }
 
+    // TerminalSession がワークスペース内でコマンドを実行し標準出力を受信できるかを検証
     @Test("TerminalSession executes command and delivers output in workspace")
     @MainActor
     func terminalExecutesCommandInWorkspace() async throws {
@@ -365,7 +383,7 @@ struct RollCodeTests {
         }
     }
 
-
+    // TerminalSession のコマンド履歴の前進・後退ナビゲーションを検証
     @Test("TerminalSession command history moves backward and forward")
     @MainActor
     func terminalCommandHistoryMovesBackwardAndForward() {
@@ -379,6 +397,7 @@ struct RollCodeTests {
         #expect(terminal.nextCommand() == "")
     }
 
+    // 最後に開いていたワークスペースフォルダが UserDefaults に保存され復元されるかを検証
     @Test("WorkspaceModel persists and restores last opened folder")
     @MainActor
     func workspacePersistsAndRestoresLastFolder() throws {
@@ -395,6 +414,7 @@ struct RollCodeTests {
         }
     }
 
+    // エディタのフォントサイズズームおよびプリセット倍率の管理・永続化を検証
     @Test("WorkspaceModel manages and persists font size zoom levels")
     @MainActor
     func workspaceManagesFontSizeZoom() throws {
@@ -435,6 +455,7 @@ struct RollCodeTests {
         #expect(restored.fontSize == 9)
     }
 
+    // ファイルやフォルダの新規作成およびゴミ箱への移動削除を検証
     @Test("WorkspaceModel creates files and folders and moves to Trash")
     @MainActor
     func workspaceCreatesAndDeletesItems() throws {
@@ -464,6 +485,7 @@ struct RollCodeTests {
         }
     }
 
+    // GitBridgeService が変更をコミットしステータスをクリーンに更新できるかを検証
     @Test("GitBridgeService commits changes and updates status")
     func gitDiffServiceCommitsChanges() throws {
         try withTemporaryDirectory { root in
@@ -484,6 +506,7 @@ struct RollCodeTests {
         }
     }
 
+    // Git 操作の範囲を開いているサブフォルダ内に正しく限定できるかを検証
     @Test("GitBridgeService limits changes and commits to an opened repository subfolder")
     func gitDiffServiceScopesOperationsToWorkspace() throws {
         try withTemporaryDirectory { root in
@@ -513,6 +536,7 @@ struct RollCodeTests {
         }
     }
 
+    // WorkspaceModel が確認ダイアログなしでドキュメントを直接閉じられるかを検証
     @Test("WorkspaceModel closes document directly without safety dialog")
     @MainActor
     func workspaceClosesDocumentDirectly() throws {
@@ -530,6 +554,7 @@ struct RollCodeTests {
         }
     }
 
+    // CodexAuthService が ChatGPT ログインモードとトークン情報を解析できるかを検証
     @Test("CodexAuthService parses ChatGPT login mode and credentials")
     @MainActor
     func codexAuthServiceParsesChatGPTLogin() throws {
@@ -546,6 +571,7 @@ struct RollCodeTests {
         }
     }
 
+    // CodexAuthService が API キー認証を検出できるかを検証
     @Test("CodexAuthService detects API key authentication")
     @MainActor
     func codexAuthServiceDetectsAPIKey() throws {
@@ -562,6 +588,7 @@ struct RollCodeTests {
         }
     }
 
+    // AgentSession が複数スレッドとスレッド切り替えを正しく処理できるかを検証
     @Test("AgentSession supports multiple threads and switching")
     @MainActor
     func agentSessionSupportsMultipleThreads() throws {
@@ -586,6 +613,7 @@ struct RollCodeTests {
         #expect(session.threads.count == 2)
     }
 
+    // 過去の Codex セッション概要から新しいスレッドとして復元・再開できるかを検証
     @Test("AgentSession resumes past Codex session into new thread")
     @MainActor
     func agentSessionResumesPastCodexSession() throws {
@@ -598,6 +626,7 @@ struct RollCodeTests {
         #expect(session.entries.count == 1)
     }
 
+    // Codex と Gemini の最新スレッド間を独立して相互にトグル切り替えできるかを検証
     @Test("AgentSession toggles between latest Codex and Gemini threads independently")
     @MainActor
     func agentSessionTogglesBetweenProviders() throws {
@@ -632,6 +661,7 @@ struct RollCodeTests {
         }
     }
 
+    // プロバイダーをまたいで特定のスレッドインスタンスへ正確に切り替えられるかを検証
     @Test("AgentSession switches to the exact thread across providers")
     @MainActor
     func agentSessionSwitchesToExactCrossProviderThread() throws {
@@ -656,6 +686,7 @@ struct RollCodeTests {
         #expect(session.entries == geminiThread.entries)
     }
 
+    // エージェントの実行中 (turn 進行中) にプロバイダーやスレッドの切り替え要求を安全に拒絶するかを検証
     @Test("AgentSession rejects provider and thread switches while a turn is running")
     @MainActor
     func agentSessionRejectsSwitchesDuringTurn() async throws {
@@ -701,6 +732,7 @@ struct RollCodeTests {
         }
     }
 
+    // Codex と Gemini の会話履歴がそれぞれ独立して復元されるかを検証
     @Test("AgentSession restores Codex and Gemini conversations independently")
     @MainActor
     func agentSessionRestoresProviderThreadsIndependently() throws {
@@ -740,6 +772,7 @@ struct RollCodeTests {
         }
     }
 
+    // CodexEventParser が非推奨警告 (deprecation warning) のエラー項目を無視するかを検証
     @Test("CodexEventParser ignores deprecation warning error items")
     func codexEventParserIgnoresDeprecationWarnings() {
         let line = """
@@ -749,6 +782,7 @@ struct RollCodeTests {
         #expect(event == nil)
     }
 
+    // 前回ワークスペース復元設定 (restoreLastWorkspace) の設定保存および起動時復元を検証
     @Test("WorkspaceModel manages restoreLastWorkspace preference and restores workspace on launch")
     @MainActor
     func workspaceRestoresLastWorkspacePreference() throws {
@@ -774,6 +808,7 @@ struct RollCodeTests {
         }
     }
 
+    // ワークスペースごとの会話スレッドがセッションをまたいで永続化・復元されるかを検証
     @Test("AgentSession persists and restores conversation threads for a workspace")
     @MainActor
     func agentSessionPersistsThreadsAcrossSessions() throws {
@@ -798,6 +833,7 @@ struct RollCodeTests {
         }
     }
 
+    // 読み込み時に破損した永続化スレッド（プロバイダー属性不整合など）を自動修復できるかを検証
     @Test("AgentSession heals corrupted persisted threads on load")
     @MainActor
     func agentSessionHealsCorruptedPersistedThreadsOnLoad() throws {
@@ -855,6 +891,7 @@ struct RollCodeTests {
         }
     }
 
+    // TerminalSession が複数タブの管理およびタブ切り替えを正しく行えるかを検証
     @Test("TerminalSession manages multiple tabs and tab switching")
     @MainActor
     func terminalSessionManagesMultipleTabs() {
@@ -876,6 +913,7 @@ struct RollCodeTests {
         #expect(terminal.activeTabID == secondTab.id)
     }
 
+    // SyntaxCheckService が JSON の構文エラーを正確に検知できるかを検証
     @Test("SyntaxCheckService detects JSON syntax errors")
     func syntaxCheckDetectsJSONErrors() async {
         let validJSON = "{\"name\": \"RollCode\", \"version\": 1}"
@@ -896,6 +934,7 @@ struct RollCodeTests {
         #expect(invalidResult[0].severity == .error)
     }
 
+    // CodeCompletionService が言語キーワードおよびバッファ内の識別子を補完できるかを検証
     @Test("CodeCompletionService completes language keywords and buffer identifiers")
     @MainActor
     func codeCompletionCompletesKeywordsAndBufferWords() {
@@ -927,6 +966,7 @@ struct RollCodeTests {
         #expect(fMatches.first == "for" || fMatches.first == "func")
     }
 
+    // WorkspaceModel のタブ並べ替えおよび他のタブを閉じる機能を検証
     @Test("WorkspaceModel supports tab reordering and closing other tabs")
     @MainActor
     func workspaceModelTabManagement() throws {
@@ -947,21 +987,23 @@ struct RollCodeTests {
         #expect(workspace.documents.map(\.name) == ["A.swift"])
     }
 
+    // GitBridgeService が diff の行番号を正しく解析できるかを検証
     @Test("GitBridgeService parses diff line numbers correctly")
     func gitDiffServiceLineNumberParsing() throws {
         let sampleDiff = """
-        @@ -10,3 +10,4 @@
-         let a = 1
-        +let b = 2
-        +let c = 3
-         let d = 4
-        """
+@@ -10,3 +10,4 @@
+ let a = 1
++let b = 2
++let c = 3
+ let d = 4
+"""
         let (added, _) = GitBridgeService.diffLineNumbers(for: sampleDiff)
         #expect(added.contains(11))
         #expect(added.contains(12))
         #expect(!added.contains(10))
     }
 
+    // LSPClient が JSON-RPC メッセージを正しく抽出できるかを検証
     @Test("LSPClient extracts JSON-RPC messages correctly")
     func lspClientExtractsJSONRPCMessages() throws {
         let jsonString = "{\"jsonrpc\":\"2.0\",\"id\":42,\"result\":{\"items\":[{\"label\":\"title\"}]}}"
@@ -975,6 +1017,7 @@ struct RollCodeTests {
         #expect(buffer.isEmpty)
     }
 
+    // LanguageServerConfig が利用可能な言語サーバーおよび言語識別子を正しく解決できるかを検証
     @Test("LanguageServerConfig resolves available language servers")
     func languageServerConfigResolves() throws {
         let swiftServer = LanguageServerConfig.resolve(for: CodeLanguage.swift)
@@ -994,6 +1037,7 @@ struct RollCodeTests {
         ) == "objective-cpp")
     }
 
+    // LSPClient が補完レスポンスの両方の形状（リスト・配列）と挿入エディットを正しくデコードできるかを検証
     @Test("LSPClient decodes both completion response shapes and insertion edits")
     func lspClientDecodesCompletions() throws {
         let text = "thing.ti"
@@ -1031,6 +1075,7 @@ struct RollCodeTests {
         #expect(arrayItems.map(\.insertText) == ["map(transform)"])
     }
 
+    // LSPClient がドキュメントのフォーマット編集を逆順で正しく適用できるかを検証
     @Test("LSPClient applies document formatting edits in reverse order")
     func lspClientAppliesFormattingEdits() {
         let text = "let x=1\n"
@@ -1056,6 +1101,7 @@ struct RollCodeTests {
         #expect(LSPClient.formattedText(from: response, text: text) == "let x = 1\n")
     }
 
+    // LSPClient が UTF-16 エディタ位置をネゴシエートされたエンコーディング (UTF-8, UTF-16, UTF-32) に正しく変換するかを検証
     @Test("LSPClient converts UTF-16 editor positions to negotiated LSP encodings")
     func lspClientConvertsPositionEncodings() {
         let text = "😀abc"
@@ -1079,6 +1125,7 @@ struct RollCodeTests {
         ) == 1)
     }
 
+    // CodeCompletionService が非同期の LSP 補完とローカル補完のブレンドをサポートしているかを検証
     @Test("CodeCompletionService supports async completions blending")
     @MainActor
     func codeCompletionAsyncBlending() async {
@@ -1097,6 +1144,7 @@ struct RollCodeTests {
         #expect(matches.contains(where: { $0.insertText == "title" }))
     }
 
+    // MarkdownBlockParser がコードブロックと通常テキストを正しく抽出・分離できるかを検証
     @Test("MarkdownBlockParser extracts code blocks and plain text correctly")
     func markdownBlockParserExtractsBlocks() {
         let text = """
@@ -1113,6 +1161,7 @@ struct RollCodeTests {
         #expect(blocks[2] == .text("And conclusion."))
     }
 
+    // AgentSession が ANSI エスケープカラーシーケンスを綺麗に除去できるかを検証
     @Test("AgentSession strips ANSI color escape codes cleanly")
     func agentSessionStripsANSIEscapes() {
         let raw = "\u{001B}[32mSuccess\u{001B}[0m: \u{001B}[1mUpdated 2 files\u{001B}[0m"
@@ -1120,6 +1169,7 @@ struct RollCodeTests {
         #expect(stripped == "Success: Updated 2 files")
     }
 
+    // WorkspaceModel が UI フォントスケール（ズーム）の変更と永続化を正しく管理できるかを検証
     @Test("WorkspaceModel manages and persists uiFontScale levels")
     @MainActor
     func workspaceModelManagesUIFontSize() {
@@ -1154,6 +1204,7 @@ struct RollCodeTests {
         #expect(restored.uiFontSize == 16.5)
     }
 
+    // GeminiAuthService が保存された設定および projects.json から有効な Project ID を解決できるかを検証
     @Test("GeminiAuthService resolves effectiveProjectID from stored setting and projects.json")
     @MainActor
     func geminiAuthServiceResolvesProjectID() throws {
@@ -1190,6 +1241,7 @@ struct RollCodeTests {
         }
     }
 
+    // ModelCatalogService が Gemini API の JSON をパースしスピード階層を付与できるかを検証
     @Test("ModelCatalogService parses Gemini API JSON and assigns speed tiers")
     func modelCatalogServiceParsesGeminiModels() throws {
         let json = """
@@ -1222,6 +1274,7 @@ struct RollCodeTests {
         #expect(parsed[1].speedTier == .fast)
     }
 
+    // ModelCatalogService が Vertex AI 公開モデル JSON をパースし、非チャットモデルを除外して最新モデルを最上位にするかを検証
     @Test("ModelCatalogService parses Vertex AI publisher models JSON, filters non-chat, and ranks gemini-3.8-flash highest")
     func modelCatalogServiceParsesVertexGeminiModels() throws {
         let json = """
@@ -1262,6 +1315,7 @@ struct RollCodeTests {
         #expect(parsed[2].speedTier == .fast)
     }
 
+    // ModelCatalogService が思考力 (reasoning support) 対応の Codex キャッシュ JSON をパースできるかを検証
     @Test("ModelCatalogService parses Codex cache JSON with reasoning support")
     func modelCatalogServiceParsesCodexCache() throws {
         let json = """
@@ -1289,6 +1343,7 @@ struct RollCodeTests {
         #expect(parsed[1].speedTier == .fast)
     }
 
+    // AgentTokenUsage がトークン表記文字列を正しく解析できるかを検証
     @Test("AgentTokenUsage parses token descriptions accurately")
     func agentTokenUsageParsesDescriptions() throws {
         let usage1 = try #require(AgentTokenUsage.parse(from: "20 input · 10 cached · 5 output"))
@@ -1301,6 +1356,7 @@ struct RollCodeTests {
         #expect(usage2 == nil)
     }
 
+    // AgentSession がモデル選択、推論深度 (reasoning effort) を管理しトークン使用量を記録できるかを検証
     @Test("AgentSession manages model selection, reasoning effort, and tracks token usage")
     @MainActor
     func agentSessionManagesModelAndTracksTokens() async throws {
@@ -1335,6 +1391,7 @@ struct RollCodeTests {
         }
     }
 
+    // CodexAppServerClient JSONDictionary のキーアクセスとスレッド安全性を検証
     @Test("CodexAppServerClient JSONDictionary subscript and Sendable safety")
     @MainActor
     func codexAppServerServiceJSONDictionary() {
@@ -1348,6 +1405,7 @@ struct RollCodeTests {
         #expect((dict["nested"] as? [String: Any])?["name"] as? String == "gpt-5.6-sol")
     }
 
+    // AgentSession が useAppServer フラグとそのフォールバックをサポートしているかを検証
     @Test("AgentSession supports useAppServer flag and fallback")
     @MainActor
     func agentSessionSupportsUseAppServer() {
@@ -1358,6 +1416,7 @@ struct RollCodeTests {
         #expect(sessionExplicitTrue.useAppServer == true)
     }
 
+    // WorkspaceModel が自動保存有効化およびアプリテーマ設定の変更・永続化を正しく行えるかを検証
     @Test("WorkspaceModel manages autoSaveEnabled and appTheme preferences")
     @MainActor
     func workspaceModelManagesPreferences() {
@@ -1379,6 +1438,7 @@ struct RollCodeTests {
         #expect(model.appTheme.colorScheme == .light)
     }
 
+    // クエリが空のとき Quick Open で最近開いたファイル (MRU) が優先表示されるかを検証
     @Test("WorkspaceModel prioritizes recent files in quick open when query is empty")
     @MainActor
     func workspaceModelPrioritizesRecentFiles() throws {
@@ -1402,6 +1462,7 @@ struct RollCodeTests {
         }
     }
 
+    // EditorDocument のエンコーディング判定および表示名取得機能を検証
     @Test("EditorDocument supports encoding detection and display name")
     @MainActor
     func editorDocumentEncodingSupport() throws {
